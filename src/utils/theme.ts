@@ -1,0 +1,58 @@
+import type { AppConfig } from '../types/models'
+
+const PERSONAL_BG_KEY = 'esp_personal_bg_v1'
+
+type BgMode = 'gradient' | 'plain' | 'image'
+
+interface PersonalBackgroundSettings {
+  mode: BgMode
+  color: string
+  imageUrl: string
+}
+
+const defaultPersonalSettings: PersonalBackgroundSettings = {
+  mode: 'gradient',
+  color: '#0D0D0D',
+  imageUrl: ''
+}
+
+export function getPersonalBackgroundSettings(): PersonalBackgroundSettings {
+  try {
+    const raw = localStorage.getItem(PERSONAL_BG_KEY)
+    if (!raw) return defaultPersonalSettings
+    const parsed = JSON.parse(raw) as Partial<PersonalBackgroundSettings>
+    const mode: BgMode = parsed.mode === 'plain' || parsed.mode === 'image' ? parsed.mode : 'gradient'
+    return {
+      mode,
+      color: parsed.color || defaultPersonalSettings.color,
+      imageUrl: parsed.imageUrl || ''
+    }
+  } catch {
+    return defaultPersonalSettings
+  }
+}
+
+export function setPersonalBackgroundSettings(next: PersonalBackgroundSettings) {
+  localStorage.setItem(PERSONAL_BG_KEY, JSON.stringify(next))
+}
+
+function applyBackground(mode: BgMode, color: string, imageUrl: string) {
+  const root = document.documentElement
+  root.setAttribute('data-app-bg-mode', mode)
+  root.style.setProperty('--app-bg-mode', mode)
+  root.style.setProperty('--app-bg-color', color || '#0D0D0D')
+  root.style.setProperty('--app-bg-image', imageUrl ? `url("${imageUrl}")` : 'none')
+}
+
+export function applyTheme(cfg: Pick<AppConfig, 'primary_color' | 'secondary_color' | 'background_mode' | 'background_color' | 'background_image_url'>) {
+  const root = document.documentElement
+  root.style.setProperty('--color-primary', cfg.primary_color)
+  root.style.setProperty('--color-secondary', cfg.secondary_color)
+  applyBackground(cfg.background_mode, cfg.background_color, cfg.background_image_url)
+
+  const personal = getPersonalBackgroundSettings()
+  if (personal.mode !== 'gradient') {
+    applyBackground(personal.mode, personal.color, personal.imageUrl)
+  }
+}
+

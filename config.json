@@ -1,0 +1,48 @@
+{
+  "app_name": "ระบบจัดการสต็อกองค์กร",
+  "app_logo_url": "",
+  "primary_color": "#FF7300",
+  "secondary_color": "#000000",
+  "default_language": "th",
+  "date_format": "DD/MM/YYYY",
+  "currency": "THB",
+  "timezone": "Asia/Bangkok",
+  "min_stock_threshold": 10,
+  "max_backup_files": 30,
+  "backup_interval_hours": 6,
+  "google_sheets_id": "1tYqpnWwIeKl5zRP83GBoAPaVB0zy8nbpRC3SDVayZfM",
+  "google_service_account_key_path": "C:\\Stock Penaek Webapp\\credentials\\google_key.json",
+  "line_token_stock": "",
+  "line_token_admin": "",
+  "line_token_accountant": "",
+  "line_token_owner": "",
+  "line_token_dev": "",
+  "summary_time_daily": "22:00",
+  "session_max_per_user": 3,
+  "jwt_secret": "CHANGE_ME_IN_INSTALLER",
+  "login_secret_phrase": "",
+  "smtp_host": "",
+  "google_sheets": {
+    "sheet_id": "1tYqpnWwIeKl5zRP83GBoAPaVB0zy8nbpRC3SDVayZfM",
+    "service_account_key_path": "C:\\Stock Penaek Webapp\\credentials\\google_key.json",
+    "sync_interval_seconds": 30
+  },
+  "web_url": "",
+  "background_mode": "gradient",
+  "background_color": "#0D0D0D",
+  "background_image_url": "",
+  "notification_enabled": true,
+  "notification_low_levels_pct": [
+    50,
+    20,
+    10,
+    0
+  ],
+  "notification_high_levels_pct": [
+    100
+  ],
+  "notification_roles": [
+    "STOCK",
+    "OWNER"
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "app": {
+    "name": "Enterprise Stock Platform",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "logout": "Logout",
+    "searchPlaceholder": "Scan barcode / Type product name or SKU...",
+    "openCamera": "📷 Open Camera",
+    "closeCamera": "Close Camera",
+    "copyLink": "🔗 Copy Link",
+    "copied": "Link copied to clipboard",
+    "printQR": "🖨️ Print QR / Barcode",
+    "noActivity": "No activity yet.",
+    "productNotFound": "Product not found",
+    "backToHome": "Back to Dashboard",
+    "managedBy": "Managed by"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "transactions": "Transactions",
+    "reports": "Reports",
+    "ownerInsights": "Owner Insights",
+    "adminUsers": "Users",
+    "settings": "Settings",
+    "devTools": "Dev Tools"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "totp": "TOTP code",
+    "secretPhrase": "Secret phrase",
+    "submit": "Sign in",
+    "invalidCredentials": "Invalid username or password",
+    "locked": "Temporarily locked. Please try again later."
+  },
+  "dashboard": {
+    "stock": {
+      "title": "Product Search (Stock Dashboard)",
+      "totalProducts": "Total Products",
+      "lowStock": "Low Stock",
+      "outOfStock": "Out of Stock",
+      "scannedToday": "Scanned Today"
+    },
+    "admin": {
+      "pendingApproval": "Pending Approval",
+      "todayMovement": "Today's Movement",
+      "needRestock": "Needs Restock"
+    },
+    "accountant": {
+      "todayRevenue": "Today's Revenue",
+      "todayExpense": "Today's Expense",
+      "cogs": "Cost of Goods Sold",
+      "grossProfit": "Gross Profit",
+      "margin": "Margin %",
+      "stockValue": "Stock Value (Cost)"
+    },
+    "owner": {
+      "totalProducts": "Total Products",
+      "stockValue": "Total Stock Value",
+      "dailyRevenue": "Daily Revenue",
+      "usersOnline": "Users Online",
+      "liveActivity": "Live Activity"
+    }
+  },
+  "product": {
+    "detailTitle": "Product Details",
+    "sku": "SKU",
+    "category": "Category",
+    "type": "Type",
+    "status": "Status",
+    "currentStock": "Current Stock",
+    "shouldHave": "Target Max",
+    "needRestock": "Need to Restock",
+    "publicScan": "Scan for details",
+    "barcode": "Product Barcode",
+    "stockIn": "Stock In",
+    "stockOut": "Stock Out",
+    "adjustQty": "Quantity",
+    "reason": "Reason / Note",
+    "adjustSuccess": "Stock adjusted successfully",
+    "insufficientStock": "Insufficient stock"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Theme / Language / Limits",
+    "appName": "App name",
+    "webUrl": "Web URL (for QR/share)",
+    "defaultLanguage": "Default language",
+    "primaryColor": "Primary color",
+    "secondaryColor": "Secondary color",
+    "sessionMax": "Max sessions per user",
+    "minStockThreshold": "Default min stock threshold",
+    "backupIntervalHours": "Backup interval (hours)",
+    "maxBackupFiles": "Max backup files",
+    "reset": "Reset",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Save failed"
+  },
+  "stockStatus": {
+    "FULL": "Full",
+    "NORMAL": "Normal",
+    "LOW": "Low",
+    "CRITICAL": "Critical",
+    "OUT": "Out",
+    "TEST": "Test"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "forbidden": "Access denied",
+    "notFound": "Not found"
+  }
+}
+

@@ -1,0 +1,118 @@
+{
+  "app": {
+    "name": "ระบบจัดการสต็อกองค์กร",
+    "loading": "กำลังโหลด...",
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "confirm": "ยืนยัน",
+    "logout": "ออกจากระบบ",
+    "searchPlaceholder": "แสกนบาร์โค้ด / พิมพ์ชื่อสินค้า หรือ SKU...",
+    "openCamera": "📷 เปิดกล้อง",
+    "closeCamera": "ปิดกล้อง",
+    "copyLink": "🔗 คัดลอกลิงก์",
+    "copied": "คัดลอกลิงก์แล้ว",
+    "printQR": "🖨️ พิมพ์ QR / บาร์โค้ด",
+    "noActivity": "ยังไม่มีความเคลื่อนไหว",
+    "productNotFound": "ไม่พบสินค้า",
+    "backToHome": "กลับหน้าหลัก",
+    "managedBy": "จัดการโดย"
+  },
+  "nav": {
+    "dashboard": "แดชบอร์ด",
+    "products": "สินค้า",
+    "transactions": "ธุรกรรม",
+    "reports": "รายงาน",
+    "ownerInsights": "สำหรับเจ้าของ",
+    "adminUsers": "ผู้ใช้",
+    "settings": "ตั้งค่า",
+    "devTools": "เครื่องมือ Dev"
+  },
+  "auth": {
+    "loginTitle": "เข้าสู่ระบบ",
+    "username": "ชื่อผู้ใช้",
+    "password": "รหัสผ่าน",
+    "totp": "รหัสยืนยัน (TOTP)",
+    "secretPhrase": "รหัสลับ",
+    "submit": "เข้าสู่ระบบ",
+    "invalidCredentials": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+    "locked": "ถูกล็อกชั่วคราว กรุณาลองใหม่ภายหลัง"
+  },
+  "dashboard": {
+    "stock": {
+      "title": "ค้นหาสินค้า (Stock Dashboard)",
+      "totalProducts": "รายการสินค้าทั้งหมด",
+      "lowStock": "สินค้าใกล้หมด",
+      "outOfStock": "สินค้าหมด",
+      "scannedToday": "สแกนวันนี้"
+    },
+    "admin": {
+      "pendingApproval": "รออนุมัติรับเข้า",
+      "todayMovement": "ความเคลื่อนไหววันนี้",
+      "needRestock": "สินค้าที่ต้องสั่งเพิ่ม"
+    },
+    "accountant": {
+      "todayRevenue": "รายรับวันนี้",
+      "todayExpense": "รายจ่ายวันนี้",
+      "cogs": "ต้นทุนขาย",
+      "grossProfit": "กำไรขั้นต้น",
+      "margin": "อัตรากำไร (%)",
+      "stockValue": "มูลค่าสต็อก (ต้นทุน)"
+    },
+    "owner": {
+      "totalProducts": "จำนวนสินค้าทั้งหมด",
+      "stockValue": "มูลค่าสต็อกรวม",
+      "dailyRevenue": "รายรับวันนี้",
+      "usersOnline": "ผู้ใช้ออนไลน์",
+      "liveActivity": "ความเคลื่อนไหวล่าสุด"
+    }
+  },
+  "product": {
+    "detailTitle": "รายละเอียดสินค้า",
+    "sku": "รหัสสินค้า (SKU)",
+    "category": "หมวดหมู่",
+    "type": "ประเภท",
+    "status": "สถานะ",
+    "currentStock": "คงเหลือปัจจุบัน",
+    "shouldHave": "ควรมี",
+    "needRestock": "ต้องเติม",
+    "publicScan": "สแกนดูรายละเอียด",
+    "barcode": "บาร์โค้ดสินค้า",
+    "stockIn": "รับเข้า",
+    "stockOut": "เบิกออก",
+    "adjustQty": "จำนวน",
+    "reason": "หมายเหตุ / เหตุผล",
+    "adjustSuccess": "ปรับปรุงสต็อกสำเร็จ",
+    "insufficientStock": "สต็อกไม่เพียงพอ"
+  },
+  "settings": {
+    "title": "ตั้งค่า",
+    "subtitle": "ธีม / ภาษา / ขีดจำกัด",
+    "appName": "ชื่อระบบ",
+    "webUrl": "ลิงก์สำหรับ QR/แชร์ (Web URL)",
+    "defaultLanguage": "ภาษาเริ่มต้น",
+    "primaryColor": "สีหลัก",
+    "secondaryColor": "สีรอง",
+    "sessionMax": "จำนวน session สูงสุดต่อผู้ใช้",
+    "minStockThreshold": "ค่าเริ่มต้นขั้นต่ำของสต็อก",
+    "backupIntervalHours": "ช่วงเวลาสำรองข้อมูล (ชั่วโมง)",
+    "maxBackupFiles": "จำนวนไฟล์สำรองสูงสุด",
+    "reset": "รีเซ็ต",
+    "save": "บันทึก",
+    "saved": "บันทึกแล้ว",
+    "saveFailed": "บันทึกไม่สำเร็จ"
+  },
+  "stockStatus": {
+    "FULL": "เต็ม",
+    "NORMAL": "ปกติ",
+    "LOW": "ใกล้หมด",
+    "CRITICAL": "ควรเติม",
+    "OUT": "หมด",
+    "TEST": "ทดสอบ"
+  },
+  "errors": {
+    "generic": "เกิดข้อผิดพลาด กรุณาลองใหม่",
+    "forbidden": "ไม่มีสิทธิ์เข้าถึง",
+    "notFound": "ไม่พบข้อมูล"
+  }
+}
+
