@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && npx vite build",
+    "build": "npx tsc -b && npx vite build", 
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier . --write"
-  },
+}
   "dependencies": {
     "@zxing/browser": "^0.1.5",
     "axios": "^1.7.9",
