@@ -35,6 +35,15 @@ def _clean_roles(roles: list[str]) -> list[str]:
     return out
 
 
+def _mask_token(value: str) -> str:
+    token = (value or "").strip()
+    if not token:
+        return ""
+    if len(token) <= 8:
+        return "*" * len(token)
+    return f"{token[:4]}...{token[-4:]}"
+
+
 @router.get("/config", response_model=NotificationConfigOut, dependencies=[Depends(require_roles([Role.DEV]))])
 async def get_notification_config():
     cfg = load_master_config()
@@ -53,6 +62,22 @@ async def get_notification_config():
         low_levels_pct=_clean_levels(low_levels),
         high_levels_pct=_clean_levels(high_levels),
         roles=_clean_roles(roles),
+        line_token_status={
+            "OWNER": _mask_token(str(cfg.get("line_token_owner") or "")),
+            "ADMIN": _mask_token(str(cfg.get("line_token_admin") or "")),
+            "STOCK": _mask_token(str(cfg.get("line_token_stock") or "")),
+            "ACCOUNTANT": _mask_token(str(cfg.get("line_token_accountant") or "")),
+            "DEV": _mask_token(str(cfg.get("line_token_dev") or "")),
+        },
+        include_name=bool(cfg.get("notification_include_name", True)),
+        include_sku=bool(cfg.get("notification_include_sku", True)),
+        include_status=bool(cfg.get("notification_include_status", True)),
+        include_current_qty=bool(cfg.get("notification_include_current_qty", True)),
+        include_target_qty=bool(cfg.get("notification_include_target_qty", True)),
+        include_restock_qty=bool(cfg.get("notification_include_restock_qty", True)),
+        include_actor=bool(cfg.get("notification_include_actor", True)),
+        include_reason=bool(cfg.get("notification_include_reason", True)),
+        include_image_url=bool(cfg.get("notification_include_image_url", False)),
     )
 
 
@@ -69,6 +94,19 @@ async def update_notification_config(payload: NotificationConfigUpdateIn):
     cfg["notification_low_levels_pct"] = sorted(low, reverse=True)
     cfg["notification_high_levels_pct"] = sorted(high)
     cfg["notification_roles"] = roles
+    for role in ("owner", "admin", "stock", "accountant", "dev"):
+        provided = (payload.line_tokens or {}).get(role.upper())
+        if provided is not None:
+            cfg[f"line_token_{role}"] = str(provided).strip()
+    cfg["notification_include_name"] = bool(payload.include_name)
+    cfg["notification_include_sku"] = bool(payload.include_sku)
+    cfg["notification_include_status"] = bool(payload.include_status)
+    cfg["notification_include_current_qty"] = bool(payload.include_current_qty)
+    cfg["notification_include_target_qty"] = bool(payload.include_target_qty)
+    cfg["notification_include_restock_qty"] = bool(payload.include_restock_qty)
+    cfg["notification_include_actor"] = bool(payload.include_actor)
+    cfg["notification_include_reason"] = bool(payload.include_reason)
+    cfg["notification_include_image_url"] = bool(payload.include_image_url)
     write_master_config(cfg)
 
     return NotificationConfigOut(
@@ -76,5 +114,21 @@ async def update_notification_config(payload: NotificationConfigUpdateIn):
         low_levels_pct=sorted(low, reverse=True),
         high_levels_pct=sorted(high),
         roles=roles,
+        line_token_status={
+            "OWNER": _mask_token(str(cfg.get("line_token_owner") or "")),
+            "ADMIN": _mask_token(str(cfg.get("line_token_admin") or "")),
+            "STOCK": _mask_token(str(cfg.get("line_token_stock") or "")),
+            "ACCOUNTANT": _mask_token(str(cfg.get("line_token_accountant") or "")),
+            "DEV": _mask_token(str(cfg.get("line_token_dev") or "")),
+        },
+        include_name=bool(cfg.get("notification_include_name", True)),
+        include_sku=bool(cfg.get("notification_include_sku", True)),
+        include_status=bool(cfg.get("notification_include_status", True)),
+        include_current_qty=bool(cfg.get("notification_include_current_qty", True)),
+        include_target_qty=bool(cfg.get("notification_include_target_qty", True)),
+        include_restock_qty=bool(cfg.get("notification_include_restock_qty", True)),
+        include_actor=bool(cfg.get("notification_include_actor", True)),
+        include_reason=bool(cfg.get("notification_include_reason", True)),
+        include_image_url=bool(cfg.get("notification_include_image_url", False)),
     )
 

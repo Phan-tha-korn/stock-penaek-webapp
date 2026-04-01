@@ -387,12 +387,12 @@ function StockDashboard() {
     try {
       const s = await fetchStockSummary()
       setSummary({
-        totalProducts: s.total_products,
-        fullStock: s.full,
-        normalStock: s.normal,
-        lowStock: s.low,
-        criticalStock: s.critical,
-        outOfStock: s.out,
+        totalProducts: Number(s.total_products ?? 0),
+        fullStock: Number(s.full ?? 0),
+        normalStock: Number((s as any).normal ?? 0),
+        lowStock: Number(s.low ?? 0),
+        criticalStock: Number(s.critical ?? 0),
+        outOfStock: Number(s.out ?? 0),
       })
       setSummaryReady(true)
     } finally {

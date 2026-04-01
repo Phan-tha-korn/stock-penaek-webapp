@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { api } from '../../services/api'
 import { createDevBackup, getDevBackupDownloadUrl, restoreDevBackup } from '../../services/devBackup'
@@ -14,6 +15,7 @@ import type { ActivityItem } from '../../services/dashboard'
 import type { AppConfig } from '../../types/models'
 
 export function DevPage() {
+  const navigate = useNavigate()
   const role = useAuthStore((s) => s.role)
   const canUse = role === 'DEV'
 
@@ -51,6 +53,19 @@ export function DevPage() {
   const [notifRoles, setNotifRoles] = useState<string[]>([])
   const [notifLowInput, setNotifLowInput] = useState('')
   const [notifHighInput, setNotifHighInput] = useState('')
+  const [notifTokenStatus, setNotifTokenStatus] = useState<Record<string, string>>({})
+  const [notifLineTokens, setNotifLineTokens] = useState<Record<string, string>>({})
+  const [notifTokenRole, setNotifTokenRole] = useState<string | null>(null)
+  const [notifTokenInput, setNotifTokenInput] = useState('')
+  const [notifIncludeName, setNotifIncludeName] = useState(true)
+  const [notifIncludeSku, setNotifIncludeSku] = useState(true)
+  const [notifIncludeStatus, setNotifIncludeStatus] = useState(true)
+  const [notifIncludeCurrentQty, setNotifIncludeCurrentQty] = useState(true)
+  const [notifIncludeTargetQty, setNotifIncludeTargetQty] = useState(true)
+  const [notifIncludeRestockQty, setNotifIncludeRestockQty] = useState(true)
+  const [notifIncludeActor, setNotifIncludeActor] = useState(true)
+  const [notifIncludeReason, setNotifIncludeReason] = useState(true)
+  const [notifIncludeImageUrl, setNotifIncludeImageUrl] = useState(false)
   const [secureAction, setSecureAction] = useState<'backup' | 'restore' | 'reset' | null>(null)
   const [securePassword, setSecurePassword] = useState('')
 
@@ -173,6 +188,16 @@ export function DevPage() {
         setNotifLow(cfg.low_levels_pct || [])
         setNotifHigh(cfg.high_levels_pct || [])
         setNotifRoles(cfg.roles || [])
+        setNotifTokenStatus(cfg.line_token_status || {})
+        setNotifIncludeName(cfg.include_name !== false)
+        setNotifIncludeSku(cfg.include_sku !== false)
+        setNotifIncludeStatus(cfg.include_status !== false)
+        setNotifIncludeCurrentQty(cfg.include_current_qty !== false)
+        setNotifIncludeTargetQty(cfg.include_target_qty !== false)
+        setNotifIncludeRestockQty(cfg.include_restock_qty !== false)
+        setNotifIncludeActor(cfg.include_actor !== false)
+        setNotifIncludeReason(cfg.include_reason !== false)
+        setNotifIncludeImageUrl(Boolean(cfg.include_image_url))
       } catch (e: any) {
         setNotifMsg(e?.response?.data?.detail || e?.message || 'โหลดการตั้งค่าแจ้งเตือนไม่สำเร็จ')
       }
@@ -200,7 +225,22 @@ export function DevPage() {
         <div className="mt-1 text-xs text-white/60">Health / Config / Activity / Google Sheets</div>
       </div>
 
-      <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
+      <div className="card relative overflow-hidden rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
+        {!sheetsCfg?.enabled ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-md">
+            <div className="mx-4 max-w-lg rounded-2xl border border-white/10 bg-[color:var(--color-card)]/90 p-6 text-center shadow-2xl">
+              <div className="text-lg font-semibold">ยังไม่ได้ตั้งค่า Google Sheets</div>
+              <div className="mt-2 text-sm text-white/65">ไปที่หน้า Config เพื่อกำหนด Gmail, path credentials และให้ระบบสร้าง/เชื่อม Google Sheets อัตโนมัติก่อนใช้งานโซนนี้</div>
+              <button
+                className="mt-4 rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+                type="button"
+                onClick={() => navigate('/settings#google-setup')}
+              >
+                ไปตั้งค่า Google ใน Config
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold">Garbage File Management</div>
@@ -416,12 +456,33 @@ export function DevPage() {
                     enabled: notifEnabled,
                     low_levels_pct: notifLow,
                     high_levels_pct: notifHigh,
-                    roles: notifRoles
+                    roles: notifRoles,
+                    line_tokens: notifLineTokens,
+                    include_name: notifIncludeName,
+                    include_sku: notifIncludeSku,
+                    include_status: notifIncludeStatus,
+                    include_current_qty: notifIncludeCurrentQty,
+                    include_target_qty: notifIncludeTargetQty,
+                    include_restock_qty: notifIncludeRestockQty,
+                    include_actor: notifIncludeActor,
+                    include_reason: notifIncludeReason,
+                    include_image_url: notifIncludeImageUrl,
                   })
                   setNotifEnabled(Boolean(res.enabled))
                   setNotifLow(res.low_levels_pct || [])
                   setNotifHigh(res.high_levels_pct || [])
                   setNotifRoles(res.roles || [])
+                  setNotifTokenStatus(res.line_token_status || {})
+                  setNotifLineTokens({})
+                  setNotifIncludeName(res.include_name !== false)
+                  setNotifIncludeSku(res.include_sku !== false)
+                  setNotifIncludeStatus(res.include_status !== false)
+                  setNotifIncludeCurrentQty(res.include_current_qty !== false)
+                  setNotifIncludeTargetQty(res.include_target_qty !== false)
+                  setNotifIncludeRestockQty(res.include_restock_qty !== false)
+                  setNotifIncludeActor(res.include_actor !== false)
+                  setNotifIncludeReason(res.include_reason !== false)
+                  setNotifIncludeImageUrl(Boolean(res.include_image_url))
                   setNotifMsg('บันทึกการตั้งค่าแจ้งเตือนแล้ว')
                 } catch (e: any) {
                   setNotifMsg(e?.response?.data?.detail || e?.message || 'บันทึกการตั้งค่าแจ้งเตือนไม่สำเร็จ')
@@ -608,7 +669,101 @@ export function DevPage() {
             หมายเหตุ: การแจ้งเตือนจะส่งผ่าน LINE Notify ตาม token ของ role ที่ตั้งไว้ใน config.json
           </div>
         </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+            <div className="text-xs font-semibold text-white/80">รายละเอียดที่ให้แจ้งใน LINE</div>
+            <div className="mt-1 text-xs text-white/50">เลือกได้หลายหัวข้อ และ token สามารถเป็น token ของ LINE ส่วนตัวหรือ group ที่สร้างไว้ได้</div>
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+              {[
+                { label: 'ชื่อสินค้า', checked: notifIncludeName, setter: setNotifIncludeName },
+                { label: 'SKU', checked: notifIncludeSku, setter: setNotifIncludeSku },
+                { label: 'สถานะ', checked: notifIncludeStatus, setter: setNotifIncludeStatus },
+                { label: 'จำนวนคงเหลือ', checked: notifIncludeCurrentQty, setter: setNotifIncludeCurrentQty },
+                { label: 'จำนวนที่ควรมี', checked: notifIncludeTargetQty, setter: setNotifIncludeTargetQty },
+                { label: 'จำนวนที่ต้องเติม', checked: notifIncludeRestockQty, setter: setNotifIncludeRestockQty },
+                { label: 'ผู้ทำรายการ', checked: notifIncludeActor, setter: setNotifIncludeActor },
+                { label: 'เหตุผล/หมายเหตุ', checked: notifIncludeReason, setter: setNotifIncludeReason },
+                { label: 'ลิงก์รูปสินค้า', checked: notifIncludeImageUrl, setter: setNotifIncludeImageUrl },
+              ].map((item) => (
+                <label key={item.label} className="flex items-center gap-2 rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80">
+                  <input type="checkbox" checked={item.checked} onChange={(e) => item.setter(e.target.checked)} />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+            <div className="text-xs font-semibold text-white/80">จัดการ LINE Token แยกตาม Role</div>
+            <div className="mt-1 text-xs text-white/50">กดเลือก role แล้วระบบจะให้กรอก token แบบ popup ก่อนบันทึก</div>
+            <div className="mt-3 space-y-2">
+              {(['OWNER', 'ADMIN', 'STOCK', 'ACCOUNTANT', 'DEV'] as const).map((roleName) => (
+                <div key={roleName} className="flex items-center justify-between gap-2 rounded border border-[color:var(--color-border)] px-3 py-2">
+                  <div>
+                    <div className="text-sm font-semibold">{roleName}</div>
+                    <div className="text-xs text-white/50">{notifTokenStatus[roleName] ? `ตั้งค่าแล้ว: ${notifTokenStatus[roleName]}` : 'ยังไม่มี token'}</div>
+                  </div>
+                  <button
+                    className="rounded border border-[color:var(--color-border)] px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+                    type="button"
+                    onClick={() => {
+                      setNotifTokenRole(roleName)
+                      setNotifTokenInput('')
+                    }}
+                  >
+                    ตั้งค่า Token
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
+
+      {notifTokenRole ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="w-full max-w-md rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)] shadow-2xl">
+              <div className="border-b border-[color:var(--color-border)] px-5 py-4 text-sm font-semibold">ตั้งค่า LINE Token สำหรับ {notifTokenRole}</div>
+              <div className="space-y-3 px-5 py-4">
+                <div className="text-sm text-white/70">รองรับ token ที่ใช้แจ้งเข้า LINE ส่วนตัวหรือ LINE Group ที่สร้าง token ไว้แล้ว</div>
+                <input
+                  className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                  value={notifTokenInput}
+                  onChange={(e) => setNotifTokenInput(e.target.value)}
+                  placeholder="วาง LINE token ที่นี่"
+                />
+              </div>
+              <div className="flex justify-end gap-2 border-t border-[color:var(--color-border)] px-5 py-4">
+                <button
+                  className="rounded border border-[color:var(--color-border)] px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+                  type="button"
+                  onClick={() => {
+                    setNotifTokenRole(null)
+                    setNotifTokenInput('')
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+                  type="button"
+                  onClick={() => {
+                    setNotifLineTokens((prev) => ({ ...prev, [notifTokenRole]: notifTokenInput.trim() }))
+                    setNotifTokenStatus((prev) => ({ ...prev, [notifTokenRole]: notifTokenInput.trim() ? `${notifTokenInput.trim().slice(0, 4)}...${notifTokenInput.trim().slice(-4)}` : '' }))
+                    setNotifTokenRole(null)
+                    setNotifTokenInput('')
+                    setNotifMsg(`เตรียม token สำหรับ ${notifTokenRole} แล้ว กดบันทึกเพื่อใช้งานจริง`)
+                  }}
+                >
+                  ใช้ Token นี้
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {secureAction ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">

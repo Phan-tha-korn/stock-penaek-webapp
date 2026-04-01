@@ -44,10 +44,29 @@ function applyBackground(mode: BgMode, color: string, imageUrl: string) {
   root.style.setProperty('--app-bg-image', imageUrl ? `url("${imageUrl}")` : 'none')
 }
 
-export function applyTheme(cfg: Pick<AppConfig, 'primary_color' | 'secondary_color' | 'background_mode' | 'background_color' | 'background_image_url'>) {
+export function applyTheme(
+  cfg: Pick<
+    AppConfig,
+    | 'primary_color'
+    | 'secondary_color'
+    | 'background_mode'
+    | 'background_color'
+    | 'background_image_url'
+    | 'background_gradient_from'
+    | 'background_gradient_to'
+    | 'background_gradient_accent'
+    | 'background_blur_px'
+    | 'background_overlay_opacity'
+  >
+) {
   const root = document.documentElement
   root.style.setProperty('--color-primary', cfg.primary_color)
   root.style.setProperty('--color-secondary', cfg.secondary_color)
+  root.style.setProperty('--app-bg-gradient-from', cfg.background_gradient_from || '#0D0D0D')
+  root.style.setProperty('--app-bg-gradient-to', cfg.background_gradient_to || '#101826')
+  root.style.setProperty('--app-bg-gradient-accent', cfg.background_gradient_accent || '#1E6FD9')
+  root.style.setProperty('--app-bg-blur', `${Math.max(0, Number(cfg.background_blur_px || 0))}px`)
+  root.style.setProperty('--app-bg-overlay-opacity', `${Math.max(0, Math.min(95, Number(cfg.background_overlay_opacity || 35))) / 100}`)
   applyBackground(cfg.background_mode, cfg.background_color, cfg.background_image_url)
 
   const personal = getPersonalBackgroundSettings()

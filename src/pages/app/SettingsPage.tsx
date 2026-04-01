@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { fetchGoogleSetupConfig, updateGoogleSetupConfig, type GoogleSetupConfig } from '../../services/configSecure'
 import i18n from '../../services/i18n'
 import { updateConfig } from '../../services/config'
 import { useAuthStore } from '../../store/authStore'
@@ -31,10 +32,17 @@ export function SettingsPage() {
   const initial = useMemo<AppConfig | null>(() => config, [config])
   const [form, setForm] = useState<AppConfig | null>(initial)
   const [personal, setPersonal] = useState(getPersonalBackgroundSettings())
+  const [googleCfg, setGoogleCfg] = useState<GoogleSetupConfig | null>(null)
+  const [googleBusy, setGoogleBusy] = useState(false)
 
   useEffect(() => {
     if (config) setForm(config)
   }, [config])
+
+  useEffect(() => {
+    if (!canManageGlobal) return
+    fetchGoogleSetupConfig().then(setGoogleCfg).catch(() => {})
+  }, [canManageGlobal])
 
   if (!form) {
     return (
@@ -273,6 +281,50 @@ export function SettingsPage() {
               placeholder="https://..."
             />
           </Field>
+          <Field label="สีไล่เฉดเริ่มต้น">
+            <input
+              className="h-10 w-full rounded border border-[color:var(--color-border)] bg-black/30"
+              type="color"
+              value={form.background_gradient_from}
+              onChange={(e) => setForm({ ...form, background_gradient_from: e.target.value })}
+            />
+          </Field>
+          <Field label="สีไล่เฉดปลายทาง">
+            <input
+              className="h-10 w-full rounded border border-[color:var(--color-border)] bg-black/30"
+              type="color"
+              value={form.background_gradient_to}
+              onChange={(e) => setForm({ ...form, background_gradient_to: e.target.value })}
+            />
+          </Field>
+          <Field label="สีแสงเสริม">
+            <input
+              className="h-10 w-full rounded border border-[color:var(--color-border)] bg-black/30"
+              type="color"
+              value={form.background_gradient_accent}
+              onChange={(e) => setForm({ ...form, background_gradient_accent: e.target.value })}
+            />
+          </Field>
+          <Field label="ความเบลอพื้นหลัง (px)">
+            <input
+              className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              type="number"
+              min={0}
+              max={48}
+              value={form.background_blur_px}
+              onChange={(e) => setForm({ ...form, background_blur_px: Number(e.target.value) })}
+            />
+          </Field>
+          <Field label="ความเข้ม overlay (%)">
+            <input
+              className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              type="number"
+              min={0}
+              max={95}
+              value={form.background_overlay_opacity}
+              onChange={(e) => setForm({ ...form, background_overlay_opacity: Number(e.target.value) })}
+            />
+          </Field>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -317,6 +369,119 @@ export function SettingsPage() {
             {t('settings.save')}
           </button>
         </div>
+        </div>
+      ) : null}
+
+      {canManageGlobal ? (
+        <div id="google-setup" className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
+          <div className="mb-3 text-sm font-semibold">Google Sheets Setup Wizard</div>
+          <div className="mb-3 text-xs text-white/60">กำหนด Gmail/Drive/ชื่อไฟล์หลักของร้าน แล้วให้ระบบสร้างหรือสลับไปใช้ Google Sheets ใหม่อัตโนมัติ</div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Gmail ที่ใช้ดูแล Google Drive">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={googleCfg?.workspace_email || ''}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), workspace_email: e.target.value }))}
+                placeholder="owner@gmail.com"
+              />
+            </Field>
+            <Field label="ชื่อโฟลเดอร์ใน Google Drive">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={googleCfg?.drive_folder_name || ''}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), drive_folder_name: e.target.value }))}
+                placeholder="Stock Penaek Drive"
+              />
+            </Field>
+            <Field label="ชื่อไฟล์ Sheets หลัก">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={googleCfg?.default_sheet_title || ''}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), default_sheet_title: e.target.value }))}
+                placeholder="Stock Penaek Master"
+              />
+            </Field>
+            <Field label="Path ไฟล์ Google credentials">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={googleCfg?.service_account_key_path || ''}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), service_account_key_path: e.target.value }))}
+                placeholder="C:\Stock Penaek Webapp\credentials\google_key.json"
+              />
+            </Field>
+          </div>
+          <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3 text-xs text-white/65">
+            {googleCfg?.configured ? `พร้อมใช้งานแล้ว • Sheet ปัจจุบัน: ${googleCfg.current_sheet_id || '-'}` : 'ยังไม่ได้ตั้งค่า Google ให้พร้อมใช้งาน'}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
+              type="button"
+              disabled={googleBusy || !googleCfg}
+              onClick={async () => {
+                if (!googleCfg) return
+                setGoogleBusy(true)
+                setError(null)
+                setOk(null)
+                try {
+                  const next = await updateGoogleSetupConfig({
+                    workspace_email: googleCfg.workspace_email,
+                    drive_folder_name: googleCfg.drive_folder_name,
+                    default_sheet_title: googleCfg.default_sheet_title,
+                    service_account_key_path: googleCfg.service_account_key_path,
+                    create_new_sheet: false,
+                    migrate_existing_data: false,
+                  })
+                  setGoogleCfg(next)
+                  setOk('บันทึกข้อมูล Google แล้ว')
+                } catch (e: any) {
+                  setError(e?.response?.data?.detail || 'บันทึก Google config ไม่สำเร็จ')
+                } finally {
+                  setGoogleBusy(false)
+                }
+              }}
+            >
+              บันทึกข้อมูล Google
+            </button>
+            <button
+              className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+              type="button"
+              disabled={googleBusy || !googleCfg}
+              onClick={async () => {
+                if (!googleCfg) return
+                setGoogleBusy(true)
+                setError(null)
+                setOk(null)
+                try {
+                  const next = await updateGoogleSetupConfig({
+                    workspace_email: googleCfg.workspace_email,
+                    drive_folder_name: googleCfg.drive_folder_name,
+                    default_sheet_title: googleCfg.default_sheet_title,
+                    service_account_key_path: googleCfg.service_account_key_path,
+                    create_new_sheet: true,
+                    migrate_existing_data: true,
+                  })
+                  setGoogleCfg(next)
+                  setOk('สร้าง/สลับ Google Sheets ใหม่และ sync ข้อมูลแล้ว')
+                } catch (e: any) {
+                  setError(e?.response?.data?.detail || 'ตั้งค่า Google ไม่สำเร็จ')
+                } finally {
+                  setGoogleBusy(false)
+                }
+              }}
+            >
+              {googleBusy ? 'กำลังเชื่อม Google...' : 'เชื่อม Google และสร้าง Sheets อัตโนมัติ'}
+            </button>
+            {googleCfg?.current_sheet_url ? (
+              <button
+                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                type="button"
+                onClick={() => window.open(googleCfg.current_sheet_url, '_blank', 'noopener,noreferrer')}
+              >
+                เปิดชีตปัจจุบัน
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </div>

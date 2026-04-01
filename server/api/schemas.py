@@ -22,6 +22,11 @@ class PublicConfig(BaseModel):
     background_mode: str = "gradient"
     background_color: str = "#0D0D0D"
     background_image_url: str = ""
+    background_gradient_from: str = "#0D0D0D"
+    background_gradient_to: str = "#101826"
+    background_gradient_accent: str = "#1E6FD9"
+    background_blur_px: int = 0
+    background_overlay_opacity: int = 35
 
 
 class ConfigUpdateIn(BaseModel):
@@ -40,6 +45,11 @@ class ConfigUpdateIn(BaseModel):
     background_mode: str = "gradient"
     background_color: str = "#0D0D0D"
     background_image_url: str = ""
+    background_gradient_from: str = "#0D0D0D"
+    background_gradient_to: str = "#101826"
+    background_gradient_accent: str = "#1E6FD9"
+    background_blur_px: int = 0
+    background_overlay_opacity: int = 35
 
 
 class UserOut(BaseModel):
@@ -303,6 +313,16 @@ class NotificationConfigOut(BaseModel):
     low_levels_pct: list[int]
     high_levels_pct: list[int]
     roles: list[str]
+    line_token_status: dict[str, str] = {}
+    include_name: bool = True
+    include_sku: bool = True
+    include_status: bool = True
+    include_current_qty: bool = True
+    include_target_qty: bool = True
+    include_restock_qty: bool = True
+    include_actor: bool = True
+    include_reason: bool = True
+    include_image_url: bool = False
 
 
 class NotificationConfigUpdateIn(BaseModel):
@@ -310,4 +330,33 @@ class NotificationConfigUpdateIn(BaseModel):
     low_levels_pct: list[int] = []
     high_levels_pct: list[int] = []
     roles: list[str] = []
+    line_tokens: dict[str, str] = {}
+    include_name: bool = True
+    include_sku: bool = True
+    include_status: bool = True
+    include_current_qty: bool = True
+    include_target_qty: bool = True
+    include_restock_qty: bool = True
+    include_actor: bool = True
+    include_reason: bool = True
+    include_image_url: bool = False
+
+
+class GoogleSetupOut(BaseModel):
+    configured: bool
+    workspace_email: str = ""
+    drive_folder_name: str = ""
+    default_sheet_title: str = ""
+    service_account_key_path: str = ""
+    current_sheet_id: str = ""
+    current_sheet_url: str = ""
+
+
+class GoogleSetupIn(BaseModel):
+    workspace_email: str = ""
+    drive_folder_name: str = ""
+    default_sheet_title: str = ""
+    service_account_key_path: str = ""
+    create_new_sheet: bool = True
+    migrate_existing_data: bool = True
 

@@ -13,6 +13,11 @@
   --app-bg-mode: gradient;
   --app-bg-color: #0d0d0d;
   --app-bg-image: none;
+  --app-bg-gradient-from: #0d0d0d;
+  --app-bg-gradient-to: #101826;
+  --app-bg-gradient-accent: #1e6fd9;
+  --app-bg-blur: 0px;
+  --app-bg-overlay-opacity: 0.35;
 }
 
 html,
@@ -21,12 +26,13 @@ body {
 }
 
 .bg-app {
+  position: relative;
   background-color: var(--app-bg-color);
   background-image:
-    radial-gradient(800px 500px at 10% 0%, color-mix(in srgb, var(--color-primary) 25%, transparent), transparent 60%),
+    radial-gradient(800px 500px at 10% 0%, color-mix(in srgb, var(--app-bg-gradient-accent) 35%, transparent), transparent 60%),
     radial-gradient(900px 600px at 90% 10%, color-mix(in srgb, var(--color-secondary) 18%, transparent), transparent 65%),
     radial-gradient(900px 700px at 50% 100%, rgba(255, 255, 255, 0.06), transparent 55%),
-    var(--color-bg);
+    linear-gradient(135deg, var(--app-bg-gradient-from), var(--app-bg-gradient-to));
   background-size: cover;
   background-attachment: fixed;
 }
@@ -40,6 +46,15 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
+}
+
+.bg-app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(0, 0, 0, var(--app-bg-overlay-opacity));
+  backdrop-filter: blur(var(--app-bg-blur));
 }
 
 .text-app {

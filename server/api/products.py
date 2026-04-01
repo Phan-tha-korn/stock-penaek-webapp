@@ -31,6 +31,7 @@ from server.db.init_db import calc_status
 from server.services.audit import write_audit_log
 from server.services.media_store import choose_image_for_row, parse_products_csv, read_zip_payload, save_product_image_bytes
 from server.realtime.socket_manager import broadcast
+from server.config.config_loader import load_master_config
 from server.config.settings import settings
 
 
@@ -58,6 +59,32 @@ def _trigger_sheet_sync() -> None:
         asyncio.create_task(sync_all_to_sheets())
     except Exception:
         pass
+
+
+def _build_line_notification_message(*, product: Product, new_qty: float, new_pct: float, notify_messages: list[str], user: User, reason: str | None) -> str:
+    cfg = load_master_config()
+    lines = [f"[STOCK NOTICE] {product.name_th or product.sku}"]
+    if bool(cfg.get("notification_include_name", True)):
+        lines[0] = f"[STOCK NOTICE] {product.name_th or product.sku}"
+    if bool(cfg.get("notification_include_sku", True)):
+        lines.append(f"SKU: {product.sku}")
+    if bool(cfg.get("notification_include_status", True)):
+        lines.append(f"สถานะ: {product.status.value}")
+    if bool(cfg.get("notification_include_current_qty", True)):
+        lines.append(f"คงเหลือ: {new_qty} {product.unit}")
+    if bool(cfg.get("notification_include_target_qty", True)):
+        lines.append(f"ควรมี: {float(product.max_stock)} {product.unit}")
+    if bool(cfg.get("notification_include_restock_qty", True)):
+        lines.append(f"ต้องเติม: {max(0.0, float(product.max_stock) - new_qty)} {product.unit}")
+    lines.append(f"เปอร์เซ็นต์: {new_pct:.1f}%")
+    lines.append(f"เหตุการณ์: {', '.join(notify_messages)}")
+    if bool(cfg.get("notification_include_actor", True)):
+        lines.append(f"ผู้ทำรายการ: {user.username} ({user.role.value})")
+    if bool(cfg.get("notification_include_reason", True)):
+        lines.append(f"หมายเหตุ: {reason or '-'}")
+    if bool(cfg.get("notification_include_image_url", False)) and product.image_url:
+        lines.append(f"รูปสินค้า: {product.image_url}")
+    return "\n" + "\n".join(lines)
 
 
 def _to_out(p: Product) -> ProductOut:
@@ -921,15 +948,13 @@ async def adjust_stock(
                             import asyncio
                             from server.services.line import send_line_notify
 
-                            name = product.name_th or product.sku
-                            msg = (
-                                f"\n[STOCK NOTICE] {name}\n"
-                                f"SKU: {product.sku}\n"
-                                f"คงเหลือ: {new_qty} {product.unit} (ควรมี: {float(product.max_stock)} {product.unit})\n"
-                                f"เปอร์เซ็นต์: {new_pct:.1f}%\n"
-                                f"เหตุการณ์: {', '.join(notify_messages)}\n"
-                                f"ผู้ทำรายการ: {user.username} ({user.role.value})\n"
-                                f"หมายเหตุ: {payload.reason or '-'}"
+                            msg = _build_line_notification_message(
+                                product=product,
+                                new_qty=new_qty,
+                                new_pct=new_pct,
+                                notify_messages=notify_messages,
+                                user=user,
+                                reason=payload.reason,
                             )
                             for r in (settings.notification_roles or []):
                                 asyncio.create_task(send_line_notify(str(r), msg))

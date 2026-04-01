@@ -16,6 +16,11 @@ export interface AppConfig {
   background_mode: 'gradient' | 'plain' | 'image'
   background_color: string
   background_image_url: string
+  background_gradient_from: string
+  background_gradient_to: string
+  background_gradient_accent: string
+  background_blur_px: number
+  background_overlay_opacity: number
 }
 
 export interface User {

@@ -29,6 +29,15 @@ export function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-lg items-center px-4">
+      {busy ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[color:var(--color-card)]/90 p-6 text-center shadow-2xl">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-[color:var(--color-primary)]" />
+            <div className="mt-4 text-base font-semibold">กำลังเข้าสู่ระบบ</div>
+            <div className="mt-1 text-sm text-white/60">กรุณารอสักครู่ ระบบกำลังตรวจสอบสิทธิ์และเตรียมข้อมูลให้พร้อม</div>
+          </div>
+        </div>
+      ) : null}
       <div className="card w-full rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-5 backdrop-blur animate-fade-in">
         <div className="mb-4 text-lg font-semibold">{t('auth.loginTitle')}</div>
         {reauthReason === 'session_expired' ? (
@@ -102,9 +111,6 @@ export function LoginPage() {
             {t('auth.submit')}
           </button>
         </form>
-        <div className="mt-4 text-xs text-white/60">
-          Demo: owner / Owner@1234, admin / Admin@1234, stock / Stock@1234, accountant / Acc@1234, dev / Dev@1234
-        </div>
       </div>
     </div>
   )
