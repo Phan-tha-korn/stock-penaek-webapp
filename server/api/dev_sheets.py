@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import csv
+import io
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from server.api.deps import require_roles
@@ -36,6 +40,9 @@ class DevSheetsConfigOut(BaseModel):
     stock_tab_url: str
     accounting_tab_url: str
     logs_tab_url: str
+    stock_download_url: str
+    accounting_download_url: str
+    logs_download_url: str
 
 
 class DevSheetsCreateIn(BaseModel):
@@ -80,6 +87,9 @@ async def get_sheets_config():
         stock_tab_url=stock_tab_url,
         accounting_tab_url=accounting_tab_url,
         logs_tab_url=logs_tab_url,
+        stock_download_url="/api/dev/sheets/export/stock" if enabled else "",
+        accounting_download_url="/api/dev/sheets/export/accounting" if enabled else "",
+        logs_download_url="/api/dev/sheets/export/logs" if enabled else "",
     )
 
 
@@ -137,3 +147,35 @@ async def create_new_sheet(payload: DevSheetsCreateIn):
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="create_failed")
+
+
+@router.get("/export/{kind}", dependencies=[Depends(require_roles([Role.DEV, Role.OWNER, Role.ADMIN, Role.ACCOUNTANT]))])
+async def export_sheet(kind: str):
+    mapping = {
+        "stock": TAB_STOCK,
+        "accounting": TAB_ACCOUNTING,
+        "logs": TAB_AUDIT_LOG,
+    }
+    tab = mapping.get((kind or "").strip().lower())
+    if not tab:
+        raise HTTPException(status_code=400, detail="invalid_export_kind")
+    client = get_client()
+    cfg = load_master_config()
+    sheet_id = str(cfg.get("google_sheets_id") or cfg.get("google_sheets", {}).get("sheet_id") or "")
+    if not client or not sheet_id:
+        raise HTTPException(status_code=400, detail="gsheets_not_configured")
+    try:
+        sheet = client.open_by_key(sheet_id)
+        ws = _ensure_tab(sheet, tab)
+        rows = ws.get_all_values()
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        for row in rows:
+            writer.writerow(row)
+        buffer = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
+        file_name = f"{kind}-{sheet_id[:8]}.csv"
+        return StreamingResponse(buffer, media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{file_name}"'})
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="sheet_export_failed")

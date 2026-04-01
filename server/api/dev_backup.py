@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from server.api.deps import require_roles
 from server.db.models import Role
 from server.services.gsheets import sync_all_to_sheets
-from server.services.system_backup import backups_root, create_backup_archive, restore_backup_archive
+from server.services.system_backup import backups_root, create_backup_archive, preview_backup_archive, restore_backup_archive
 import asyncio
 
 
@@ -34,6 +34,13 @@ class BackupCreateOut(BaseModel):
 class BackupRestoreOut(BaseModel):
     ok: bool
     restored: dict[str, int]
+
+
+class BackupPreviewOut(BaseModel):
+    created_at: str
+    counts: dict[str, int]
+    sheet_id: str = ""
+    app_name: str = ""
 
 
 @router.post("/create", response_model=BackupCreateOut, dependencies=[Depends(require_roles([Role.DEV]))])
@@ -79,3 +86,22 @@ async def restore_backup(
     except Exception:
         raise HTTPException(status_code=500, detail="backup_restore_failed")
     return BackupRestoreOut(ok=True, restored={str(k): int(v or 0) for k, v in restored.items()})
+
+
+@router.post("/preview", response_model=BackupPreviewOut, dependencies=[Depends(require_roles([Role.DEV]))])
+async def preview_backup(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="backup_zip_required")
+    raw = await file.read()
+    try:
+        preview = preview_backup_archive(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="backup_preview_failed")
+    return BackupPreviewOut(
+        created_at=str(preview.get("created_at") or ""),
+        counts={str(k): int(v or 0) for k, v in dict(preview.get("counts") or {}).items()},
+        sheet_id=str(preview.get("sheet_id") or ""),
+        app_name=str(preview.get("app_name") or ""),
+    )

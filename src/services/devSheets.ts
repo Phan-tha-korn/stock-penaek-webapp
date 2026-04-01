@@ -9,6 +9,9 @@ export type DevSheetsConfig = {
   stock_tab_url: string
   accounting_tab_url: string
   logs_tab_url: string
+  stock_download_url: string
+  accounting_download_url: string
+  logs_download_url: string
 }
 
 export type DevSheetCreateResult = {

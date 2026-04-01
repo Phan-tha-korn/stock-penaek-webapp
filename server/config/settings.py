@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Google Sheets
     google_sheets_id: str = ""
     google_service_account_key_path: str = "./credentials/google_key.json"
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_redirect_uri: str = ""
+    google_oauth_token_path: str = "./credentials/google_oauth_token.json"
     google_sheets_sync_interval_seconds: int = 30
     line_token_stock: str = ""
     line_token_admin: str = ""
@@ -70,6 +74,10 @@ class Settings(BaseSettings):
             or cfg.get("google_service_account_key_path")
             or s.google_service_account_key_path
         )
+        s.google_oauth_client_id = str(cfg.get("google_oauth_client_id") or google_sheets.get("oauth_client_id") or s.google_oauth_client_id)
+        s.google_oauth_client_secret = str(cfg.get("google_oauth_client_secret") or google_sheets.get("oauth_client_secret") or s.google_oauth_client_secret)
+        s.google_oauth_redirect_uri = str(cfg.get("google_oauth_redirect_uri") or google_sheets.get("oauth_redirect_uri") or s.google_oauth_redirect_uri)
+        s.google_oauth_token_path = str(cfg.get("google_oauth_token_path") or google_sheets.get("oauth_token_path") or s.google_oauth_token_path)
         s.google_sheets_sync_interval_seconds = int(
             google_sheets.get("sync_interval_seconds")
             or cfg.get("google_sheets_sync_interval_seconds")

@@ -217,6 +217,25 @@ def _extract_backup_json(zip_bytes: bytes) -> tuple[dict, dict | None, list[tupl
         return payload, config, media_files
 
 
+def preview_backup_archive(zip_bytes: bytes) -> dict:
+    payload, config, media_files = _extract_backup_json(zip_bytes)
+    meta = dict(payload.get("meta") or {})
+    counts = dict(meta.get("counts") or {})
+    return {
+        "created_at": str(meta.get("created_at") or ""),
+        "counts": {
+            "users": int(counts.get("users") or len(payload.get("users") or [])),
+            "products": int(counts.get("products") or len(payload.get("products") or [])),
+            "transactions": int(counts.get("transactions") or len(payload.get("transactions") or [])),
+            "alert_states": int(counts.get("alert_states") or len(payload.get("alert_states") or [])),
+            "audit_logs": int(counts.get("audit_logs") or len(payload.get("audit_logs") or [])),
+            "media_files": int(len(media_files)),
+        },
+        "sheet_id": str((config or {}).get("google_sheets_id") or ((config or {}).get("google_sheets") or {}).get("sheet_id") or ""),
+        "app_name": str((config or {}).get("app_name") or ""),
+    }
+
+
 async def restore_backup_archive(zip_bytes: bytes) -> dict:
     payload, config, media_files = _extract_backup_json(zip_bytes)
     users = payload.get("users") or []

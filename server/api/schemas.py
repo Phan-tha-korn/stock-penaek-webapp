@@ -348,6 +348,11 @@ class GoogleSetupOut(BaseModel):
     drive_folder_name: str = ""
     default_sheet_title: str = ""
     service_account_key_path: str = ""
+    oauth_client_id: str = ""
+    oauth_client_secret_masked: str = ""
+    oauth_redirect_uri: str = ""
+    oauth_token_path: str = ""
+    oauth_connected: bool = False
     current_sheet_id: str = ""
     current_sheet_url: str = ""
 
@@ -357,6 +362,14 @@ class GoogleSetupIn(BaseModel):
     drive_folder_name: str = ""
     default_sheet_title: str = ""
     service_account_key_path: str = ""
+    oauth_client_id: str = ""
+    oauth_client_secret: str = ""
+    oauth_redirect_uri: str = ""
+    oauth_token_path: str = ""
     create_new_sheet: bool = True
     migrate_existing_data: bool = True
+
+
+class GoogleOAuthStartOut(BaseModel):
+    auth_url: str
 

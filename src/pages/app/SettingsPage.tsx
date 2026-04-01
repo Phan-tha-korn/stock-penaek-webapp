@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { fetchGoogleSetupConfig, updateGoogleSetupConfig, type GoogleSetupConfig } from '../../services/configSecure'
+import { fetchGoogleSetupConfig, startGoogleOAuthLogin, updateGoogleSetupConfig, type GoogleSetupConfig } from '../../services/configSecure'
 import i18n from '../../services/i18n'
 import { updateConfig } from '../../services/config'
 import { useAuthStore } from '../../store/authStore'
@@ -16,6 +16,21 @@ function Field(props: { label: string; children: React.ReactNode }) {
       {props.children}
     </label>
   )
+}
+
+const EMPTY_GOOGLE_CFG: GoogleSetupConfig = {
+  configured: false,
+  workspace_email: '',
+  drive_folder_name: '',
+  default_sheet_title: '',
+  service_account_key_path: '',
+  oauth_client_id: '',
+  oauth_client_secret_masked: '',
+  oauth_redirect_uri: '',
+  oauth_token_path: '',
+  oauth_connected: false,
+  current_sheet_id: '',
+  current_sheet_url: '',
 }
 
 export function SettingsPage() {
@@ -34,6 +49,7 @@ export function SettingsPage() {
   const [personal, setPersonal] = useState(getPersonalBackgroundSettings())
   const [googleCfg, setGoogleCfg] = useState<GoogleSetupConfig | null>(null)
   const [googleBusy, setGoogleBusy] = useState(false)
+  const [googleOauthSecretDraft, setGoogleOauthSecretDraft] = useState('')
 
   useEffect(() => {
     if (config) setForm(config)
@@ -41,7 +57,12 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!canManageGlobal) return
-    fetchGoogleSetupConfig().then(setGoogleCfg).catch(() => {})
+    fetchGoogleSetupConfig()
+      .then((data) => {
+        setGoogleCfg(data)
+        setGoogleOauthSecretDraft('')
+      })
+      .catch(() => {})
   }, [canManageGlobal])
 
   if (!form) {
@@ -381,7 +402,7 @@ export function SettingsPage() {
               <input
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={googleCfg?.workspace_email || ''}
-                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), workspace_email: e.target.value }))}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), workspace_email: e.target.value }))}
                 placeholder="owner@gmail.com"
               />
             </Field>
@@ -389,7 +410,7 @@ export function SettingsPage() {
               <input
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={googleCfg?.drive_folder_name || ''}
-                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), drive_folder_name: e.target.value }))}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), drive_folder_name: e.target.value }))}
                 placeholder="Stock Penaek Drive"
               />
             </Field>
@@ -397,7 +418,7 @@ export function SettingsPage() {
               <input
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={googleCfg?.default_sheet_title || ''}
-                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), default_sheet_title: e.target.value }))}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), default_sheet_title: e.target.value }))}
                 placeholder="Stock Penaek Master"
               />
             </Field>
@@ -405,13 +426,46 @@ export function SettingsPage() {
               <input
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={googleCfg?.service_account_key_path || ''}
-                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || { configured: false, workspace_email: '', drive_folder_name: '', default_sheet_title: '', service_account_key_path: '', current_sheet_id: '', current_sheet_url: '' }), service_account_key_path: e.target.value }))}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), service_account_key_path: e.target.value }))}
                 placeholder="C:\Stock Penaek Webapp\credentials\google_key.json"
+              />
+            </Field>
+            <Field label="Google OAuth Client ID">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={googleCfg?.oauth_client_id || ''}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), oauth_client_id: e.target.value }))}
+                placeholder="Google OAuth Client ID"
+              />
+            </Field>
+            <Field label="Google OAuth Client Secret">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                type="password"
+                value={googleOauthSecretDraft}
+                onChange={(e) => setGoogleOauthSecretDraft(e.target.value)}
+                placeholder={googleCfg?.oauth_client_secret_masked ? `ตั้งค่าแล้ว ${googleCfg.oauth_client_secret_masked}` : 'Google OAuth Client Secret'}
+              />
+            </Field>
+            <Field label="OAuth Redirect URI">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={googleCfg?.oauth_redirect_uri || ''}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), oauth_redirect_uri: e.target.value }))}
+                placeholder="https://api.example.com/api/config/google-oauth/callback"
+              />
+            </Field>
+            <Field label="OAuth Token Path">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={googleCfg?.oauth_token_path || ''}
+                onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), oauth_token_path: e.target.value }))}
+                placeholder="C:\Stock Penaek Webapp\credentials\google_oauth_token.json"
               />
             </Field>
           </div>
           <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3 text-xs text-white/65">
-            {googleCfg?.configured ? `พร้อมใช้งานแล้ว • Sheet ปัจจุบัน: ${googleCfg.current_sheet_id || '-'}` : 'ยังไม่ได้ตั้งค่า Google ให้พร้อมใช้งาน'}
+            {googleCfg?.configured ? `พร้อมใช้งานแล้ว • Sheet ปัจจุบัน: ${googleCfg.current_sheet_id || '-'}${googleCfg.oauth_connected ? ' • OAuth Connected' : ''}` : 'ยังไม่ได้ตั้งค่า Google ให้พร้อมใช้งาน'}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -429,10 +483,15 @@ export function SettingsPage() {
                     drive_folder_name: googleCfg.drive_folder_name,
                     default_sheet_title: googleCfg.default_sheet_title,
                     service_account_key_path: googleCfg.service_account_key_path,
+                    oauth_client_id: googleCfg.oauth_client_id,
+                    oauth_client_secret: googleOauthSecretDraft,
+                    oauth_redirect_uri: googleCfg.oauth_redirect_uri,
+                    oauth_token_path: googleCfg.oauth_token_path,
                     create_new_sheet: false,
                     migrate_existing_data: false,
                   })
                   setGoogleCfg(next)
+                  setGoogleOauthSecretDraft('')
                   setOk('บันทึกข้อมูล Google แล้ว')
                 } catch (e: any) {
                   setError(e?.response?.data?.detail || 'บันทึก Google config ไม่สำเร็จ')
@@ -458,10 +517,15 @@ export function SettingsPage() {
                     drive_folder_name: googleCfg.drive_folder_name,
                     default_sheet_title: googleCfg.default_sheet_title,
                     service_account_key_path: googleCfg.service_account_key_path,
+                    oauth_client_id: googleCfg.oauth_client_id,
+                    oauth_client_secret: googleOauthSecretDraft,
+                    oauth_redirect_uri: googleCfg.oauth_redirect_uri,
+                    oauth_token_path: googleCfg.oauth_token_path,
                     create_new_sheet: true,
                     migrate_existing_data: true,
                   })
                   setGoogleCfg(next)
+                  setGoogleOauthSecretDraft('')
                   setOk('สร้าง/สลับ Google Sheets ใหม่และ sync ข้อมูลแล้ว')
                 } catch (e: any) {
                   setError(e?.response?.data?.detail || 'ตั้งค่า Google ไม่สำเร็จ')
@@ -471,6 +535,41 @@ export function SettingsPage() {
               }}
             >
               {googleBusy ? 'กำลังเชื่อม Google...' : 'เชื่อม Google และสร้าง Sheets อัตโนมัติ'}
+            </button>
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
+              type="button"
+              disabled={googleBusy || !googleCfg?.oauth_client_id}
+              onClick={async () => {
+                setGoogleBusy(true)
+                setError(null)
+                setOk(null)
+                try {
+                  const next = await updateGoogleSetupConfig({
+                    workspace_email: googleCfg?.workspace_email || '',
+                    drive_folder_name: googleCfg?.drive_folder_name || '',
+                    default_sheet_title: googleCfg?.default_sheet_title || '',
+                    service_account_key_path: googleCfg?.service_account_key_path || '',
+                    oauth_client_id: googleCfg?.oauth_client_id || '',
+                    oauth_client_secret: googleOauthSecretDraft,
+                    oauth_redirect_uri: googleCfg?.oauth_redirect_uri || '',
+                    oauth_token_path: googleCfg?.oauth_token_path || '',
+                    create_new_sheet: false,
+                    migrate_existing_data: false,
+                  })
+                  setGoogleCfg(next)
+                  setGoogleOauthSecretDraft('')
+                  const res = await startGoogleOAuthLogin()
+                  window.open(res.auth_url, '_blank', 'noopener,noreferrer')
+                  setOk('เปิดหน้าต่าง Sign in with Google แล้ว')
+                } catch (e: any) {
+                  setError(e?.response?.data?.detail || 'เริ่ม Google OAuth ไม่สำเร็จ')
+                } finally {
+                  setGoogleBusy(false)
+                }
+              }}
+            >
+              Sign in with Google
             </button>
             {googleCfg?.current_sheet_url ? (
               <button

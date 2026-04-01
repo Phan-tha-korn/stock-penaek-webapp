@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import HTMLResponse
+from google_auth_oauthlib.flow import Flow
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.deps import get_current_user
-from server.api.schemas import ConfigUpdateIn, GoogleSetupIn, GoogleSetupOut, PublicConfig
+from server.api.schemas import ConfigUpdateIn, GoogleOAuthStartOut, GoogleSetupIn, GoogleSetupOut, PublicConfig
 from server.config.config_loader import load_master_config, write_master_config
 from server.config.settings import settings
 from server.db.database import get_db
@@ -66,6 +69,37 @@ def _norm_int(value: int, fallback: int, min_value: int, max_value: int) -> int:
     except Exception:
         return fallback
     return max(min_value, min(max_value, n))
+
+
+def _mask_secret(value: str) -> str:
+    text = (value or "").strip()
+    if not text:
+        return ""
+    if len(text) <= 8:
+        return "*" * len(text)
+    return f"{text[:4]}...{text[-4:]}"
+
+
+def _oauth_client_config(cfg: dict, request: Request | None = None) -> tuple[dict, str]:
+    client_id = str(cfg.get("google_oauth_client_id") or "")
+    client_secret = str(cfg.get("google_oauth_client_secret") or "")
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=400, detail="google_oauth_not_ready")
+    redirect_uri = str(cfg.get("google_oauth_redirect_uri") or "").strip()
+    if not redirect_uri and request is not None:
+        redirect_uri = str(request.base_url).rstrip("/") + "/api/config/google-oauth/callback"
+    if not redirect_uri:
+        raise HTTPException(status_code=400, detail="google_oauth_redirect_missing")
+    config = {
+        "web": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [redirect_uri],
+        }
+    }
+    return config, redirect_uri
 
 
 
@@ -158,11 +192,23 @@ async def get_google_setup(user: User = Depends(get_current_user)):
     sheet_id = str(cfg.get("google_sheets_id") or cfg.get("google_sheets", {}).get("sheet_id") or "")
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}" if sheet_id else ""
     return GoogleSetupOut(
-        configured=bool(sheet_id and (cfg.get("google_service_account_key_path") or cfg.get("google_sheets", {}).get("service_account_key_path"))),
+        configured=bool(
+            sheet_id
+            and (
+                cfg.get("google_service_account_key_path")
+                or cfg.get("google_sheets", {}).get("service_account_key_path")
+                or Path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path)).exists()
+            )
+        ),
         workspace_email=str(cfg.get("google_workspace_email") or ""),
         drive_folder_name=str(cfg.get("google_drive_folder_name") or ""),
         default_sheet_title=str(cfg.get("google_default_sheet_title") or ""),
         service_account_key_path=str(cfg.get("google_service_account_key_path") or cfg.get("google_sheets", {}).get("service_account_key_path") or ""),
+        oauth_client_id=str(cfg.get("google_oauth_client_id") or ""),
+        oauth_client_secret_masked=_mask_secret(str(cfg.get("google_oauth_client_secret") or "")),
+        oauth_redirect_uri=str(cfg.get("google_oauth_redirect_uri") or ""),
+        oauth_token_path=str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path),
+        oauth_connected=Path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path)).exists(),
         current_sheet_id=sheet_id,
         current_sheet_url=sheet_url,
     )
@@ -188,6 +234,15 @@ async def update_google_setup(
     if key_path:
         cfg["google_service_account_key_path"] = key_path
         google_sheets["service_account_key_path"] = key_path
+    cfg["google_oauth_client_id"] = (payload.oauth_client_id or "").strip()
+    if (payload.oauth_client_secret or "").strip():
+        cfg["google_oauth_client_secret"] = (payload.oauth_client_secret or "").strip()
+    cfg["google_oauth_redirect_uri"] = (payload.oauth_redirect_uri or "").strip()
+    cfg["google_oauth_token_path"] = (payload.oauth_token_path or "").strip() or str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path)
+    google_sheets["oauth_client_id"] = cfg["google_oauth_client_id"]
+    google_sheets["oauth_client_secret"] = cfg.get("google_oauth_client_secret") or ""
+    google_sheets["oauth_redirect_uri"] = cfg["google_oauth_redirect_uri"]
+    google_sheets["oauth_token_path"] = cfg["google_oauth_token_path"]
 
     new_sheet_id = str(cfg.get("google_sheets_id") or google_sheets.get("sheet_id") or "")
     if payload.create_new_sheet:
@@ -223,6 +278,10 @@ async def update_google_setup(
 
     settings.google_sheets_id = str(cfg.get("google_sheets_id") or google_sheets.get("sheet_id") or "")
     settings.google_service_account_key_path = str(cfg.get("google_service_account_key_path") or google_sheets.get("service_account_key_path") or settings.google_service_account_key_path)
+    settings.google_oauth_client_id = str(cfg.get("google_oauth_client_id") or google_sheets.get("oauth_client_id") or "")
+    settings.google_oauth_client_secret = str(cfg.get("google_oauth_client_secret") or google_sheets.get("oauth_client_secret") or "")
+    settings.google_oauth_redirect_uri = str(cfg.get("google_oauth_redirect_uri") or google_sheets.get("oauth_redirect_uri") or "")
+    settings.google_oauth_token_path = str(cfg.get("google_oauth_token_path") or google_sheets.get("oauth_token_path") or settings.google_oauth_token_path)
 
     if payload.migrate_existing_data and settings.google_sheets_id:
         try:
@@ -243,4 +302,107 @@ async def update_google_setup(
         after=cfg,
     )
     return await get_google_setup(user)
+
+
+@router.post("/config/google-oauth/start", response_model=GoogleOAuthStartOut)
+async def start_google_oauth(request: Request, user: User = Depends(get_current_user)):
+    if user.role not in (Role.OWNER, Role.DEV):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    cfg = load_master_config()
+    client_config, redirect_uri = _oauth_client_config(cfg, request)
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=[
+            "openid",
+            "email",
+            "profile",
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive.file",
+        ],
+        redirect_uri=redirect_uri,
+    )
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
+    return GoogleOAuthStartOut(auth_url=auth_url)
+
+
+@router.get("/config/google-oauth/callback")
+async def google_oauth_callback(request: Request):
+    cfg = load_master_config()
+    client_config, redirect_uri = _oauth_client_config(cfg, request)
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=[
+            "openid",
+            "email",
+            "profile",
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive.file",
+        ],
+        redirect_uri=redirect_uri,
+    )
+    try:
+        flow.fetch_token(authorization_response=str(request.url))
+        credentials = flow.credentials
+        token_path = Path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path))
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(credentials.to_json(), encoding="utf-8")
+        cfg["google_oauth_token_path"] = str(token_path)
+        google_sheets = dict(cfg.get("google_sheets") or {})
+        google_sheets["oauth_token_path"] = str(token_path)
+        cfg["google_sheets"] = google_sheets
+        settings.google_oauth_token_path = str(token_path)
+
+        session = flow.authorized_session()
+        try:
+            profile = session.get("https://openidconnect.googleapis.com/v1/userinfo", timeout=20).json()
+            cfg["google_workspace_email"] = str(profile.get("email") or cfg.get("google_workspace_email") or "")
+        except Exception:
+            pass
+
+        write_master_config(cfg)
+
+        if not str(cfg.get("google_sheets_id") or google_sheets.get("sheet_id") or ""):
+            settings.google_sheets_id = ""
+            client = get_client()
+            if client:
+                sheet = client.create(str(cfg.get("google_default_sheet_title") or "Stock Penaek"))
+                tabs = [
+                    _ensure_tab(sheet, TAB_OVERVIEW),
+                    _ensure_tab(sheet, TAB_STOCK),
+                    _ensure_tab(sheet, TAB_STOCK_ALERTS),
+                    _ensure_tab(sheet, TAB_ACCOUNTING),
+                    _ensure_tab(sheet, TAB_AUDIT_LOG),
+                    _ensure_tab(sheet, TAB_EDIT_LOG),
+                    _ensure_tab(sheet, TAB_ADD_LOG),
+                    _ensure_tab(sheet, TAB_SELL_LOG),
+                    _ensure_tab(sheet, TAB_INCOME_LOG),
+                    _ensure_tab(sheet, TAB_EXPENSE_LOG),
+                ]
+                _style_sheet(sheet, tabs)
+                sheet_id = str(getattr(sheet, "id", "") or "")
+                cfg["google_sheets_id"] = sheet_id
+                google_sheets["sheet_id"] = sheet_id
+                cfg["google_sheets"] = google_sheets
+                settings.google_sheets_id = sheet_id
+                write_master_config(cfg)
+
+        try:
+            await sync_all_to_sheets()
+        except Exception:
+            pass
+    except HTTPException:
+        raise
+    except Exception:
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>เชื่อม Google ไม่สำเร็จ กรุณากลับไปลองใหม่</body></html>",
+            status_code=500,
+        )
+
+    return HTMLResponse(
+        "<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>เชื่อม Google สำเร็จ กำลังกลับไปหน้าตั้งค่า<script>setTimeout(function(){ window.location.href='/settings#google-setup'; }, 1200)</script></body></html>"
+    )
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { api } from '../../services/api'
-import { createDevBackup, getDevBackupDownloadUrl, restoreDevBackup } from '../../services/devBackup'
+import { createDevBackup, getDevBackupDownloadUrl, previewDevBackup, restoreDevBackup, type DevBackupPreviewResult } from '../../services/devBackup'
 import { fetchConfig } from '../../services/config'
 import { fetchActivity } from '../../services/dashboard'
 import { importFromSheets, syncToSheets } from '../../services/products'
@@ -68,6 +68,9 @@ export function DevPage() {
   const [notifIncludeImageUrl, setNotifIncludeImageUrl] = useState(false)
   const [secureAction, setSecureAction] = useState<'backup' | 'restore' | 'reset' | null>(null)
   const [securePassword, setSecurePassword] = useState('')
+  const [sheetGuardOpen, setSheetGuardOpen] = useState(false)
+  const [sheetGuardMode, setSheetGuardMode] = useState<'missing' | 'sync'>('missing')
+  const [restorePreview, setRestorePreview] = useState<DevBackupPreviewResult | null>(null)
 
   async function reload() {
     setBusy(true)
@@ -125,6 +128,16 @@ export function DevPage() {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
+  }
+
+  function requireSheetsReady(action: () => void, mode: 'missing' | 'sync' = 'missing') {
+    if (sheetsCfg?.enabled) {
+      action()
+      return
+    }
+    setSheetGuardMode(mode)
+    setSheetGuardOpen(true)
+    window.setTimeout(() => setSheetGuardOpen(false), 3000)
   }
 
   async function runSecureAction() {
@@ -765,6 +778,51 @@ export function DevPage() {
         </div>
       ) : null}
 
+      {sheetGuardOpen ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-md">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[color:var(--color-card)]/95 p-6 text-center shadow-2xl">
+              <div className="text-xl font-semibold">ยังไม่ได้ sync Google Sheets</div>
+              <div className="mt-2 text-sm text-white/65">
+                {sheetGuardMode === 'missing'
+                  ? 'โซนนี้ใช้ข้อมูลที่เก็บกับ Google Sheets กรุณาเชื่อม Google หรือ Sync ให้พร้อมก่อนใช้งาน'
+                  : 'กรุณา Sync Google Sheets ก่อน เพื่อให้ข้อมูลล่าสุดพร้อมสำหรับการเปิดดูหรือดาวน์โหลด'}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  className="rounded border border-[color:var(--color-border)] px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+                  type="button"
+                  onClick={() => {
+                    setSheetGuardOpen(false)
+                    navigate('/settings#google-setup')
+                  }}
+                >
+                  ไปตั้งค่า Google
+                </button>
+                <button
+                  className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+                  type="button"
+                  onClick={async () => {
+                    setSheetGuardOpen(false)
+                    setSheetMsg('กำลัง Sync ไปชีต...')
+                    setSheetAction('sync')
+                    try {
+                      const res = await syncToSheets()
+                      setSheetMsg(res.ok ? 'Sync ไปชีตเสร็จแล้ว' : `Sync ไม่สำเร็จ: ${res.error || ''}`)
+                      setSheetsCfg(await getDevSheetsConfig())
+                    } finally {
+                      setSheetAction(null)
+                    }
+                  }}
+                >
+                  ไป Sync Google Sheets
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {secureAction ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
           <div className="flex min-h-full items-center justify-center">
@@ -915,17 +973,19 @@ export function DevPage() {
               className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
               type="button"
               disabled={sheetAction !== null}
-              onClick={async () => {
-                setSheetMsg(null)
-                setSheetAction('sync')
-                setSheetMsg('กำลัง Sync ไปชีต...')
-                try {
-                  const res = await syncToSheets()
-                  setSheetMsg(res.ok ? 'Sync ไปชีตเสร็จแล้ว' : `Sync ไม่สำเร็จ: ${res.error || ''}`)
-                } finally {
-                  setSheetAction(null)
-                }
-              }}
+              onClick={() =>
+                requireSheetsReady(async () => {
+                  setSheetMsg(null)
+                  setSheetAction('sync')
+                  setSheetMsg('กำลัง Sync ไปชีต...')
+                  try {
+                    const res = await syncToSheets()
+                    setSheetMsg(res.ok ? 'Sync ไปชีตเสร็จแล้ว' : `Sync ไม่สำเร็จ: ${res.error || ''}`)
+                  } finally {
+                    setSheetAction(null)
+                  }
+                }, 'sync')
+              }
             >
               {sheetAction === 'sync' ? 'กำลัง Sync...' : 'Sync ไปชีตตอนนี้'}
             </button>
@@ -933,18 +993,20 @@ export function DevPage() {
               className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
               type="button"
               disabled={sheetAction !== null}
-              onClick={async () => {
-                setSheetMsg(null)
-                setSheetAction('import')
-                setSheetMsg('กำลัง Import Stock → DB...')
-                try {
-                  const res = await importFromSheets({ overwrite_stock_qty: false, overwrite_prices: false })
-                  setSheetMsg(res.ok ? `นำเข้าเสร็จ: สร้าง ${res.created || 0}, อัปเดต ${res.updated || 0}, ข้าม ${res.skipped || 0}` : `นำเข้าไม่สำเร็จ: ${res.error || ''}`)
-                  await reload()
-                } finally {
-                  setSheetAction(null)
-                }
-              }}
+              onClick={() =>
+                requireSheetsReady(async () => {
+                  setSheetMsg(null)
+                  setSheetAction('import')
+                  setSheetMsg('กำลัง Import Stock → DB...')
+                  try {
+                    const res = await importFromSheets({ overwrite_stock_qty: false, overwrite_prices: false })
+                    setSheetMsg(res.ok ? `นำเข้าเสร็จ: สร้าง ${res.created || 0}, อัปเดต ${res.updated || 0}, ข้าม ${res.skipped || 0}` : `นำเข้าไม่สำเร็จ: ${res.error || ''}`)
+                    await reload()
+                  } finally {
+                    setSheetAction(null)
+                  }
+                }, 'sync')
+              }
             >
               {sheetAction === 'import' ? 'กำลัง Import...' : 'Import Stock → DB'}
             </button>
@@ -962,11 +1024,14 @@ export function DevPage() {
               <div className="text-sm font-semibold text-green-100">โซน Stock</div>
               <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" disabled={!sheetsCfg?.stock_tab_url} onClick={() => window.open(sheetsCfg?.stock_tab_url, '_blank', 'noopener,noreferrer')}>
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.stock_tab_url, '_blank', 'noopener,noreferrer'), 'sync')}>
                   เปิดแท็บ Stock
                 </button>
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" disabled={!sheetsCfg?.download_xlsx_url} onClick={() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer')}>
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer'), 'sync')}>
                   โหลดทั้งชีต .xlsx
+                </button>
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.stock_download_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                  โหลดเฉพาะ Stock .csv
                 </button>
               </div>
             </div>
@@ -974,11 +1039,14 @@ export function DevPage() {
               <div className="text-sm font-semibold text-violet-100">โซนบัญชี</div>
               <div className="mt-1 text-xs text-violet-100/80">แยกสรุปบัญชี รายรับ รายจ่าย และภาพรวมมูลค่าสต็อก</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" disabled={!sheetsCfg?.accounting_tab_url} onClick={() => window.open(sheetsCfg?.accounting_tab_url, '_blank', 'noopener,noreferrer')}>
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.accounting_tab_url, '_blank', 'noopener,noreferrer'), 'sync')}>
                   เปิดแท็บบัญชี
                 </button>
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" disabled={!sheetsCfg?.sheet_url} onClick={() => window.open(sheetsCfg?.sheet_url, '_blank', 'noopener,noreferrer')}>
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.sheet_url, '_blank', 'noopener,noreferrer'), 'sync')}>
                   เปิดสมุดทั้งหมด
+                </button>
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.accounting_download_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                  โหลดเฉพาะบัญชี .csv
                 </button>
               </div>
             </div>
@@ -986,11 +1054,14 @@ export function DevPage() {
               <div className="text-sm font-semibold text-red-100">โซน Log</div>
               <div className="mt-1 text-xs text-red-100/80">เก็บการแก้ไขสำคัญ Add/Edit/Sell/Audit แยกหัวข้อให้อ่านง่าย</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" disabled={!sheetsCfg?.logs_tab_url} onClick={() => window.open(sheetsCfg?.logs_tab_url, '_blank', 'noopener,noreferrer')}>
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.logs_tab_url, '_blank', 'noopener,noreferrer'), 'sync')}>
                   เปิดแท็บ Log
                 </button>
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" disabled={!sheetsCfg?.download_xlsx_url} onClick={() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer')}>
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer'), 'sync')}>
                   โหลดทั้งชีต .xlsx
+                </button>
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.logs_download_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                  โหลดเฉพาะ Log .csv
                 </button>
               </div>
             </div>
@@ -1091,7 +1162,18 @@ export function DevPage() {
                 type="file"
                 accept=".zip,application/zip"
                 className="min-w-[240px] flex-1 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm text-white/80 file:mr-3 file:rounded file:border file:border-[color:var(--color-border)] file:bg-black/40 file:px-3 file:py-1.5"
-                onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] || null
+                  setRestoreFile(file)
+                  setRestorePreview(null)
+                  if (!file) return
+                  try {
+                    const preview = await previewDevBackup(file)
+                    setRestorePreview(preview)
+                  } catch (error: any) {
+                    setSheetMsg(error?.response?.data?.detail || error?.message || 'อ่าน preview backup ไม่สำเร็จ')
+                  }
+                }}
               />
               <button
                 className="rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
@@ -1105,6 +1187,22 @@ export function DevPage() {
                 {restoreBusy ? 'กำลังกู้คืน...' : 'กู้คืนจาก Backup'}
               </button>
             </div>
+            {restorePreview ? (
+              <div className="mt-3 rounded border border-amber-400/30 bg-black/20 p-3 text-xs text-amber-50">
+                <div className="font-semibold">Preview Backup</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
+                  <div>App: <span className="text-white">{restorePreview.app_name || '-'}</span></div>
+                  <div>สร้างเมื่อ: <span className="text-white">{restorePreview.created_at || '-'}</span></div>
+                  <div>Sheet: <span className="text-white">{restorePreview.sheet_id || '-'}</span></div>
+                  <div>Users: <span className="text-white">{restorePreview.counts.users || 0}</span></div>
+                  <div>Products: <span className="text-white">{restorePreview.counts.products || 0}</span></div>
+                  <div>Transactions: <span className="text-white">{restorePreview.counts.transactions || 0}</span></div>
+                  <div>Alert states: <span className="text-white">{restorePreview.counts.alert_states || 0}</span></div>
+                  <div>Audit logs: <span className="text-white">{restorePreview.counts.audit_logs || 0}</span></div>
+                  <div>Media files: <span className="text-white">{restorePreview.counts.media_files || 0}</span></div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 

@@ -1,10 +1,12 @@
 import asyncio
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
 
 import gspread
 import orjson
+from google.oauth2.credentials import Credentials as OAuthCredentials
 from google.oauth2.service_account import Credentials
 from sqlalchemy import select
 
@@ -95,7 +97,15 @@ async def _with_retries(coro_factory, retries: int = 3, delay_sec: float = 2.0):
 def get_client() -> gspread.client.Client | None:
     if not settings.google_sheets_id:
         return None
-    
+
+    oauth_token_path = Path(settings.google_oauth_token_path)
+    if oauth_token_path.exists():
+        try:
+            credentials = OAuthCredentials.from_authorized_user_file(str(oauth_token_path), scopes=SCOPES)
+            return gspread.authorize(credentials)
+        except Exception as e:
+            logger.error(f"Failed to authorize Google Sheets OAuth client: {e}")
+
     key_path = Path(settings.google_service_account_key_path)
     if not key_path.exists():
         logger.warning(f"Google Sheets service account key not found at {key_path}")

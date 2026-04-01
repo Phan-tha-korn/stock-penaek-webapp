@@ -13,6 +13,13 @@ export type DevBackupRestoreResult = {
   restored: Record<string, number>
 }
 
+export type DevBackupPreviewResult = {
+  created_at: string
+  counts: Record<string, number>
+  sheet_id: string
+  app_name: string
+}
+
 export async function createDevBackup(password: string) {
   const form = new FormData()
   form.append('password', password)
@@ -25,6 +32,13 @@ export async function restoreDevBackup(password: string, file: File) {
   form.append('password', password)
   form.append('file', file)
   const res = await api.post<DevBackupRestoreResult>('/dev/backup/restore', form)
+  return res.data
+}
+
+export async function previewDevBackup(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await api.post<DevBackupPreviewResult>('/dev/backup/preview', form)
   return res.data
 }
 
