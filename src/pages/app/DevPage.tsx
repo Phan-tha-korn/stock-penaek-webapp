@@ -7,6 +7,7 @@ import { importFromSheets, syncToSheets } from '../../services/products'
 import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist, type GarbageFileItem } from '../../services/devGarbage'
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
 import { createDevSheet, getDevSheetsConfig, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
+import { resetStock } from '../../services/devReset'
 import { useAuthStore } from '../../store/authStore'
 import type { ActivityItem } from '../../services/dashboard'
 import type { AppConfig } from '../../types/models'
@@ -27,6 +28,7 @@ export function DevPage() {
   const [sheetShareEmails, setSheetShareEmails] = useState('')
   const [sheetCreateBusy, setSheetCreateBusy] = useState(false)
   const [lastCreatedSheet, setLastCreatedSheet] = useState<DevSheetCreateResult | null>(null)
+  const [resetStockBusy, setResetStockBusy] = useState(false)
   const [garbageBusy, setGarbageBusy] = useState(false)
   const [garbageItems, setGarbageItems] = useState<GarbageFileItem[]>([])
   const [selectedPaths, setSelectedPaths] = useState<string[]>([])
@@ -673,6 +675,34 @@ export function DevPage() {
               </button>
             </div>
           ) : null}
+        </div>
+
+        <div className="mt-3 rounded border border-red-500/30 bg-red-500/5 p-3">
+          <div className="text-xs text-white/60">ล้างสินค้า/สต็อกทั้งหมด (DB) แต่คงผู้ใช้ไว้</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              className="rounded bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              type="button"
+              disabled={resetStockBusy}
+              onClick={async () => {
+                const ok = window.confirm('ยืนยันล้างสินค้า/สต็อกทั้งหมด? (จะลบสินค้าและธุรกรรมทั้งหมดใน DB แต่ผู้ใช้จะไม่ถูกลบ)')
+                if (!ok) return
+                setSheetMsg(null)
+                setResetStockBusy(true)
+                try {
+                  const res = await resetStock()
+                  setSheetMsg(`ล้างสต็อกแล้ว: สินค้า ${res.deleted_products}, ธุรกรรม ${res.deleted_transactions}`)
+                  await reload()
+                } catch (e: any) {
+                  setSheetMsg(e?.response?.data?.detail || e?.message || 'ล้างสต็อกไม่สำเร็จ')
+                } finally {
+                  setResetStockBusy(false)
+                }
+              }}
+            >
+              {resetStockBusy ? 'กำลังล้าง...' : 'ล้าง Stock ให้โล่ง'}
+            </button>
+          </div>
         </div>
       </div>
 
