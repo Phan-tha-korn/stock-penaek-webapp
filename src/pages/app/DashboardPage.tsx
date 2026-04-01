@@ -1,12 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useConfigStore } from '../../store/configStore'
-import { fetchActivity, fetchKpis, type ActivityItem, type Kpis } from '../../services/dashboard'
+import { fetchActivity, fetchKpis, fetchStockSummary, type ActivityItem, type Kpis } from '../../services/dashboard'
 import { listProducts, adjustStock, type StockAdjustData } from '../../services/products'
 import type { Product } from '../../types/models'
-import { BrowserMultiFormatReader } from '@zxing/browser'
-import QRCode from 'react-qr-code'
-import JsBarcode from 'jsbarcode'
 import { getSocket } from '../../services/socketManager'
 
 import { useTranslation } from 'react-i18next'
@@ -89,6 +86,7 @@ function ProductDetailModal({ product, onClose, onUpdate, onToast }: { product: 
   const role = useAuthStore((s) => s.role)
   const canAdjust = role === 'ADMIN' || role === 'OWNER' || role === 'DEV'
   const barcodeRef = useRef<SVGSVGElement>(null)
+  const [QRCodeComp, setQRCodeComp] = useState<any>(null)
   
   const [adjustQty, setAdjustQty] = useState<number | ''>('')
   const [adjustReason, setAdjustReason] = useState('')
@@ -123,8 +121,12 @@ function ProductDetailModal({ product, onClose, onUpdate, onToast }: { product: 
   }
 
   useEffect(() => {
-    if (barcodeRef.current) {
-      JsBarcode(barcodeRef.current, product.sku, {
+    ;(async () => {
+      if (!barcodeRef.current) return
+      const mod: any = await import('jsbarcode')
+      const fn = mod?.default || mod
+      if (!fn) return
+      fn(barcodeRef.current, product.sku, {
         format: 'CODE128',
         width: 1.5,
         height: 40,
@@ -133,8 +135,13 @@ function ProductDetailModal({ product, onClose, onUpdate, onToast }: { product: 
         lineColor: '#fff',
         margin: 0
       })
-    }
+    })()
   }, [product.sku])
+
+  useEffect(() => {
+    if (QRCodeComp) return
+    import('react-qr-code').then((m: any) => setQRCodeComp(() => m.default)).catch(() => {})
+  }, [QRCodeComp])
 
   const baseUrl = (config?.web_url || window.location.origin).replace(/\/+$/, '')
   const publicUrl = `${baseUrl}/public/product/${encodeURIComponent(product.sku)}`
@@ -256,7 +263,7 @@ function ProductDetailModal({ product, onClose, onUpdate, onToast }: { product: 
             <div className="text-center">
               <div className="mb-2 text-sm text-white/60">{t('product.publicScan')}</div>
               <div className="rounded-xl bg-white p-3 inline-block">
-                <QRCode value={publicUrl} size={220} level="Q" />
+                {QRCodeComp ? <QRCodeComp value={publicUrl} size={220} level="Q" /> : <div className="h-[220px] w-[220px]" />}
               </div>
             </div>
 
@@ -311,25 +318,19 @@ function StockDashboard() {
   })
   const { toasts, addToast } = useToast()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const codeReader = useRef(new BrowserMultiFormatReader())
+  const codeReader = useRef<any>(null)
   const realtimeTimerRef = useRef<number | null>(null)
 
   async function reloadSummary() {
     setSummaryBusy(true)
     try {
-      const [allRes, fullRes, lowRes, critRes, outRes] = await Promise.all([
-        listProducts({ limit: 1 }),
-        listProducts({ status: 'FULL', limit: 1 }),
-        listProducts({ status: 'LOW', limit: 1 }),
-        listProducts({ status: 'CRITICAL', limit: 1 }),
-        listProducts({ status: 'OUT', limit: 1 }),
-      ])
+      const s = await fetchStockSummary()
       setSummary({
-        totalProducts: allRes.total,
-        fullStock: fullRes.total,
-        lowStock: lowRes.total,
-        criticalStock: critRes.total,
-        outOfStock: outRes.total,
+        totalProducts: s.total_products,
+        fullStock: s.full,
+        lowStock: s.low,
+        criticalStock: s.critical,
+        outOfStock: s.out,
       })
       setSummaryReady(true)
     } finally {
@@ -361,15 +362,28 @@ function StockDashboard() {
   }, [q])
 
   useEffect(() => {
-    if (scanning && videoRef.current) {
-      codeReader.current.decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
+    let cancelled = false
+    ;(async () => {
+      if (!scanning || !videoRef.current) return
+      if (!codeReader.current) {
+        try {
+          const mod: any = await import('@zxing/browser')
+          if (cancelled) return
+          codeReader.current = new mod.BrowserMultiFormatReader()
+        } catch {
+          setScanning(false)
+          return
+        }
+      }
+      codeReader.current.decodeFromVideoDevice(undefined, videoRef.current, (result: any) => {
         if (result) {
           setQ(result.getText())
           setScanning(false)
         }
       })
-    }
+    })()
     return () => {
+      cancelled = true
       // @zxing/browser doesn't have reset on BrowserMultiFormatReader, it manages its own lifecycle or we can stop the stream if we kept the stream reference. 
       // For this simple implementation, unmounting the component handles it.
     }
@@ -377,7 +391,7 @@ function StockDashboard() {
 
   useEffect(() => {
     reloadSummary()
-    const timer = window.setInterval(reloadSummary, 10_000)
+    const timer = window.setInterval(reloadSummary, 30_000)
     return () => window.clearInterval(timer)
   }, [])
 

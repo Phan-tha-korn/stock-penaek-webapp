@@ -29,8 +29,21 @@ export interface TransactionItem {
   actor_username: string | null
 }
 
+export interface StockSummary {
+  total_products: number
+  full: number
+  low: number
+  critical: number
+  out: number
+}
+
 export async function fetchKpis() {
   const { data } = await api.get<Kpis>('/dashboard/kpis')
+  return data
+}
+
+export async function fetchStockSummary() {
+  const { data } = await api.get<StockSummary>('/dashboard/stock_summary')
   return data
 }
 

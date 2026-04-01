@@ -235,5 +235,15 @@ async def refresh(payload: RefreshIn, request: Request, db: AsyncSession = Depen
 
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)):
-    return UserOut.model_validate(user, from_attributes=True)
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        role=user.role,
+        is_active=user.is_active,
+        language=user.language,
+        has_secret_key=bool(user.totp_secret),
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+    )
 

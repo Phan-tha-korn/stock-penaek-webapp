@@ -6,6 +6,7 @@ import { fetchActivity } from '../../services/dashboard'
 import { importFromSheets, syncToSheets } from '../../services/products'
 import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist, type GarbageFileItem } from '../../services/devGarbage'
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
+import { createDevSheet, getDevSheetsConfig, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
 import { useAuthStore } from '../../store/authStore'
 import type { ActivityItem } from '../../services/dashboard'
 import type { AppConfig } from '../../types/models'
@@ -21,6 +22,11 @@ export function DevPage() {
 
   const [sheetMsg, setSheetMsg] = useState<string | null>(null)
   const [sheetAction, setSheetAction] = useState<'sync' | 'import' | null>(null)
+  const [sheetsCfg, setSheetsCfg] = useState<DevSheetsConfig | null>(null)
+  const [sheetCreateTitle, setSheetCreateTitle] = useState('')
+  const [sheetShareEmails, setSheetShareEmails] = useState('')
+  const [sheetCreateBusy, setSheetCreateBusy] = useState(false)
+  const [lastCreatedSheet, setLastCreatedSheet] = useState<DevSheetCreateResult | null>(null)
   const [garbageBusy, setGarbageBusy] = useState(false)
   const [garbageItems, setGarbageItems] = useState<GarbageFileItem[]>([])
   const [selectedPaths, setSelectedPaths] = useState<string[]>([])
@@ -93,6 +99,12 @@ export function DevPage() {
       } catch (e: any) {
         setNotifMsg(e?.response?.data?.detail || e?.message || 'โหลดการตั้งค่าแจ้งเตือนไม่สำเร็จ')
       }
+    })()
+    ;(async () => {
+      try {
+        const c = await getDevSheetsConfig()
+        setSheetsCfg(c)
+      } catch {}
     })()
   }, [])
 
@@ -572,6 +584,96 @@ export function DevPage() {
           </div>
         </div>
         {sheetMsg ? <div className="mt-2 text-xs text-white/70">{sheetMsg}</div> : null}
+
+        <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+          <div className="text-xs text-white/60">สร้าง Google Sheet ใหม่และตั้งค่า sheet_id ให้ระบบ</div>
+          <div className="mt-2 text-xs text-white/50 break-words">
+            sheet_id ปัจจุบัน: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | key: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
+              type="button"
+              disabled={!sheetsCfg?.sheet_id}
+              onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${sheetsCfg?.sheet_id}`, '_blank', 'noopener,noreferrer')}
+            >
+              เปิดชีตปัจจุบัน
+            </button>
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
+              type="button"
+              disabled={!sheetsCfg?.sheet_id}
+              onClick={() =>
+                window.open(`https://docs.google.com/spreadsheets/d/${sheetsCfg?.sheet_id}/export?format=xlsx`, '_blank', 'noopener,noreferrer')
+              }
+            >
+              ดาวน์โหลด .xlsx
+            </button>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-5">
+            <input
+              className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              value={sheetCreateTitle}
+              onChange={(e) => setSheetCreateTitle(e.target.value)}
+              placeholder="ชื่อชีตใหม่ (เช่น Stock Penaek)"
+            />
+            <input
+              className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              value={sheetShareEmails}
+              onChange={(e) => setSheetShareEmails(e.target.value)}
+              placeholder="แชร์ให้ (คั่นด้วย ,) เช่น you@gmail.com"
+            />
+            <button
+              className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+              type="button"
+              disabled={sheetCreateBusy}
+              onClick={async () => {
+                setSheetMsg(null)
+                setSheetCreateBusy(true)
+                try {
+                  const emails = sheetShareEmails
+                    .split(',')
+                    .map((x) => x.trim())
+                    .filter(Boolean)
+                  const res = await createDevSheet({ title: sheetCreateTitle.trim(), share_emails: emails, set_as_default: true })
+                  setLastCreatedSheet(res)
+                  setSheetMsg('กำลัง Sync ไปชีตใหม่...')
+                  try {
+                    const s = await syncToSheets()
+                    setSheetMsg(s.ok ? `สร้างชีตใหม่และ Sync แล้ว: ${res.sheet_id}` : `สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ: ${s.error || ''}`)
+                  } catch {
+                    setSheetMsg(`สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ`)
+                  }
+                  setSheetsCfg(await getDevSheetsConfig())
+                } catch (e: any) {
+                  setSheetMsg(e?.response?.data?.detail || e?.message || 'สร้างชีตไม่สำเร็จ')
+                } finally {
+                  setSheetCreateBusy(false)
+                }
+              }}
+            >
+              {sheetCreateBusy ? 'กำลังสร้าง/Sync...' : 'สร้างชีตใหม่ + Sync'}
+            </button>
+          </div>
+          {lastCreatedSheet ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                type="button"
+                onClick={() => window.open(lastCreatedSheet.sheet_url, '_blank', 'noopener,noreferrer')}
+              >
+                เปิดชีตที่สร้างล่าสุด
+              </button>
+              <button
+                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                type="button"
+                onClick={() => window.open(lastCreatedSheet.download_xlsx_url, '_blank', 'noopener,noreferrer')}
+              >
+                ดาวน์โหลดชีตล่าสุด (.xlsx)
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 backdrop-blur">

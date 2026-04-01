@@ -139,6 +139,14 @@ class KpisOut(BaseModel):
     active_users_online: int
 
 
+class StockSummaryOut(BaseModel):
+    total_products: int
+    full: int
+    low: int
+    critical: int
+    out: int
+
+
 class ActivityItemOut(BaseModel):
     id: str
     created_at: datetime

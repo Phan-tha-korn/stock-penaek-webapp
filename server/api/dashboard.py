@@ -8,9 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.deps import require_roles
-from server.api.schemas import ActivityItemOut, ActivityListOut, KpisOut, TransactionListOut, TransactionOut
+from server.api.schemas import ActivityItemOut, ActivityListOut, KpisOut, StockSummaryOut, TransactionListOut, TransactionOut
 from server.db.database import get_db
-from server.db.models import AuditLog, Product, Role, StockTransaction, TxnType, User
+from server.db.models import AuditLog, Product, Role, StockStatus, StockTransaction, TxnType, User
 from server.realtime.socket_manager import online_count
 
 
@@ -58,6 +58,30 @@ async def kpis(db: AsyncSession = Depends(get_db)):
         daily_revenue=_d(daily_revenue),
         daily_expense=_d(daily_expense),
         active_users_online=online_count(),
+    )
+
+
+@router.get("/stock_summary", response_model=StockSummaryOut, dependencies=[Depends(require_roles([Role.STOCK, Role.ADMIN, Role.ACCOUNTANT, Role.OWNER, Role.DEV]))])
+async def stock_summary(db: AsyncSession = Depends(get_db)):
+    stmt = (
+        select(Product.status, func.count())
+        .where(~Product.notes.like(f"{DELETED_PREFIX}%"))
+        .group_by(Product.status)
+    )
+    res = await db.execute(stmt)
+    rows = res.all()
+    by_status: dict[str, int] = {}
+    for st, cnt in rows:
+        key = st.value if isinstance(st, StockStatus) else str(st)
+        by_status[key] = int(cnt or 0)
+
+    total_products = int(sum(by_status.values()))
+    return StockSummaryOut(
+        total_products=total_products,
+        full=int(by_status.get(StockStatus.FULL.value, 0)),
+        low=int(by_status.get(StockStatus.LOW.value, 0)),
+        critical=int(by_status.get(StockStatus.CRITICAL.value, 0)),
+        out=int(by_status.get(StockStatus.OUT.value, 0)),
     )
 
 

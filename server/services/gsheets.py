@@ -12,7 +12,7 @@ from server.config.settings import settings
 from server.db.database import SessionLocal
 from server.db.models import AuditLog, Product, User
 from server.db.init_db import calc_status
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"]
 
 DELETED_PREFIX = "__DELETED__:"
 logger = logging.getLogger(__name__)

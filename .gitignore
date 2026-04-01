@@ -8,6 +8,8 @@ reports/
 storage/
 !storage/.gitkeep
 
+credentials/*.json
+
 server/db/app.db
 server/db/app.backup.db
 
