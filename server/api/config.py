@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -100,6 +100,16 @@ def _oauth_client_config(cfg: dict, request: Request | None = None) -> tuple[dic
         }
     }
     return config, redirect_uri
+
+
+def _safe_return_to(value: str, cfg: dict) -> str:
+    candidate = (value or "").strip()
+    if candidate.startswith("http://") or candidate.startswith("https://"):
+        return candidate
+    web_url = str(cfg.get("web_url") or "").strip().rstrip("/")
+    if web_url:
+        return f"{web_url}/settings#google-setup"
+    return "/settings#google-setup"
 
 
 
@@ -305,7 +315,7 @@ async def update_google_setup(
 
 
 @router.post("/config/google-oauth/start", response_model=GoogleOAuthStartOut)
-async def start_google_oauth(request: Request, user: User = Depends(get_current_user)):
+async def start_google_oauth(request: Request, return_to: str = "", user: User = Depends(get_current_user)):
     if user.role not in (Role.OWNER, Role.DEV):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     cfg = load_master_config()
@@ -325,6 +335,7 @@ async def start_google_oauth(request: Request, user: User = Depends(get_current_
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
+        state=_safe_return_to(return_to, cfg),
     )
     return GoogleOAuthStartOut(auth_url=auth_url)
 
@@ -332,6 +343,7 @@ async def start_google_oauth(request: Request, user: User = Depends(get_current_
 @router.get("/config/google-oauth/callback")
 async def google_oauth_callback(request: Request):
     cfg = load_master_config()
+    return_to = _safe_return_to(str(request.query_params.get("state") or ""), cfg)
     client_config, redirect_uri = _oauth_client_config(cfg, request)
     flow = Flow.from_client_config(
         client_config,
@@ -397,12 +409,10 @@ async def google_oauth_callback(request: Request):
     except HTTPException:
         raise
     except Exception:
-        return HTMLResponse(
-            "<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>เชื่อม Google ไม่สำเร็จ กรุณากลับไปลองใหม่</body></html>",
-            status_code=500,
-        )
+        html = f"<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>เชื่อม Google ไม่สำเร็จ กรุณากลับไปลองใหม่<script>setTimeout(function(){{ window.location.href={return_to!r}; }}, 2200)</script></body></html>"
+        return HTMLResponse(html, status_code=500)
 
-    return HTMLResponse(
-        "<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>เชื่อม Google สำเร็จ กำลังกลับไปหน้าตั้งค่า<script>setTimeout(function(){ window.location.href='/settings#google-setup'; }, 1200)</script></body></html>"
-    )
+    if return_to.startswith("http://") or return_to.startswith("https://"):
+        return RedirectResponse(return_to, status_code=302)
+    return RedirectResponse("/settings#google-setup", status_code=302)
 

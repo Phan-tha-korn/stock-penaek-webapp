@@ -62,7 +62,9 @@ export function SettingsPage() {
         setGoogleCfg(data)
         setGoogleOauthSecretDraft('')
       })
-      .catch(() => {})
+      .catch((e: any) => {
+        setError(e?.response?.data?.detail || 'โหลด Google setup ไม่สำเร็จ')
+      })
   }, [canManageGlobal])
 
   if (!form) {
@@ -539,29 +541,39 @@ export function SettingsPage() {
             <button
               className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
               type="button"
-              disabled={googleBusy || !googleCfg?.oauth_client_id}
+              disabled={
+                googleBusy ||
+                !googleCfg?.oauth_client_id ||
+                (!googleOauthSecretDraft.trim() && !googleCfg?.oauth_client_secret_masked) ||
+                !((googleCfg?.oauth_redirect_uri || '').trim() || (form?.web_url || '').trim())
+              }
               onClick={async () => {
+                if (!googleCfg) return
                 setGoogleBusy(true)
                 setError(null)
                 setOk(null)
                 try {
+                  const apiBaseUrl = String((import.meta as any).env?.VITE_API_URL || `${window.location.origin}/api`).replace(/\/+$/, '')
+                  const apiOrigin = apiBaseUrl.endsWith('/api') ? apiBaseUrl.slice(0, -4) : apiBaseUrl
+                  const redirectUri = (googleCfg.oauth_redirect_uri || '').trim() || `${apiOrigin}/api/config/google-oauth/callback`
                   const next = await updateGoogleSetupConfig({
-                    workspace_email: googleCfg?.workspace_email || '',
-                    drive_folder_name: googleCfg?.drive_folder_name || '',
-                    default_sheet_title: googleCfg?.default_sheet_title || '',
-                    service_account_key_path: googleCfg?.service_account_key_path || '',
-                    oauth_client_id: googleCfg?.oauth_client_id || '',
+                    workspace_email: googleCfg.workspace_email || '',
+                    drive_folder_name: googleCfg.drive_folder_name || '',
+                    default_sheet_title: googleCfg.default_sheet_title || '',
+                    service_account_key_path: googleCfg.service_account_key_path || '',
+                    oauth_client_id: googleCfg.oauth_client_id || '',
                     oauth_client_secret: googleOauthSecretDraft,
-                    oauth_redirect_uri: googleCfg?.oauth_redirect_uri || '',
-                    oauth_token_path: googleCfg?.oauth_token_path || '',
+                    oauth_redirect_uri: redirectUri,
+                    oauth_token_path: googleCfg.oauth_token_path || '',
                     create_new_sheet: false,
                     migrate_existing_data: false,
                   })
                   setGoogleCfg(next)
                   setGoogleOauthSecretDraft('')
-                  const res = await startGoogleOAuthLogin()
-                  window.open(res.auth_url, '_blank', 'noopener,noreferrer')
-                  setOk('เปิดหน้าต่าง Sign in with Google แล้ว')
+                  const returnTo = `${window.location.origin}/settings#google-setup`
+                  const res = await startGoogleOAuthLogin(returnTo)
+                  setOk('กำลังพาไปหน้า Sign in with Google...')
+                  window.location.assign(res.auth_url)
                 } catch (e: any) {
                   setError(e?.response?.data?.detail || 'เริ่ม Google OAuth ไม่สำเร็จ')
                 } finally {

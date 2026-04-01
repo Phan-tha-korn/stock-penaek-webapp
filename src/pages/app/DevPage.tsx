@@ -8,7 +8,7 @@ import { fetchActivity } from '../../services/dashboard'
 import { importFromSheets, syncToSheets } from '../../services/products'
 import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist, type GarbageFileItem } from '../../services/devGarbage'
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
-import { createDevSheet, getDevSheetsConfig, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
+import { createDevSheet, getDevSheetsConfig, resolveDevSheetUrl, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
 import { resetStock } from '../../services/devReset'
 import { useAuthStore } from '../../store/authStore'
 import type { ActivityItem } from '../../services/dashboard'
@@ -138,6 +138,17 @@ export function DevPage() {
     setSheetGuardMode(mode)
     setSheetGuardOpen(true)
     window.setTimeout(() => setSheetGuardOpen(false), 3000)
+  }
+
+  function openSheetUrl(url?: string, mode: 'missing' | 'sync' = 'sync') {
+    requireSheetsReady(() => {
+      const target = resolveDevSheetUrl(String(url || ''))
+      if (!target) {
+        setSheetMsg('ยังไม่พบลิงก์ Google Sheets สำหรับรายการนี้')
+        return
+      }
+      window.open(target, '_blank', 'noopener,noreferrer')
+    }, mode)
   }
 
   async function runSecureAction() {
@@ -1024,13 +1035,13 @@ export function DevPage() {
               <div className="text-sm font-semibold text-green-100">โซน Stock</div>
               <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.stock_tab_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_tab_url, 'sync')}>
                   เปิดแท็บ Stock
                 </button>
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
                   โหลดทั้งชีต .xlsx
                 </button>
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.stock_download_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_download_url, 'sync')}>
                   โหลดเฉพาะ Stock .csv
                 </button>
               </div>
@@ -1039,13 +1050,13 @@ export function DevPage() {
               <div className="text-sm font-semibold text-violet-100">โซนบัญชี</div>
               <div className="mt-1 text-xs text-violet-100/80">แยกสรุปบัญชี รายรับ รายจ่าย และภาพรวมมูลค่าสต็อก</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.accounting_tab_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.accounting_tab_url, 'sync')}>
                   เปิดแท็บบัญชี
                 </button>
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.sheet_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.sheet_url, 'sync')}>
                   เปิดสมุดทั้งหมด
                 </button>
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.accounting_download_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.accounting_download_url, 'sync')}>
                   โหลดเฉพาะบัญชี .csv
                 </button>
               </div>
@@ -1054,13 +1065,13 @@ export function DevPage() {
               <div className="text-sm font-semibold text-red-100">โซน Log</div>
               <div className="mt-1 text-xs text-red-100/80">เก็บการแก้ไขสำคัญ Add/Edit/Sell/Audit แยกหัวข้อให้อ่านง่าย</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.logs_tab_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_tab_url, 'sync')}>
                   เปิดแท็บ Log
                 </button>
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
                   โหลดทั้งชีต .xlsx
                 </button>
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => requireSheetsReady(() => window.open(sheetsCfg?.logs_download_url, '_blank', 'noopener,noreferrer'), 'sync')}>
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_download_url, 'sync')}>
                   โหลดเฉพาะ Log .csv
                 </button>
               </div>
@@ -1120,14 +1131,14 @@ export function DevPage() {
               <button
                 className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
                 type="button"
-                onClick={() => window.open(lastCreatedSheet.sheet_url, '_blank', 'noopener,noreferrer')}
+                onClick={() => openSheetUrl(lastCreatedSheet.sheet_url, 'sync')}
               >
                 เปิดชีตที่สร้างล่าสุด
               </button>
               <button
                 className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
                 type="button"
-                onClick={() => window.open(lastCreatedSheet.download_xlsx_url, '_blank', 'noopener,noreferrer')}
+                onClick={() => openSheetUrl(lastCreatedSheet.download_xlsx_url, 'sync')}
               >
                 ดาวน์โหลดชีตล่าสุด (.xlsx)
               </button>

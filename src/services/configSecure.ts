@@ -36,7 +36,9 @@ export async function updateGoogleSetupConfig(payload: {
   return data
 }
 
-export async function startGoogleOAuthLogin() {
-  const { data } = await api.post<{ auth_url: string }>('/config/google-oauth/start')
+export async function startGoogleOAuthLogin(returnTo?: string) {
+  const { data } = await api.post<{ auth_url: string }>('/config/google-oauth/start', null, {
+    params: returnTo ? { return_to: returnTo } : undefined,
+  })
   return data
 }
