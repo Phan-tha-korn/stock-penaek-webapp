@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Routes, Route } from 'react-router-dom'
 
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { SessionGuard } from './components/auth/SessionGuard'
 import { AppShell } from './components/layout/AppShell'
 
 const DashboardPage = lazy(() => import('./pages/app/DashboardPage').then((m) => ({ default: m.DashboardPage })))
@@ -20,6 +21,7 @@ const PublicProductPage = lazy(() => import('./pages/public/PublicProductPage').
 export function App() {
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-white/70">กำลังโหลด...</div>}>
+      <SessionGuard />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forbidden" element={<ForbiddenPage />} />

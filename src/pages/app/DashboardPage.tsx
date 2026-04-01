@@ -9,7 +9,7 @@ import { getSocket } from '../../services/socketManager'
 import { useTranslation } from 'react-i18next'
 import { formatTHB } from '../../utils/money'
 
-type CardColor = 'blue' | 'green' | 'yellow' | 'amber' | 'red' | 'orange' | 'default'
+type CardColor = 'blue' | 'green' | 'yellow' | 'amber' | 'red' | 'orange' | 'sky' | 'default'
 const CARD_COLOR_MAP: Record<CardColor, { border: string; bg: string; text: string }> = {
   blue:    { border: 'border-l-blue-500',   bg: 'bg-blue-500/10',   text: 'text-blue-300' },
   green:   { border: 'border-l-green-500',  bg: 'bg-green-500/10',  text: 'text-green-300' },
@@ -17,6 +17,7 @@ const CARD_COLOR_MAP: Record<CardColor, { border: string; bg: string; text: stri
   amber:   { border: 'border-l-amber-500',  bg: 'bg-amber-500/10',  text: 'text-amber-300' },
   red:     { border: 'border-l-red-500',    bg: 'bg-red-500/10',    text: 'text-red-300' },
   orange:  { border: 'border-l-orange-500', bg: 'bg-orange-500/10', text: 'text-orange-300' },
+  sky:     { border: 'border-l-sky-500',    bg: 'bg-sky-500/10',    text: 'text-sky-300' },
   default: { border: 'border-l-transparent',bg: '',                 text: '' },
 }
 
@@ -78,6 +79,59 @@ function statusBadgeClass(status: string): string {
     case 'TEST':     return 'bg-purple-600 text-white'
     default:         return 'bg-zinc-600 text-white'
   }
+}
+
+type StockAlertSectionKey = 'LOW' | 'CRITICAL' | 'OUT'
+
+const STOCK_ALERT_META: Array<{
+  key: StockAlertSectionKey
+  title: string
+  description: string
+  color: CardColor
+  badgeClass: string
+}> = [
+  {
+    key: 'LOW',
+    title: 'สินค้าใกล้หมด',
+    description: 'ยังพอขายได้ แต่ควรเฝ้าระวัง',
+    color: 'yellow',
+    badgeClass: 'bg-yellow-400/15 text-yellow-300 border border-yellow-400/30'
+  },
+  {
+    key: 'CRITICAL',
+    title: 'สินค้าควรเติม',
+    description: 'ต่ำกว่าจุดปลอดภัย ควรเติมด่วน',
+    color: 'amber',
+    badgeClass: 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+  },
+  {
+    key: 'OUT',
+    title: 'สินค้าหมด',
+    description: 'ไม่มีของพร้อมขายในคลัง',
+    color: 'red',
+    badgeClass: 'bg-red-500/15 text-red-300 border border-red-500/30'
+  }
+]
+
+function formatQty(value: string | number) {
+  const num = Number(value || 0)
+  return num.toLocaleString('th-TH', { maximumFractionDigits: 2 })
+}
+
+function formatUpdatedAt(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function getRestockQty(product: Product) {
+  return Math.max(0, Number(product.max_stock) - Number(product.stock_qty))
 }
 
 function ProductDetailModal({ product, onClose, onUpdate, onToast }: { product: Product; onClose: () => void; onUpdate: (p: Product) => void; onToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) {
@@ -308,13 +362,20 @@ function StockDashboard() {
   const [busy, setBusy] = useState(false)
   const [summaryBusy, setSummaryBusy] = useState(true)
   const [summaryReady, setSummaryReady] = useState(false)
+  const [alertsBusy, setAlertsBusy] = useState(true)
   const [scannedToday, setScannedToday] = useState(0)
   const [summary, setSummary] = useState({
     totalProducts: 0,
     fullStock: 0,
+    normalStock: 0,
     lowStock: 0,
     criticalStock: 0,
     outOfStock: 0
+  })
+  const [alertSections, setAlertSections] = useState<Record<StockAlertSectionKey, Product[]>>({
+    LOW: [],
+    CRITICAL: [],
+    OUT: [],
   })
   const { toasts, addToast } = useToast()
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -328,6 +389,7 @@ function StockDashboard() {
       setSummary({
         totalProducts: s.total_products,
         fullStock: s.full,
+        normalStock: s.normal,
         lowStock: s.low,
         criticalStock: s.critical,
         outOfStock: s.out,
@@ -336,6 +398,28 @@ function StockDashboard() {
     } finally {
       setSummaryBusy(false)
     }
+  }
+
+  async function reloadAlerts() {
+    setAlertsBusy(true)
+    try {
+      const [low, critical, out] = await Promise.all([
+        listProducts({ status: 'LOW', limit: 8 }),
+        listProducts({ status: 'CRITICAL', limit: 8 }),
+        listProducts({ status: 'OUT', limit: 8 }),
+      ])
+      setAlertSections({
+        LOW: low.items,
+        CRITICAL: critical.items,
+        OUT: out.items,
+      })
+    } finally {
+      setAlertsBusy(false)
+    }
+  }
+
+  async function reloadStockOverview() {
+    await Promise.all([reloadSummary(), reloadAlerts()])
   }
 
   useEffect(() => {
@@ -390,8 +474,8 @@ function StockDashboard() {
   }, [scanning])
 
   useEffect(() => {
-    reloadSummary()
-    const timer = window.setInterval(reloadSummary, 30_000)
+    reloadStockOverview()
+    const timer = window.setInterval(reloadStockOverview, 30_000)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -424,7 +508,7 @@ function StockDashboard() {
       )
       if (realtimeTimerRef.current) window.clearTimeout(realtimeTimerRef.current)
       realtimeTimerRef.current = window.setTimeout(() => {
-        reloadSummary()
+        reloadStockOverview()
       }, 300)
     }
     s.on('stock_updated', onStockUpdated)
@@ -444,7 +528,7 @@ function StockDashboard() {
           onClose={() => setSelectedProduct(null)} 
           onUpdate={(p) => {
             setSelectedProduct(p)
-            reloadSummary()
+            reloadStockOverview()
           }}
           onToast={addToast}
         />
@@ -538,13 +622,102 @@ function StockDashboard() {
             </div>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <Card title={t('dashboard.stock.totalProducts')} value={String(summary.totalProducts)} loading={!summaryReady} color="blue" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+          <Card title={t('dashboard.stock.totalProducts')} value={String(summary.totalProducts)} loading={summaryBusy && !summaryReady} color="blue" />
           <Card title="เต็ม" value={String(summary.fullStock)} loading={!summaryReady} color="green" />
+          <Card title="ปกติ" value={String(summary.normalStock)} loading={!summaryReady} color="sky" />
           <Card title={t('dashboard.stock.lowStock')} value={String(summary.lowStock)} loading={!summaryReady} color="yellow" />
           <Card title="ควรเติม" value={String(summary.criticalStock)} loading={!summaryReady} color="amber" />
           <Card title={t('dashboard.stock.outOfStock')} value={String(summary.outOfStock)} loading={!summaryReady} color="red" />
           <Card title={t('dashboard.stock.scannedToday')} value={String(scannedToday)} loading={false} color="orange" />
+        </div>
+      </div>
+
+      <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-5 backdrop-blur">
+        <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h3 className="text-base font-semibold">โซนเฝ้าระวังสต็อก</h3>
+            <p className="text-sm text-white/50">กดที่สินค้าเพื่อเปิดดูรายละเอียดและเช็กจำนวนที่ต้องเติม</p>
+          </div>
+          <div className="text-xs text-white/40">อัปเดตตามสถานะล่าสุดของคลังสินค้า</div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          {STOCK_ALERT_META.map((section) => {
+            const items = alertSections[section.key]
+            return (
+              <div key={section.key} className="rounded-xl border border-[color:var(--color-border)] bg-black/20">
+                <div className="flex items-start justify-between gap-3 border-b border-[color:var(--color-border)] px-4 py-4">
+                  <div>
+                    <div className="font-semibold">{section.title}</div>
+                    <div className="text-xs text-white/50">{section.description}</div>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${section.badgeClass}`}>
+                    {items.length} รายการ
+                  </span>
+                </div>
+
+                <div className="space-y-3 p-4">
+                  {alertsBusy ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="rounded-lg border border-[color:var(--color-border)] bg-white/5 p-4">
+                        <div className="h-4 w-32 rounded skeleton" />
+                        <div className="mt-3 h-3 w-24 rounded skeleton" />
+                        <div className="mt-4 h-16 rounded skeleton" />
+                      </div>
+                    ))
+                  ) : items.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-[color:var(--color-border)] bg-white/5 px-4 py-8 text-center text-sm text-white/45">
+                      ไม่มีรายการในโซนนี้
+                    </div>
+                  ) : (
+                    items.map((product) => {
+                      const restockQty = getRestockQty(product)
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => setSelectedProduct(product)}
+                          className="block w-full rounded-lg border border-[color:var(--color-border)] bg-white/5 p-4 text-left transition hover:border-white/20 hover:bg-white/10"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold">{product.name.th}</div>
+                              <div className="mt-1 text-xs font-mono text-white/45">{product.sku}</div>
+                            </div>
+                            <span className={`shrink-0 rounded px-2 py-1 text-[11px] font-semibold ${statusBadgeClass(product.status)}`}>
+                              {t(`stockStatus.${product.status}`)}
+                            </span>
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                            <div className="rounded border border-white/5 bg-black/20 p-3">
+                              <div className="text-xs text-white/50">คงเหลือ</div>
+                              <div className="mt-1 text-lg font-bold text-[color:var(--color-primary)]">
+                                {formatQty(product.stock_qty)} <span className="text-xs font-normal text-white/50">{product.unit}</span>
+                              </div>
+                            </div>
+                            <div className="rounded border border-white/5 bg-black/20 p-3">
+                              <div className="text-xs text-white/50">ต้องเติมเพิ่ม</div>
+                              <div className="mt-1 text-lg font-bold text-red-300">
+                                {formatQty(restockQty)} <span className="text-xs font-normal text-white/50">{product.unit}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 text-xs text-white/60 md:grid-cols-3">
+                            <div>ขั้นต่ำ: <span className="text-white">{formatQty(product.min_stock)} {product.unit}</span></div>
+                            <div>ควรมี: <span className="text-white">{formatQty(product.max_stock)} {product.unit}</span></div>
+                            <div>อัปเดตล่าสุด: <span className="text-white">{formatUpdatedAt(product.updated_at)}</span></div>
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

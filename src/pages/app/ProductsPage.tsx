@@ -7,6 +7,7 @@ import {
   createProductWithImage,
   adjustStock,
   deleteProduct,
+  downloadBulkImportTemplateZip,
   listProducts,
   restoreProduct,
   updateProductWithImage
@@ -39,6 +40,17 @@ function StatusBadge(props: { status: string; isTest: boolean }) {
   )
 }
 
+function downloadBlobFile(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export function ProductsPage() {
   const role = useAuthStore((s) => s.role)
   const user = useAuthStore((s) => s.user)
@@ -61,6 +73,7 @@ export function ProductsPage() {
   const [newImageFile, setNewImageFile] = useState<File | null>(null)
   const [bulkZipFile, setBulkZipFile] = useState<File | null>(null)
   const [bulkZipMsg, setBulkZipMsg] = useState('')
+  const [bulkTemplateRows, setBulkTemplateRows] = useState('5')
   const [editing, setEditing] = useState<Product | null>(null)
   const [editNameTh, setEditNameTh] = useState('')
   const [editCategory, setEditCategory] = useState('')
@@ -364,6 +377,30 @@ export function ProductsPage() {
                 </div>
                 <div className="text-xs text-white/50">
                   คอลัมน์ที่รองรับ: sku,name_th,category,unit,stock_qty,min_stock,max_stock,cost_price,selling_price,image_key
+                </div>
+                <div className="rounded border border-[color:var(--color-border)] bg-white/5 p-3">
+                  <div className="text-xs text-white/60">โหลดไฟล์ตัวอย่าง ZIP</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input
+                      className="w-28 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                      value={bulkTemplateRows}
+                      onChange={(e) => setBulkTemplateRows(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="จำนวนรายการ"
+                    />
+                    <button
+                      className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                      type="button"
+                      onClick={async () => {
+                        const rows = Math.max(1, Math.min(200, Number(bulkTemplateRows) || 5))
+                        const blob = await downloadBulkImportTemplateZip(rows)
+                        downloadBlobFile(blob, `products-template-${rows}-rows.zip`)
+                      }}
+                    >
+                      โหลดตัวอย่าง ZIP
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-white/45">ภายใน ZIP จะมี products.csv, README และโฟลเดอร์ images/ ให้เอาไปจัดไฟล์ต่อได้ทันที</div>
                 </div>
                 <input
                   type="file"

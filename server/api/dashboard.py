@@ -79,6 +79,7 @@ async def stock_summary(db: AsyncSession = Depends(get_db)):
     return StockSummaryOut(
         total_products=total_products,
         full=int(by_status.get(StockStatus.FULL.value, 0)),
+        normal=int(by_status.get(StockStatus.NORMAL.value, 0)),
         low=int(by_status.get(StockStatus.LOW.value, 0)),
         critical=int(by_status.get(StockStatus.CRITICAL.value, 0)),
         out=int(by_status.get(StockStatus.OUT.value, 0)),

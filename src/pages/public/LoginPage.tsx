@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { login as loginApi, getMe } from '../../services/auth'
 import { useAuthStore } from '../../store/authStore'
@@ -16,10 +16,12 @@ interface FormValues {
 export function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const setSession = useAuthStore((s) => s.setSession)
   const setTokens = useAuthStore((s) => s.setTokens)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const reauthReason = (location.state as { reason?: string } | null)?.reason
 
   const { register, handleSubmit } = useForm<FormValues>({
     defaultValues: { username: '', password: '', totp: '', secret_phrase: '' }
@@ -29,6 +31,11 @@ export function LoginPage() {
     <div className="mx-auto flex min-h-screen max-w-lg items-center px-4">
       <div className="card w-full rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-5 backdrop-blur animate-fade-in">
         <div className="mb-4 text-lg font-semibold">{t('auth.loginTitle')}</div>
+        {reauthReason === 'session_expired' ? (
+          <div className="mb-3 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+            เซสชันครบ 24 ชั่วโมงแล้ว กรุณาเข้าสู่ระบบใหม่เพื่อใช้งานต่อ
+          </div>
+        ) : null}
         {error ? (
           <div className="mb-3 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
             {error}
@@ -43,7 +50,7 @@ export function LoginPage() {
               const tokens = await loginApi(values)
               setTokens(tokens)
               const me = await getMe()
-              setSession(me, tokens)
+              setSession(me, tokens, { freshLogin: true })
               navigate('/')
             } catch (e: any) {
               const msg = e?.response?.data?.detail

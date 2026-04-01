@@ -4,6 +4,11 @@ export type DevSheetsConfig = {
   enabled: boolean
   sheet_id: string
   key_path: string
+  sheet_url: string
+  download_xlsx_url: string
+  stock_tab_url: string
+  accounting_tab_url: string
+  logs_tab_url: string
 }
 
 export type DevSheetCreateResult = {

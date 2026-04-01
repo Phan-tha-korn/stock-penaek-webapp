@@ -119,6 +119,14 @@ export async function bulkImportProductsZip(file: File, overwriteExisting = fals
   return res.data
 }
 
+export async function downloadBulkImportTemplateZip(rows: number) {
+  const res = await api.get<Blob>('/products/bulk-import-template-zip', {
+    params: { rows },
+    responseType: 'blob',
+  })
+  return res.data
+}
+
 export async function deleteProduct(sku: string, reason: string) {
   const res = await api.post<Product>(`/products/${encodeURIComponent(sku)}/delete`, { reason })
   return res.data

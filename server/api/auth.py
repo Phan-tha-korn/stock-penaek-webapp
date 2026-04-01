@@ -195,6 +195,10 @@ async def refresh(payload: RefreshIn, request: Request, db: AsyncSession = Depen
     sess = res.scalar_one_or_none()
     if not sess or sess.revoked or _utc(sess.expires_at) <= now_utc():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh_revoked")
+    if _utc(sess.created_at) + timedelta(hours=settings.reauth_after_hours) <= now_utc():
+        sess.revoked = True
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="reauth_required")
 
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
@@ -209,6 +213,8 @@ async def refresh(payload: RefreshIn, request: Request, db: AsyncSession = Depen
         ip=ip,
         user_agent=ua,
         revoked=False,
+        created_at=sess.created_at,
+        last_used_at=now_utc().replace(tzinfo=None),
         expires_at=(now_utc() + timedelta(days=settings.refresh_token_days)).replace(tzinfo=None),
     )
     db.add(sess2)

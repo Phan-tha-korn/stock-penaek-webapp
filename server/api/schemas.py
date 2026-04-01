@@ -142,6 +142,7 @@ class KpisOut(BaseModel):
 class StockSummaryOut(BaseModel):
     total_products: int
     full: int
+    normal: int
     low: int
     critical: int
     out: int

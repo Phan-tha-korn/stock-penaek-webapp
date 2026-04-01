@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import io
+import zipfile
 from decimal import Decimal
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +48,16 @@ def _d(v) -> str:
 
 def _is_deleted(p: Product) -> bool:
     return bool((p.notes or "").startswith(DELETED_PREFIX))
+
+
+def _trigger_sheet_sync() -> None:
+    try:
+        import asyncio
+        from server.services.gsheets import sync_all_to_sheets
+
+        asyncio.create_task(sync_all_to_sheets())
+    except Exception:
+        pass
 
 
 def _to_out(p: Product) -> ProductOut:
@@ -343,6 +356,36 @@ async def create_product_with_image(
     return await create_product(payload=payload, request=request, db=db, user=user)
 
 
+@router.get("/bulk-import-template-zip", dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))])
+async def bulk_import_template_zip(rows: int = Query(default=5, ge=1, le=200)):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+        csv_lines = ["sku,name_th,category,unit,stock_qty,min_stock,max_stock,cost_price,selling_price,image_key"]
+        for index in range(1, rows + 1):
+            sku = f"SKU-{index:04d}"
+            image_key = f"images/product-{index:04d}.jpg"
+            csv_lines.append(f'{sku},,หมวดหมู่ตัวอย่าง,ชิ้น,0,0,0,0,0,{image_key}')
+        zf.writestr("products.csv", "\n".join(csv_lines) + "\n")
+        zf.writestr(
+            "README.txt",
+            (
+                "ZIP ตัวอย่างสำหรับเพิ่มสินค้าใหม่หลายรายการ\n"
+                "- ต้องมีไฟล์ products.csv ที่ root ของ ZIP\n"
+                "- ถ้าต้องการแนบรูป ให้ใส่รูปไว้ในโฟลเดอร์ images/\n"
+                "- ค่า image_key ใน products.csv ต้องตรงกับ path ของรูปใน ZIP เช่น images/product-0001.jpg\n"
+                "- คอลัมน์ที่รองรับ: sku,name_th,category,unit,stock_qty,min_stock,max_stock,cost_price,selling_price,image_key\n"
+            ),
+        )
+        zf.writestr("images/put-images-here.txt", "วางรูปสินค้าในโฟลเดอร์ images/ แล้วแก้ image_key ใน products.csv ให้ตรงกัน\n")
+    buffer.seek(0)
+    file_name = f"products-template-{rows}-rows.zip"
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+
 @router.post("/bulk-import-zip", response_model=ProductBulkImportOut, dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))])
 async def bulk_import_zip(
     request: Request,
@@ -456,6 +499,7 @@ async def bulk_import_zip(
         before=None,
         after={"created": created, "updated": updated, "failed": failed},
     )
+    _trigger_sheet_sync()
     return ProductBulkImportOut(ok=True, created=created, updated=updated, failed=failed, items=items)
 
 

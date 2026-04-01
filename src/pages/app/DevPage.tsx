@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { api } from '../../services/api'
+import { createDevBackup, getDevBackupDownloadUrl, restoreDevBackup } from '../../services/devBackup'
 import { fetchConfig } from '../../services/config'
 import { fetchActivity } from '../../services/dashboard'
 import { importFromSheets, syncToSheets } from '../../services/products'
@@ -28,6 +29,9 @@ export function DevPage() {
   const [sheetShareEmails, setSheetShareEmails] = useState('')
   const [sheetCreateBusy, setSheetCreateBusy] = useState(false)
   const [lastCreatedSheet, setLastCreatedSheet] = useState<DevSheetCreateResult | null>(null)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [restoreBusy, setRestoreBusy] = useState(false)
+  const [restoreFile, setRestoreFile] = useState<File | null>(null)
   const [resetStockBusy, setResetStockBusy] = useState(false)
   const [garbageBusy, setGarbageBusy] = useState(false)
   const [garbageItems, setGarbageItems] = useState<GarbageFileItem[]>([])
@@ -37,6 +41,7 @@ export function DevPage() {
   const [garbageMsg, setGarbageMsg] = useState<string | null>(null)
   const [whitelist, setWhitelist] = useState<string[]>([])
   const [whitelistInput, setWhitelistInput] = useState('')
+  const [garbageExpanded, setGarbageExpanded] = useState(false)
 
   const [notifBusy, setNotifBusy] = useState(false)
   const [notifMsg, setNotifMsg] = useState<string | null>(null)
@@ -46,6 +51,8 @@ export function DevPage() {
   const [notifRoles, setNotifRoles] = useState<string[]>([])
   const [notifLowInput, setNotifLowInput] = useState('')
   const [notifHighInput, setNotifHighInput] = useState('')
+  const [secureAction, setSecureAction] = useState<'backup' | 'restore' | 'reset' | null>(null)
+  const [securePassword, setSecurePassword] = useState('')
 
   async function reload() {
     setBusy(true)
@@ -86,6 +93,74 @@ export function DevPage() {
     if (mb < 1024) return `${mb.toFixed(1)} MB`
     const gb = mb / 1024
     return `${gb.toFixed(2)} GB`
+  }
+
+  async function downloadProtectedFile(downloadUrl: string, fileName: string) {
+    const token = useAuthStore.getState().tokens?.access_token
+    const res = await fetch(getDevBackupDownloadUrl(downloadUrl), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error('download_failed')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  async function runSecureAction() {
+    const password = securePassword.trim()
+    if (!password || !secureAction) return
+    if (secureAction === 'backup') {
+      setSheetMsg(null)
+      setBackupBusy(true)
+      try {
+        const res = await createDevBackup(password)
+        await downloadProtectedFile(res.download_url, res.file_name)
+        setSheetMsg(`สร้าง Backup Now และดาวน์โหลดแล้ว: ${res.file_name}`)
+      } catch (e: any) {
+        setSheetMsg(e?.response?.data?.detail || e?.message || 'สร้าง backup ไม่สำเร็จ')
+      } finally {
+        setBackupBusy(false)
+      }
+      return
+    }
+    if (secureAction === 'restore') {
+      if (!restoreFile) {
+        setSheetMsg('กรุณาเลือกไฟล์ backup ก่อน')
+        return
+      }
+      setSheetMsg(null)
+      setRestoreBusy(true)
+      try {
+        const res = await restoreDevBackup(password, restoreFile)
+        setSheetMsg(`กู้คืน backup แล้ว: users ${res.restored.users || 0}, products ${res.restored.products || 0}, transactions ${res.restored.transactions || 0}`)
+        setRestoreFile(null)
+        await reload()
+        setSheetsCfg(await getDevSheetsConfig())
+      } catch (e: any) {
+        setSheetMsg(e?.response?.data?.detail || e?.message || 'กู้คืน backup ไม่สำเร็จ')
+      } finally {
+        setRestoreBusy(false)
+      }
+      return
+    }
+    setSheetMsg(null)
+    setResetStockBusy(true)
+    try {
+      const res = await resetStock(password)
+      await downloadProtectedFile(res.backup_download_url, res.backup_file_name)
+      setSheetMsg(`ล้างสต็อกแล้วและดาวน์โหลด backup ให้แล้ว: สินค้า ${res.deleted_products}, ธุรกรรม ${res.deleted_transactions}`)
+      await reload()
+    } catch (e: any) {
+      setSheetMsg(e?.response?.data?.detail || e?.message || 'ล้างสต็อกไม่สำเร็จ')
+    } finally {
+      setResetStockBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -135,6 +210,13 @@ export function DevPage() {
             <button
               className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
               type="button"
+              onClick={() => setGarbageExpanded((prev) => !prev)}
+            >
+              {garbageExpanded ? 'ยุบรายการ' : `ดูรายการ (${garbageItems.length})`}
+            </button>
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+              type="button"
               onClick={scanNow}
               disabled={garbageBusy}
             >
@@ -177,118 +259,133 @@ export function DevPage() {
           </div>
         </div>
         {garbageMsg ? <div className="mt-2 text-xs text-yellow-300">{garbageMsg}</div> : null}
+        <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 px-3 py-2 text-xs text-white/65">
+          พบทั้งหมด <span className="font-semibold text-white">{garbageItems.length}</span> รายการ
+          <span className="mx-2 text-white/25">•</span>
+          เลือกไว้ <span className="font-semibold text-white">{selectedPaths.length}</span> รายการ
+          <span className="mx-2 text-white/25">•</span>
+          Whitelist <span className="font-semibold text-white">{whitelist.length}</span> รายการ
+        </div>
 
-        <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-          <div className="mb-2 text-xs text-white/60">Whitelist (รองรับ wildcard เช่น dist/**, **/*.log)</div>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="min-w-[240px] flex-1 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
-              value={whitelistInput}
-              onChange={(e) => setWhitelistInput(e.target.value)}
-              placeholder="เพิ่ม path หรือ pattern"
-            />
-            <button
-              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-              type="button"
-              onClick={async () => {
-                const v = whitelistInput.trim()
-                if (!v) return
-                const next = Array.from(new Set([...whitelist, v]))
-                await updateGarbageWhitelist(next)
-                setWhitelist(next)
-                setWhitelistInput('')
-                await scanNow()
-              }}
-            >
-              เพิ่ม
-            </button>
-          </div>
-          {whitelist.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {whitelist.map((w) => (
+        {garbageExpanded ? (
+          <>
+            <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+              <div className="mb-2 text-xs text-white/60">Whitelist (รองรับ wildcard เช่น dist/**, **/*.log)</div>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  className="min-w-[240px] flex-1 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                  value={whitelistInput}
+                  onChange={(e) => setWhitelistInput(e.target.value)}
+                  placeholder="เพิ่ม path หรือ pattern"
+                />
                 <button
-                  key={w}
-                  className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/70 hover:bg-white/10"
+                  className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
                   type="button"
                   onClick={async () => {
-                    const next = whitelist.filter((x) => x !== w)
+                    const v = whitelistInput.trim()
+                    if (!v) return
+                    const next = Array.from(new Set([...whitelist, v]))
                     await updateGarbageWhitelist(next)
                     setWhitelist(next)
+                    setWhitelistInput('')
                     await scanNow()
                   }}
                 >
-                  {w} ✕
+                  เพิ่ม
                 </button>
-              ))}
+              </div>
+              {whitelist.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {whitelist.map((w) => (
+                    <button
+                      key={w}
+                      className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/70 hover:bg-white/10"
+                      type="button"
+                      onClick={async () => {
+                        const next = whitelist.filter((x) => x !== w)
+                        await updateGarbageWhitelist(next)
+                        setWhitelist(next)
+                        await scanNow()
+                      }}
+                    >
+                      {w} ✕
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
 
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-white/60">
-              <tr className="border-b border-[color:var(--color-border)]">
-                <th className="px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={garbageItems.length > 0 && selectedPaths.length === garbageItems.length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedPaths(garbageItems.map((x) => x.path))
-                      } else {
-                        setSelectedPaths([])
-                      }
-                    }}
-                  />
-                </th>
-                <th className="px-3 py-2">ประเภท</th>
-                <th className="px-3 py-2">Path</th>
-                <th className="px-3 py-2">ขนาด</th>
-                <th className="px-3 py-2">แก้ไขล่าสุด</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[color:var(--color-border)]">
-              {garbageItems.map((x) => (
-                <tr
-                  key={x.id}
-                  className="cursor-pointer hover:bg-white/5"
-                  onClick={() => {
-                    setSelectedPaths((prev) => {
-                      if (prev.includes(x.path)) return prev.filter((p) => p !== x.path)
-                      return [...prev, x.path]
-                    })
-                  }}
-                >
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedPaths.includes(x.path)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const checked = e.target.checked
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs text-white/60">
+                  <tr className="border-b border-[color:var(--color-border)]">
+                    <th className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={garbageItems.length > 0 && selectedPaths.length === garbageItems.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPaths(garbageItems.map((x) => x.path))
+                          } else {
+                            setSelectedPaths([])
+                          }
+                        }}
+                      />
+                    </th>
+                    <th className="px-3 py-2">ประเภท</th>
+                    <th className="px-3 py-2">Path</th>
+                    <th className="px-3 py-2">ขนาด</th>
+                    <th className="px-3 py-2">แก้ไขล่าสุด</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[color:var(--color-border)]">
+                  {garbageItems.map((x) => (
+                    <tr
+                      key={x.id}
+                      className="cursor-pointer hover:bg-white/5"
+                      onClick={() => {
                         setSelectedPaths((prev) => {
-                          if (checked) return prev.includes(x.path) ? prev : [...prev, x.path]
-                          return prev.filter((p) => p !== x.path)
+                          if (prev.includes(x.path)) return prev.filter((p) => p !== x.path)
+                          return [...prev, x.path]
                         })
                       }}
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-white/70">{x.category}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-white/80">{x.path}</td>
-                  <td className="px-3 py-2 text-white/80">{formatSize(x.size_bytes)}</td>
-                  <td className="px-3 py-2 text-white/60">{new Date(x.modified_at).toLocaleString()}</td>
-                </tr>
-              ))}
-              {!garbageBusy && garbageItems.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-6 text-sm text-white/60" colSpan={5}>
-                    ไม่พบไฟล์ขยะตามเงื่อนไข
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+                    >
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedPaths.includes(x.path)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            setSelectedPaths((prev) => {
+                              if (checked) return prev.includes(x.path) ? prev : [...prev, x.path]
+                              return prev.filter((p) => p !== x.path)
+                            })
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-white/70">{x.category}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-white/80">{x.path}</td>
+                      <td className="px-3 py-2 text-white/80">{formatSize(x.size_bytes)}</td>
+                      <td className="px-3 py-2 text-white/60">{new Date(x.modified_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                  {!garbageBusy && garbageItems.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-sm text-white/60" colSpan={5}>
+                        ไม่พบไฟล์ขยะตามเงื่อนไข
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="mt-3 rounded border border-dashed border-[color:var(--color-border)] bg-white/5 px-4 py-5 text-sm text-white/55">
+            ซ่อนรายละเอียดรายการไว้แล้ว กด “ดูรายการ” เพื่อเปิดตารางไฟล์ขยะและ whitelist
+          </div>
+        )}
       </div>
 
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
@@ -339,9 +436,49 @@ export function DevPage() {
         </div>
         {notifMsg ? <div className="mt-2 text-xs text-yellow-300">{notifMsg}</div> : null}
 
+        <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+          <div className="text-xs text-white/60">ตั้งค่าด่วน</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+              type="button"
+              onClick={() => {
+                setNotifLow([50, 20, 10, 0])
+                setNotifHigh([80, 90, 100])
+                setNotifMsg('โหลดชุดแจ้งเตือนพื้นฐานแล้ว')
+              }}
+            >
+              พื้นฐานร้านทั่วไป
+            </button>
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+              type="button"
+              onClick={() => {
+                setNotifLow([70, 50, 30, 15, 5, 0])
+                setNotifHigh([60, 80, 90, 100])
+                setNotifMsg('โหลดชุดแจ้งเตือนละเอียดแล้ว')
+              }}
+            >
+              ละเอียดมาก
+            </button>
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+              type="button"
+              onClick={() => {
+                setNotifLow([30, 10, 0])
+                setNotifHigh([95, 100])
+                setNotifMsg('โหลดชุดแจ้งเตือนแบบกระชับแล้ว')
+              }}
+            >
+              กระชับ
+            </button>
+          </div>
+        </div>
+
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-            <div className="text-xs text-white/60">แจ้งเตือนเมื่อ “ลงถึง” (% ของ max_stock)</div>
+            <div className="text-xs font-semibold text-white/80">โซนแจ้งเตือนฝั่งสต็อกลดลง</div>
+            <div className="mt-1 text-xs text-white/50">กำหนดว่าเมื่อสต็อกเหลือต่ำกว่ากี่ % ของจำนวนที่ควรมี ให้แจ้งเตือนทันที</div>
             <div className="mt-2 flex flex-wrap gap-2">
               <input
                 className="w-28 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
@@ -384,7 +521,8 @@ export function DevPage() {
           </div>
 
           <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-            <div className="text-xs text-white/60">แจ้งเตือนเมื่อ “ขึ้นถึง” (% ของ max_stock)</div>
+            <div className="text-xs font-semibold text-white/80">โซนแจ้งเตือนฝั่งสต็อกเพิ่มขึ้น</div>
+            <div className="mt-1 text-xs text-white/50">ใช้ติดตามว่าเติมของกลับมาถึงระดับไหนแล้ว เช่น 80%, 90%, 100%</div>
             <div className="mt-2 flex flex-wrap gap-2">
               <input
                 className="w-28 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
@@ -427,6 +565,25 @@ export function DevPage() {
           </div>
         </div>
 
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="rounded border border-green-500/30 bg-green-500/10 p-3 text-xs text-green-100">
+            <div className="font-semibold">สีเขียว</div>
+            <div className="mt-1 text-green-100/80">ปกติหรือพร้อมใช้งาน</div>
+          </div>
+          <div className="rounded border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-100">
+            <div className="font-semibold">สีเหลือง</div>
+            <div className="mt-1 text-yellow-100/80">เริ่มเข้าใกล้จุดเตือน</div>
+          </div>
+          <div className="rounded border border-orange-500/30 bg-orange-500/10 p-3 text-xs text-orange-100">
+            <div className="font-semibold">สีส้ม</div>
+            <div className="mt-1 text-orange-100/80">ควรเติมหรือควรเช็กทันที</div>
+          </div>
+          <div className="rounded border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-100">
+            <div className="font-semibold">สีแดง</div>
+            <div className="mt-1 text-red-100/80">สำคัญมากหรือสต็อกหมด</div>
+          </div>
+        </div>
+
         <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
           <div className="text-xs text-white/60">Role ที่จะรับการแจ้งเตือน</div>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -452,6 +609,59 @@ export function DevPage() {
           </div>
         </div>
       </div>
+
+      {secureAction ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="w-full max-w-md rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)] shadow-2xl">
+              <div className="border-b border-[color:var(--color-border)] px-5 py-4 text-sm font-semibold">
+                {secureAction === 'backup' ? 'ยืนยันสร้าง Backup Now' : secureAction === 'restore' ? 'ยืนยันกู้คืน Backup' : 'ยืนยันล้าง Stock'}
+              </div>
+              <div className="space-y-3 px-5 py-4">
+                <div className="text-sm text-white/70">
+                  {secureAction === 'backup'
+                    ? 'กรอกรหัสเพื่อสร้างไฟล์ backup แบบ realtime แล้วดาวน์โหลดทันที'
+                    : secureAction === 'restore'
+                      ? `กรอกรหัสเพื่อกู้คืนจากไฟล์ ${restoreFile?.name || '-'} และแทนที่ข้อมูลทั้งหมดในระบบ`
+                      : 'กรอกรหัสเพื่อสำรองข้อมูลก่อน แล้วล้างสินค้า/ธุรกรรม/alert ทั้งหมดโดยคงผู้ใช้ไว้'}
+                </div>
+                <input
+                  type="password"
+                  value={securePassword}
+                  onChange={(e) => setSecurePassword(e.target.value)}
+                  placeholder="กรอกรหัสยืนยัน"
+                  className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                />
+                <div className="text-xs text-white/45">ต้องใช้รหัส: phanthakorn</div>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-[color:var(--color-border)] px-5 py-4">
+                <button
+                  className="rounded border border-[color:var(--color-border)] px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+                  type="button"
+                  onClick={() => {
+                    setSecureAction(null)
+                    setSecurePassword('')
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+                  type="button"
+                  disabled={!securePassword.trim() || backupBusy || restoreBusy || resetStockBusy}
+                  onClick={async () => {
+                    await runSecureAction()
+                    setSecureAction(null)
+                    setSecurePassword('')
+                  }}
+                >
+                  ยืนยัน
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {confirmOpen ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
@@ -542,8 +752,8 @@ export function DevPage() {
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Google Sheets</div>
-            <div className="text-xs text-white/60">นำเข้าจากชีต → DB (รอบเดียว) และสั่ง Sync ตอนนี้</div>
+            <div className="text-sm font-semibold">Sheets Center + Backup Control</div>
+            <div className="text-xs text-white/60">ใช้งานหลักผ่านเว็บ แต่จัดเก็บ/เรียงข้อมูลสำคัญไว้ใน Google Sheets และ Backup แบบไฟล์ ZIP</div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -588,30 +798,52 @@ export function DevPage() {
         {sheetMsg ? <div className="mt-2 text-xs text-white/70">{sheetMsg}</div> : null}
 
         <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-          <div className="text-xs text-white/60">สร้าง Google Sheet ใหม่และตั้งค่า sheet_id ให้ระบบ</div>
+          <div className="text-xs text-white/60">Google Sheets หลักของระบบ</div>
           <div className="mt-2 text-xs text-white/50 break-words">
-            sheet_id ปัจจุบัน: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | key: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
+            sheet_id: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | key: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
           </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
-              type="button"
-              disabled={!sheetsCfg?.sheet_id}
-              onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${sheetsCfg?.sheet_id}`, '_blank', 'noopener,noreferrer')}
-            >
-              เปิดชีตปัจจุบัน
-            </button>
-            <button
-              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
-              type="button"
-              disabled={!sheetsCfg?.sheet_id}
-              onClick={() =>
-                window.open(`https://docs.google.com/spreadsheets/d/${sheetsCfg?.sheet_id}/export?format=xlsx`, '_blank', 'noopener,noreferrer')
-              }
-            >
-              ดาวน์โหลด .xlsx
-            </button>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
+              <div className="text-sm font-semibold text-green-100">โซน Stock</div>
+              <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" disabled={!sheetsCfg?.stock_tab_url} onClick={() => window.open(sheetsCfg?.stock_tab_url, '_blank', 'noopener,noreferrer')}>
+                  เปิดแท็บ Stock
+                </button>
+                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" disabled={!sheetsCfg?.download_xlsx_url} onClick={() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer')}>
+                  โหลดทั้งชีต .xlsx
+                </button>
+              </div>
+            </div>
+            <div className="rounded border border-violet-500/30 bg-violet-500/10 p-3">
+              <div className="text-sm font-semibold text-violet-100">โซนบัญชี</div>
+              <div className="mt-1 text-xs text-violet-100/80">แยกสรุปบัญชี รายรับ รายจ่าย และภาพรวมมูลค่าสต็อก</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" disabled={!sheetsCfg?.accounting_tab_url} onClick={() => window.open(sheetsCfg?.accounting_tab_url, '_blank', 'noopener,noreferrer')}>
+                  เปิดแท็บบัญชี
+                </button>
+                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" disabled={!sheetsCfg?.sheet_url} onClick={() => window.open(sheetsCfg?.sheet_url, '_blank', 'noopener,noreferrer')}>
+                  เปิดสมุดทั้งหมด
+                </button>
+              </div>
+            </div>
+            <div className="rounded border border-red-500/30 bg-red-500/10 p-3">
+              <div className="text-sm font-semibold text-red-100">โซน Log</div>
+              <div className="mt-1 text-xs text-red-100/80">เก็บการแก้ไขสำคัญ Add/Edit/Sell/Audit แยกหัวข้อให้อ่านง่าย</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" disabled={!sheetsCfg?.logs_tab_url} onClick={() => window.open(sheetsCfg?.logs_tab_url, '_blank', 'noopener,noreferrer')}>
+                  เปิดแท็บ Log
+                </button>
+                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" disabled={!sheetsCfg?.download_xlsx_url} onClick={() => window.open(sheetsCfg?.download_xlsx_url, '_blank', 'noopener,noreferrer')}>
+                  โหลดทั้งชีต .xlsx
+                </button>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+          <div className="text-xs text-white/60">สร้าง Google Sheet ใหม่และตั้งค่าให้ระบบ</div>
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-5">
             <input
               className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
@@ -677,27 +909,60 @@ export function DevPage() {
           ) : null}
         </div>
 
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3">
+            <div className="text-sm font-semibold text-blue-100">Backup Now</div>
+            <div className="mt-1 text-xs text-blue-100/80">สร้างไฟล์ ZIP ของข้อมูลทั้งระบบ ณ ตอนนั้น แล้วดาวน์โหลดทันที</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                className="rounded bg-blue-500 px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                type="button"
+                disabled={backupBusy}
+                onClick={() => {
+                  setSecurePassword('')
+                  setSecureAction('backup')
+                }}
+              >
+                {backupBusy ? 'กำลังสร้าง...' : 'โหลด Backup Now'}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3">
+            <div className="text-sm font-semibold text-amber-100">Restore Backup</div>
+            <div className="mt-1 text-xs text-amber-100/80">เลือกไฟล์ backup ZIP แล้วแทนที่ข้อมูลทั้งหมดในระบบให้ตรงกับ backup</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input
+                type="file"
+                accept=".zip,application/zip"
+                className="min-w-[240px] flex-1 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm text-white/80 file:mr-3 file:rounded file:border file:border-[color:var(--color-border)] file:bg-black/40 file:px-3 file:py-1.5"
+                onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
+              />
+              <button
+                className="rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+                type="button"
+                disabled={!restoreFile || restoreBusy}
+                onClick={() => {
+                  setSecurePassword('')
+                  setSecureAction('restore')
+                }}
+              >
+                {restoreBusy ? 'กำลังกู้คืน...' : 'กู้คืนจาก Backup'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-3 rounded border border-red-500/30 bg-red-500/5 p-3">
-          <div className="text-xs text-white/60">ล้างสินค้า/สต็อกทั้งหมด (DB) แต่คงผู้ใช้ไว้</div>
+          <div className="text-xs text-white/60">ล้างสินค้า/สต็อกทั้งหมด (DB) แต่คงผู้ใช้ไว้ พร้อมดาวน์โหลด backup ก่อนล้าง</div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               className="rounded bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
               type="button"
               disabled={resetStockBusy}
-              onClick={async () => {
-                const ok = window.confirm('ยืนยันล้างสินค้า/สต็อกทั้งหมด? (จะลบสินค้าและธุรกรรมทั้งหมดใน DB แต่ผู้ใช้จะไม่ถูกลบ)')
-                if (!ok) return
-                setSheetMsg(null)
-                setResetStockBusy(true)
-                try {
-                  const res = await resetStock()
-                  setSheetMsg(`ล้างสต็อกแล้ว: สินค้า ${res.deleted_products}, ธุรกรรม ${res.deleted_transactions}`)
-                  await reload()
-                } catch (e: any) {
-                  setSheetMsg(e?.response?.data?.detail || e?.message || 'ล้างสต็อกไม่สำเร็จ')
-                } finally {
-                  setResetStockBusy(false)
-                }
+              onClick={() => {
+                setSecurePassword('')
+                setSecureAction('reset')
               }}
             >
               {resetStockBusy ? 'กำลังล้าง...' : 'ล้าง Stock ให้โล่ง'}

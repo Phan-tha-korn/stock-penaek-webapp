@@ -6,7 +6,21 @@ from pydantic import BaseModel
 from server.api.deps import require_roles
 from server.config.config_loader import load_master_config, write_master_config
 from server.db.models import Role
-from server.services.gsheets import get_client, _ensure_tab, TAB_ADD_LOG, TAB_EDIT_LOG, TAB_EXPENSE_LOG, TAB_INCOME_LOG, TAB_SELL_LOG, TAB_STOCK
+from server.services.gsheets import (
+    get_client,
+    _ensure_tab,
+    _style_sheet,
+    TAB_ACCOUNTING,
+    TAB_ADD_LOG,
+    TAB_AUDIT_LOG,
+    TAB_EDIT_LOG,
+    TAB_EXPENSE_LOG,
+    TAB_INCOME_LOG,
+    TAB_OVERVIEW,
+    TAB_SELL_LOG,
+    TAB_STOCK,
+    TAB_STOCK_ALERTS,
+)
 from server.config.settings import settings
 
 
@@ -17,6 +31,11 @@ class DevSheetsConfigOut(BaseModel):
     enabled: bool
     sheet_id: str
     key_path: str
+    sheet_url: str
+    download_xlsx_url: str
+    stock_tab_url: str
+    accounting_tab_url: str
+    logs_tab_url: str
 
 
 class DevSheetsCreateIn(BaseModel):
@@ -31,13 +50,37 @@ class DevSheetsCreateOut(BaseModel):
     download_xlsx_url: str
 
 
-@router.get("/config", response_model=DevSheetsConfigOut, dependencies=[Depends(require_roles([Role.DEV]))])
+@router.get("/config", response_model=DevSheetsConfigOut, dependencies=[Depends(require_roles([Role.DEV, Role.OWNER, Role.ADMIN, Role.ACCOUNTANT]))])
 async def get_sheets_config():
     cfg = load_master_config()
     sheet_id = str(cfg.get("google_sheets_id") or cfg.get("google_sheets", {}).get("sheet_id") or "")
     key_path = str(cfg.get("google_service_account_key_path") or cfg.get("google_sheets", {}).get("service_account_key_path") or settings.google_service_account_key_path or "")
     enabled = bool(sheet_id)
-    return DevSheetsConfigOut(enabled=enabled, sheet_id=sheet_id, key_path=key_path)
+    sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}" if sheet_id else ""
+    download_xlsx_url = f"{sheet_url}/export?format=xlsx" if sheet_url else ""
+    stock_tab_url = sheet_url
+    accounting_tab_url = sheet_url
+    logs_tab_url = sheet_url
+    if enabled:
+        client = get_client()
+        if client:
+            try:
+                sheet = client.open_by_key(sheet_id)
+                stock_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_STOCK).id}"
+                accounting_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_ACCOUNTING).id}"
+                logs_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_AUDIT_LOG).id}"
+            except Exception:
+                pass
+    return DevSheetsConfigOut(
+        enabled=enabled,
+        sheet_id=sheet_id,
+        key_path=key_path,
+        sheet_url=sheet_url,
+        download_xlsx_url=download_xlsx_url,
+        stock_tab_url=stock_tab_url,
+        accounting_tab_url=accounting_tab_url,
+        logs_tab_url=logs_tab_url,
+    )
 
 
 @router.post("/create", response_model=DevSheetsCreateOut, dependencies=[Depends(require_roles([Role.DEV]))])
@@ -52,12 +95,19 @@ async def create_new_sheet(payload: DevSheetsCreateIn):
 
     try:
         sheet = client.create(title)
-        _ensure_tab(sheet, TAB_STOCK)
-        _ensure_tab(sheet, TAB_EDIT_LOG)
-        _ensure_tab(sheet, TAB_ADD_LOG)
-        _ensure_tab(sheet, TAB_SELL_LOG)
-        _ensure_tab(sheet, TAB_INCOME_LOG)
-        _ensure_tab(sheet, TAB_EXPENSE_LOG)
+        tabs = [
+            _ensure_tab(sheet, TAB_OVERVIEW),
+            _ensure_tab(sheet, TAB_STOCK),
+            _ensure_tab(sheet, TAB_STOCK_ALERTS),
+            _ensure_tab(sheet, TAB_ACCOUNTING),
+            _ensure_tab(sheet, TAB_AUDIT_LOG),
+            _ensure_tab(sheet, TAB_EDIT_LOG),
+            _ensure_tab(sheet, TAB_ADD_LOG),
+            _ensure_tab(sheet, TAB_SELL_LOG),
+            _ensure_tab(sheet, TAB_INCOME_LOG),
+            _ensure_tab(sheet, TAB_EXPENSE_LOG),
+        ]
+        _style_sheet(sheet, tabs)
 
         for e in payload.share_emails or []:
             email = str(e).strip()

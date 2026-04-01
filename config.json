@@ -43,6 +43,7 @@
   ],
   "notification_roles": [
     "STOCK",
-    "OWNER"
+    "OWNER",
+    "ADMIN"
   ]
 }

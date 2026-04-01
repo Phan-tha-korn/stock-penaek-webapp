@@ -20,13 +20,18 @@ logger = logging.getLogger(__name__)
 
 
 TAB_STOCK = "Stock"
+TAB_OVERVIEW = "Overview"
+TAB_STOCK_ALERTS = "StockAlerts"
 TAB_EDIT_LOG = "EditLog"
 TAB_ADD_LOG = "AddLog"
 TAB_SELL_LOG = "SellLog"
+TAB_AUDIT_LOG = "AuditLog"
+TAB_ACCOUNTING = "Accounting"
 TAB_INCOME_LOG = "IncomeLog"
 TAB_EXPENSE_LOG = "ExpenseLog"
 
 HEADERS = {
+    TAB_OVERVIEW: ["หัวข้อ", "ค่า", "รายละเอียด"],
     TAB_STOCK: [
         "ID",
         "ชื่อสินค้า",
@@ -44,6 +49,7 @@ HEADERS = {
         "ข้อความแจ้งเตือน",
         "อัปเดตล่าสุด",
     ],
+    TAB_STOCK_ALERTS: ["ระดับ", "SKU", "ชื่อสินค้า", "คงเหลือ", "ขั้นต่ำ", "ควรมี", "สถานะ", "อัปเดตล่าสุด", "หมายเหตุ"],
     TAB_EDIT_LOG: ["วันที่-เวลา", "ประเภทการกระทำ", "ID สินค้า", "ชื่อสินค้า", "รายละเอียด", "ผู้ทำรายการ"],
     TAB_ADD_LOG: [
         "วันที่-เวลา",
@@ -67,6 +73,8 @@ HEADERS = {
         "หมายเหตุ",
         "ผู้ทำรายการ",
     ],
+    TAB_AUDIT_LOG: ["ระดับ", "วันที่-เวลา", "Action", "Entity", "SKU", "ชื่อสินค้า", "ข้อความ", "ผู้ทำรายการ"],
+    TAB_ACCOUNTING: ["หัวข้อ", "ค่า", "รายละเอียด"],
     TAB_INCOME_LOG: ["วันที่-เวลา", "หมวดรายรับ", "รายละเอียด", "จำนวนเงิน", "ช่องทาง", "อ้างอิง", "ผู้บันทึก"],
     TAB_EXPENSE_LOG: ["วันที่-เวลา", "หมวดรายจ่าย", "รายละเอียด", "จำนวนเงิน", "ช่องทาง", "อ้างอิง", "ผู้บันทึก"],
 }
@@ -151,6 +159,60 @@ def _ensure_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet:
     return ws
 
 
+TAB_STYLES = {
+    TAB_OVERVIEW: {"tab": {"red": 0.24, "green": 0.48, "blue": 0.98}, "header": {"red": 0.87, "green": 0.92, "blue": 1}},
+    TAB_STOCK: {"tab": {"red": 0.22, "green": 0.65, "blue": 0.33}, "header": {"red": 0.87, "green": 0.95, "blue": 0.88}},
+    TAB_STOCK_ALERTS: {"tab": {"red": 0.95, "green": 0.7, "blue": 0.12}, "header": {"red": 1, "green": 0.96, "blue": 0.82}},
+    TAB_ACCOUNTING: {"tab": {"red": 0.42, "green": 0.28, "blue": 0.75}, "header": {"red": 0.91, "green": 0.88, "blue": 1}},
+    TAB_AUDIT_LOG: {"tab": {"red": 0.83, "green": 0.2, "blue": 0.2}, "header": {"red": 1, "green": 0.87, "blue": 0.87}},
+    TAB_EDIT_LOG: {"tab": {"red": 0.85, "green": 0.47, "blue": 0.14}, "header": {"red": 1, "green": 0.93, "blue": 0.85}},
+    TAB_ADD_LOG: {"tab": {"red": 0.22, "green": 0.65, "blue": 0.33}, "header": {"red": 0.87, "green": 0.95, "blue": 0.88}},
+    TAB_SELL_LOG: {"tab": {"red": 0.98, "green": 0.56, "blue": 0.12}, "header": {"red": 1, "green": 0.91, "blue": 0.84}},
+    TAB_INCOME_LOG: {"tab": {"red": 0.13, "green": 0.55, "blue": 0.13}, "header": {"red": 0.86, "green": 0.96, "blue": 0.86}},
+    TAB_EXPENSE_LOG: {"tab": {"red": 0.75, "green": 0.13, "blue": 0.13}, "header": {"red": 0.97, "green": 0.87, "blue": 0.87}},
+}
+
+
+def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]) -> None:
+    requests: list[dict] = []
+    for ws in worksheets:
+        style = TAB_STYLES.get(ws.title)
+        if not style:
+            continue
+        requests.append(
+            {
+                "updateSheetProperties": {
+                    "properties": {
+                        "sheetId": ws.id,
+                        "gridProperties": {"frozenRowCount": 1},
+                        "tabColor": style["tab"],
+                    },
+                    "fields": "gridProperties.frozenRowCount,tabColor",
+                }
+            }
+        )
+        requests.append(
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": ws.id,
+                        "startRowIndex": 0,
+                        "endRowIndex": 1,
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "backgroundColor": style["header"],
+                            "textFormat": {"bold": True},
+                        }
+                    },
+                    "fields": "userEnteredFormat(backgroundColor,textFormat)",
+                }
+            }
+        )
+    if requests:
+        sheet.batch_update({"requests": requests})
+
+
 def _get_col_idx(header: list[str], keys: list[str]) -> int | None:
     norm = {str(x).strip(): i for i, x in enumerate(header)}
     for k in keys:
@@ -170,6 +232,23 @@ def _parse_float(v: str) -> float:
         return float(s)
     except Exception:
         return 0.0
+
+
+def _severity_label(action: str, success: bool, status: str = "") -> str:
+    if not success:
+        return "🟥 สำคัญ"
+    if status in ("OUT", "CRITICAL"):
+        return "🟥 สำคัญ"
+    if status == "LOW":
+        return "🟨 เฝ้าระวัง"
+    if action.startswith("DEV_"):
+        return "🟨 ตรวจสอบ"
+    return "🟩 ปกติ"
+
+
+def _write_rows(ws: gspread.Worksheet, rows: list[list]) -> None:
+    ws.clear()
+    ws.update(rows)
 
 
 def _sync_stock_sheet(ws: gspread.Worksheet, products: list[dict]) -> None:
@@ -399,9 +478,18 @@ async def import_stock_from_sheet(
 async def sync_all_to_sheets() -> None:
     products_data: list[dict] = []
     product_by_id: dict[str, dict] = {}
+    status_counts = {"FULL": 0, "NORMAL": 0, "LOW": 0, "CRITICAL": 0, "OUT": 0}
+    alert_rows = [HEADERS[TAB_STOCK_ALERTS]]
+    overview_rows = [HEADERS[TAB_OVERVIEW]]
+    accounting_rows = [HEADERS[TAB_ACCOUNTING]]
+    audit_rows = [HEADERS[TAB_AUDIT_LOG]]
     add_rows = [HEADERS[TAB_ADD_LOG]]
     sell_rows = [HEADERS[TAB_SELL_LOG]]
     edit_rows = [HEADERS[TAB_EDIT_LOG]]
+    total_stock_value = 0.0
+    total_sell_qty = 0.0
+    total_income_value = 0.0
+    total_expense_value = 0.0
 
     async with SessionLocal() as db:
         res = await db.execute(select(Product))
@@ -424,6 +512,23 @@ async def sync_all_to_sheets() -> None:
             }
             products_data.append(pd)
             product_by_id[p.id] = {"sku": p.sku, "name_th": p.name_th, "unit": p.unit}
+            total_stock_value += float(p.stock_qty or 0) * float(p.cost_price or 0)
+            status_counts[p.status.value] = status_counts.get(p.status.value, 0) + 1
+            if p.status.value in ("LOW", "CRITICAL", "OUT"):
+                note = "ยังพอขายได้" if p.status.value == "LOW" else "ควรเติมด่วน" if p.status.value == "CRITICAL" else "สินค้าหมด"
+                alert_rows.append(
+                    [
+                        _severity_label("", True, p.status.value),
+                        p.sku,
+                        p.name_th,
+                        float(p.stock_qty or 0),
+                        float(p.min_stock or 0),
+                        float(p.max_stock or 0),
+                        _status_th(p.status.value),
+                        updated,
+                        note,
+                    ]
+                )
 
         res = await db.execute(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(2000))
         logs = list(reversed(res.scalars().all()))
@@ -448,6 +553,7 @@ async def sync_all_to_sheets() -> None:
                 delta = ""
                 if isinstance(qty_before, (int, float)) and isinstance(qty_after, (int, float)):
                     delta = max(0.0, float(qty_after) - float(qty_before))
+                    total_expense_value += delta
                 add_rows.append([ts, sku, name_th, delta, unit, qty_before or "", qty_after or "", msg, actor])
                 continue
 
@@ -455,32 +561,82 @@ async def sync_all_to_sheets() -> None:
                 delta = ""
                 if isinstance(qty_before, (int, float)) and isinstance(qty_after, (int, float)):
                     delta = max(0.0, float(qty_before) - float(qty_after))
+                    total_sell_qty += float(delta or 0)
                 sell_rows.append([ts, sku, name_th, delta, unit, qty_before or "", qty_after or "", msg, actor])
                 continue
 
             if x.action.startswith("STOCK_") or x.action.startswith("PRODUCT_"):
                 edit_rows.append([ts, x.action, sku, name_th, msg, actor])
 
-    def _write_rows(ws: gspread.Worksheet, rows: list[list]) -> None:
-        ws.clear()
-        ws.update(rows)
+            audit_rows.append([
+                _severity_label(x.action, bool(x.success)),
+                ts,
+                x.action,
+                x.entity,
+                sku,
+                name_th,
+                msg,
+                actor,
+            ])
+
+    total_income_value = 0.0
+    for row in sell_rows[1:]:
+        try:
+            qty = float(row[3] or 0)
+        except Exception:
+            qty = 0.0
+        total_income_value += qty
+
+    overview_rows.extend(
+        [
+            ["ระบบ Stock ทำงาน", datetime.utcnow().isoformat(timespec="seconds"), "เวลาที่ sync ขึ้นชีตล่าสุด"],
+            ["สินค้าทั้งหมด", len(products_data), "จำนวนสินค้าที่ใช้งานอยู่ในระบบ"],
+            ["สต็อกเต็ม", status_counts.get("FULL", 0), "สีเขียว = เต็ม"],
+            ["สต็อกปกติ", status_counts.get("NORMAL", 0), "สีฟ้า = ปกติ"],
+            ["สินค้าใกล้หมด", status_counts.get("LOW", 0), "สีเหลือง = เฝ้าระวัง"],
+            ["สินค้าควรเติม", status_counts.get("CRITICAL", 0), "สีส้ม/แดง = ควรเติมด่วน"],
+            ["สินค้าหมด", status_counts.get("OUT", 0), "สีแดง = หมดสต็อก"],
+            ["มูลค่าสต็อกโดยประมาณ", f"{total_stock_value:.2f}", "อิงจากต้นทุนสินค้า"],
+            ["จำนวนรายการแจ้งเตือน", max(0, len(alert_rows) - 1), "ดูรายละเอียดต่อในแท็บ StockAlerts"],
+        ]
+    )
+    accounting_rows.extend(
+        [
+            ["รายการรับเข้า", max(0, len(add_rows) - 1), "มาจากธุรกรรม STOCK_IN"],
+            ["รายการขาย/เบิกออก", max(0, len(sell_rows) - 1), "มาจากธุรกรรม STOCK_OUT"],
+            ["จำนวนรับเข้ารวม", f"{total_expense_value:.2f}", "หน่วยรวมจาก AddLog"],
+            ["จำนวนขาย/เบิกรวม", f"{total_sell_qty:.2f}", "หน่วยรวมจาก SellLog"],
+            ["มูลค่าสต็อกปัจจุบัน", f"{total_stock_value:.2f}", "อิงจากต้นทุนสินค้าในคลัง"],
+            ["แท็บรายรับ", TAB_INCOME_LOG, "ใช้เก็บรายรับเพิ่มเติมได้"],
+            ["แท็บรายจ่าย", TAB_EXPENSE_LOG, "ใช้เก็บรายจ่ายเพิ่มเติมได้"],
+        ]
+    )
 
     def _sync_blocking() -> None:
         client = get_client()
         if not client:
             return
         sheet = client.open_by_key(settings.google_sheets_id)
+        ws_overview = _ensure_tab(sheet, TAB_OVERVIEW)
         ws_stock = _ensure_tab(sheet, TAB_STOCK)
+        ws_alerts = _ensure_tab(sheet, TAB_STOCK_ALERTS)
+        ws_accounting = _ensure_tab(sheet, TAB_ACCOUNTING)
+        ws_audit = _ensure_tab(sheet, TAB_AUDIT_LOG)
         ws_edit = _ensure_tab(sheet, TAB_EDIT_LOG)
         ws_add = _ensure_tab(sheet, TAB_ADD_LOG)
         ws_sell = _ensure_tab(sheet, TAB_SELL_LOG)
-        _ensure_tab(sheet, TAB_INCOME_LOG)
-        _ensure_tab(sheet, TAB_EXPENSE_LOG)
+        ws_income = _ensure_tab(sheet, TAB_INCOME_LOG)
+        ws_expense = _ensure_tab(sheet, TAB_EXPENSE_LOG)
 
+        _write_rows(ws_overview, overview_rows)
         _sync_stock_sheet(ws_stock, products_data)
+        _write_rows(ws_alerts, alert_rows)
+        _write_rows(ws_accounting, accounting_rows)
+        _write_rows(ws_audit, audit_rows)
         _write_rows(ws_add, add_rows)
         _write_rows(ws_sell, sell_rows)
         _write_rows(ws_edit, edit_rows)
+        _style_sheet(sheet, [ws_overview, ws_stock, ws_alerts, ws_accounting, ws_audit, ws_add, ws_sell, ws_edit, ws_income, ws_expense])
 
     try:
         await _with_retries(lambda: asyncio.to_thread(_sync_blocking), retries=3, delay_sec=2.0)

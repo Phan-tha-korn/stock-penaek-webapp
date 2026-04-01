@@ -32,6 +32,7 @@ export interface TransactionItem {
 export interface StockSummary {
   total_products: number
   full: number
+  normal: number
   low: number
   critical: number
   out: number

@@ -83,3 +83,21 @@ Vercel → Project Settings → Environment Variables:
 
 แล้วนำ URL นั้นไปใส่ใน `VITE_API_URL` และ `VITE_SOCKET_URL` ของ Vercel
 
+## 6) รัน Cloudflare Tunnel อัตโนมัติ (Windows 11)
+
+ถ้า `cloudflared` ถูกติดตั้งเป็น Windows Service แล้ว แต่ยังเจอ Cloudflare Error 1033 ทั้งที่ backend ในเครื่องเป็น ok
+สาเหตุที่พบบ่อยคือ service รันคนละ user แล้วหาไฟล์ credential/config ไม่เจอ
+
+วิธีที่ง่ายและชัวร์ (ไม่ต้องแอดมิน) คือให้ Tunnel รันตอนล็อกอินผ่าน Startup Folder:
+
+```cmd
+.\cloudflared-startup-install.cmd -TunnelName penaek-backend
+```
+
+เอาออก:
+
+```cmd
+.\cloudflared-startup-remove.cmd
+```
+
+Log อยู่ที่ `storage/logs/cloudflared.log`

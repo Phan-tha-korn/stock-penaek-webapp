@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     jwt_issuer: str = "enterprise-stock-platform"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    reauth_after_hours: int = 24
 
     login_secret_phrase: str = "dev-passphrase"
     failed_login_limit: int = 5
@@ -59,6 +60,7 @@ class Settings(BaseSettings):
                 login_phrase = s.login_secret_phrase
             s.login_secret_phrase = login_phrase
         s.session_max_per_user = int(cfg.get("session_max_per_user") or s.session_max_per_user)
+        s.reauth_after_hours = int(cfg.get("reauth_after_hours") or s.reauth_after_hours)
         s.enforce_https = bool(cfg.get("enforce_https") or False) if s.env == "production" else False
         
         google_sheets = cfg.get("google_sheets", {})
