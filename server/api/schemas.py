@@ -344,6 +344,8 @@ class NotificationConfigUpdateIn(BaseModel):
 
 class GoogleSetupOut(BaseModel):
     configured: bool
+    usable: bool = False
+    error: str = ""
     workspace_email: str = ""
     drive_folder_name: str = ""
     default_sheet_title: str = ""

@@ -2,6 +2,8 @@ import { api } from './api'
 
 export type DevSheetsConfig = {
   enabled: boolean
+  usable: boolean
+  error: string
   sheet_id: string
   key_path: string
   sheet_url: string

@@ -979,33 +979,32 @@ export function DevPage() {
             <div className="text-sm font-semibold">Sheets Center + Backup Control</div>
             <div className="text-xs text-white/60">ใช้งานหลักผ่านเว็บ แต่จัดเก็บ/เรียงข้อมูลสำคัญไว้ใน Google Sheets และ Backup แบบไฟล์ ZIP</div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-              type="button"
-              disabled={sheetAction !== null}
-              onClick={() =>
-                requireSheetsReady(async () => {
+          {sheetsCfg?.usable ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                type="button"
+                disabled={sheetAction !== null}
+                onClick={async () => {
                   setSheetMsg(null)
                   setSheetAction('sync')
                   setSheetMsg('กำลัง Sync ไปชีต...')
                   try {
                     const res = await syncToSheets()
                     setSheetMsg(res.ok ? 'Sync ไปชีตเสร็จแล้ว' : `Sync ไม่สำเร็จ: ${res.error || ''}`)
+                    setSheetsCfg(await getDevSheetsConfig())
                   } finally {
                     setSheetAction(null)
                   }
-                }, 'sync')
-              }
-            >
-              {sheetAction === 'sync' ? 'กำลัง Sync...' : 'Sync ไปชีตตอนนี้'}
-            </button>
-            <button
-              className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
-              type="button"
-              disabled={sheetAction !== null}
-              onClick={() =>
-                requireSheetsReady(async () => {
+                }}
+              >
+                {sheetAction === 'sync' ? 'กำลัง Sync...' : 'Sync ไปชีตตอนนี้'}
+              </button>
+              <button
+                className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
+                type="button"
+                disabled={sheetAction !== null}
+                onClick={async () => {
                   setSheetMsg(null)
                   setSheetAction('import')
                   setSheetMsg('กำลัง Import Stock → DB...')
@@ -1016,135 +1015,163 @@ export function DevPage() {
                   } finally {
                     setSheetAction(null)
                   }
-                }, 'sync')
-              }
+                }}
+              >
+                {sheetAction === 'import' ? 'กำลัง Import...' : 'Import Stock → DB'}
+              </button>
+            </div>
+          ) : (
+            <button
+              className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+              type="button"
+              onClick={() => navigate('/settings#google-setup')}
             >
-              {sheetAction === 'import' ? 'กำลัง Import...' : 'Import Stock → DB'}
+              ไปเชื่อม Google ใน Config
             </button>
-          </div>
+          )}
         </div>
         {sheetMsg ? <div className="mt-2 text-xs text-white/70">{sheetMsg}</div> : null}
 
-        <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-          <div className="text-xs text-white/60">Google Sheets หลักของระบบ</div>
-          <div className="mt-2 text-xs text-white/50 break-words">
-            sheet_id: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | key: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
-              <div className="text-sm font-semibold text-green-100">โซน Stock</div>
-              <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_tab_url, 'sync')}>
-                  เปิดแท็บ Stock
-                </button>
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
-                  โหลดทั้งชีต .xlsx
-                </button>
-                <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_download_url, 'sync')}>
-                  โหลดเฉพาะ Stock .csv
-                </button>
+        {sheetsCfg?.usable ? (
+          <>
+            <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+              <div className="text-xs text-white/60">Google Sheets หลักของระบบ</div>
+              <div className="mt-2 text-xs text-white/50 break-words">
+                sheet_id: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | key: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
+                  <div className="text-sm font-semibold text-green-100">โซน Stock</div>
+                  <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_tab_url, 'sync')}>
+                      เปิดแท็บ Stock
+                    </button>
+                    <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
+                      โหลดทั้งชีต .xlsx
+                    </button>
+                    <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_download_url, 'sync')}>
+                      โหลดเฉพาะ Stock .csv
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded border border-violet-500/30 bg-violet-500/10 p-3">
+                  <div className="text-sm font-semibold text-violet-100">โซนบัญชี</div>
+                  <div className="mt-1 text-xs text-violet-100/80">แยกสรุปบัญชี รายรับ รายจ่าย และภาพรวมมูลค่าสต็อก</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.accounting_tab_url, 'sync')}>
+                      เปิดแท็บบัญชี
+                    </button>
+                    <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.sheet_url, 'sync')}>
+                      เปิดสมุดทั้งหมด
+                    </button>
+                    <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.accounting_download_url, 'sync')}>
+                      โหลดเฉพาะบัญชี .csv
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded border border-red-500/30 bg-red-500/10 p-3">
+                  <div className="text-sm font-semibold text-red-100">โซน Log</div>
+                  <div className="mt-1 text-xs text-red-100/80">เก็บการแก้ไขสำคัญ Add/Edit/Sell/Audit แยกหัวข้อให้อ่านง่าย</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_tab_url, 'sync')}>
+                      เปิดแท็บ Log
+                    </button>
+                    <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
+                      โหลดทั้งชีต .xlsx
+                    </button>
+                    <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_download_url, 'sync')}>
+                      โหลดเฉพาะ Log .csv
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="rounded border border-violet-500/30 bg-violet-500/10 p-3">
-              <div className="text-sm font-semibold text-violet-100">โซนบัญชี</div>
-              <div className="mt-1 text-xs text-violet-100/80">แยกสรุปบัญชี รายรับ รายจ่าย และภาพรวมมูลค่าสต็อก</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.accounting_tab_url, 'sync')}>
-                  เปิดแท็บบัญชี
-                </button>
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.sheet_url, 'sync')}>
-                  เปิดสมุดทั้งหมด
-                </button>
-                <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.accounting_download_url, 'sync')}>
-                  โหลดเฉพาะบัญชี .csv
-                </button>
-              </div>
-            </div>
-            <div className="rounded border border-red-500/30 bg-red-500/10 p-3">
-              <div className="text-sm font-semibold text-red-100">โซน Log</div>
-              <div className="mt-1 text-xs text-red-100/80">เก็บการแก้ไขสำคัญ Add/Edit/Sell/Audit แยกหัวข้อให้อ่านง่าย</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_tab_url, 'sync')}>
-                  เปิดแท็บ Log
-                </button>
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
-                  โหลดทั้งชีต .xlsx
-                </button>
-                <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_download_url, 'sync')}>
-                  โหลดเฉพาะ Log .csv
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-          <div className="text-xs text-white/60">สร้าง Google Sheet ใหม่และตั้งค่าให้ระบบ</div>
-          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-5">
-            <input
-              className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
-              value={sheetCreateTitle}
-              onChange={(e) => setSheetCreateTitle(e.target.value)}
-              placeholder="ชื่อชีตใหม่ (เช่น Stock Penaek)"
-            />
-            <input
-              className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
-              value={sheetShareEmails}
-              onChange={(e) => setSheetShareEmails(e.target.value)}
-              placeholder="แชร์ให้ (คั่นด้วย ,) เช่น you@gmail.com"
-            />
-            <button
-              className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
-              type="button"
-              disabled={sheetCreateBusy}
-              onClick={async () => {
-                setSheetMsg(null)
-                setSheetCreateBusy(true)
-                try {
-                  const emails = sheetShareEmails
-                    .split(',')
-                    .map((x) => x.trim())
-                    .filter(Boolean)
-                  const res = await createDevSheet({ title: sheetCreateTitle.trim(), share_emails: emails, set_as_default: true })
-                  setLastCreatedSheet(res)
-                  setSheetMsg('กำลัง Sync ไปชีตใหม่...')
-                  try {
-                    const s = await syncToSheets()
-                    setSheetMsg(s.ok ? `สร้างชีตใหม่และ Sync แล้ว: ${res.sheet_id}` : `สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ: ${s.error || ''}`)
-                  } catch {
-                    setSheetMsg(`สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ`)
-                  }
-                  setSheetsCfg(await getDevSheetsConfig())
-                } catch (e: any) {
-                  setSheetMsg(e?.response?.data?.detail || e?.message || 'สร้างชีตไม่สำเร็จ')
-                } finally {
-                  setSheetCreateBusy(false)
-                }
-              }}
-            >
-              {sheetCreateBusy ? 'กำลังสร้าง/Sync...' : 'สร้างชีตใหม่ + Sync'}
-            </button>
-          </div>
-          {lastCreatedSheet ? (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
+              <div className="text-xs text-white/60">สร้าง Google Sheet ใหม่และตั้งค่าให้ระบบ</div>
+              <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-5">
+                <input
+                  className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                  value={sheetCreateTitle}
+                  onChange={(e) => setSheetCreateTitle(e.target.value)}
+                  placeholder="ชื่อชีตใหม่ (เช่น Stock Penaek)"
+                />
+                <input
+                  className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                  value={sheetShareEmails}
+                  onChange={(e) => setSheetShareEmails(e.target.value)}
+                  placeholder="แชร์ให้ (คั่นด้วย ,) เช่น you@gmail.com"
+                />
+                <button
+                  className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+                  type="button"
+                  disabled={sheetCreateBusy}
+                  onClick={async () => {
+                    setSheetMsg(null)
+                    setSheetCreateBusy(true)
+                    try {
+                      const emails = sheetShareEmails
+                        .split(',')
+                        .map((x) => x.trim())
+                        .filter(Boolean)
+                      const res = await createDevSheet({ title: sheetCreateTitle.trim(), share_emails: emails, set_as_default: true })
+                      setLastCreatedSheet(res)
+                      setSheetMsg('กำลัง Sync ไปชีตใหม่...')
+                      try {
+                        const s = await syncToSheets()
+                        setSheetMsg(s.ok ? `สร้างชีตใหม่และ Sync แล้ว: ${res.sheet_id}` : `สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ: ${s.error || ''}`)
+                      } catch {
+                        setSheetMsg(`สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ`)
+                      }
+                      setSheetsCfg(await getDevSheetsConfig())
+                    } catch (e: any) {
+                      setSheetMsg(e?.response?.data?.detail || e?.message || 'สร้างชีตไม่สำเร็จ')
+                    } finally {
+                      setSheetCreateBusy(false)
+                    }
+                  }}
+                >
+                  {sheetCreateBusy ? 'กำลังสร้าง/Sync...' : 'สร้างชีตใหม่ + Sync'}
+                </button>
+              </div>
+              {lastCreatedSheet ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                    type="button"
+                    onClick={() => openSheetUrl(lastCreatedSheet.sheet_url, 'sync')}
+                  >
+                    เปิดชีตที่สร้างล่าสุด
+                  </button>
+                  <button
+                    className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                    type="button"
+                    onClick={() => openSheetUrl(lastCreatedSheet.download_xlsx_url, 'sync')}
+                  >
+                    ดาวน์โหลดชีตล่าสุด (.xlsx)
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <div className="mt-3 relative overflow-hidden rounded border border-[color:var(--color-border)] bg-black/20 p-5">
+            <div className="absolute inset-0 bg-black/55 backdrop-blur-md" />
+            <div className="relative text-center">
+              <div className="text-base font-semibold">ปิดโซน Google Sheets ชั่วคราว</div>
+              <div className="mt-2 text-sm text-white/65">ยังไม่สามารถเชื่อม/Sync Google Sheets ได้ ระบบจึงซ่อนโซนนี้ไว้ก่อน</div>
+              <div className="mt-1 text-xs text-white/45">สถานะ: {sheetsCfg?.error || 'not_configured'}</div>
               <button
-                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                className="mt-4 rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
                 type="button"
-                onClick={() => openSheetUrl(lastCreatedSheet.sheet_url, 'sync')}
+                onClick={() => navigate('/settings#google-setup')}
               >
-                เปิดชีตที่สร้างล่าสุด
-              </button>
-              <button
-                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-                type="button"
-                onClick={() => openSheetUrl(lastCreatedSheet.download_xlsx_url, 'sync')}
-              >
-                ดาวน์โหลดชีตล่าสุด (.xlsx)
+                ไปเชื่อม Google ใน Config
               </button>
             </div>
-          ) : null}
-        </div>
+          </div>
+        )}
 
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3">

@@ -201,6 +201,21 @@ async def get_google_setup(user: User = Depends(get_current_user)):
     cfg = load_master_config()
     sheet_id = str(cfg.get("google_sheets_id") or cfg.get("google_sheets", {}).get("sheet_id") or "")
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}" if sheet_id else ""
+    usable = False
+    err = ""
+    if not sheet_id:
+        err = "sheet_missing"
+    else:
+        client = get_client()
+        if not client:
+            err = "google_client_not_ready"
+        else:
+            try:
+                sheet = client.open_by_key(sheet_id)
+                _ensure_tab(sheet, TAB_STOCK)
+                usable = True
+            except Exception:
+                err = "sheet_open_failed"
     return GoogleSetupOut(
         configured=bool(
             sheet_id
@@ -210,6 +225,8 @@ async def get_google_setup(user: User = Depends(get_current_user)):
                 or Path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path)).exists()
             )
         ),
+        usable=usable,
+        error=err,
         workspace_email=str(cfg.get("google_workspace_email") or ""),
         drive_folder_name=str(cfg.get("google_drive_folder_name") or ""),
         default_sheet_title=str(cfg.get("google_default_sheet_title") or ""),

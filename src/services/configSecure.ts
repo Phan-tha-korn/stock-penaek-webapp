@@ -2,6 +2,8 @@ import { api } from './api'
 
 export type GoogleSetupConfig = {
   configured: boolean
+  usable: boolean
+  error: string
   workspace_email: string
   drive_folder_name: string
   default_sheet_title: string

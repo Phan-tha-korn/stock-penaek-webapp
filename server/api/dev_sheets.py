@@ -33,6 +33,8 @@ router = APIRouter(prefix="/dev/sheets", tags=["dev-sheets"])
 
 class DevSheetsConfigOut(BaseModel):
     enabled: bool
+    usable: bool = False
+    error: str = ""
     sheet_id: str
     key_path: str
     sheet_url: str
@@ -68,6 +70,8 @@ async def get_sheets_config():
     stock_tab_url = sheet_url
     accounting_tab_url = sheet_url
     logs_tab_url = sheet_url
+    usable = False
+    err = ""
     if enabled:
         client = get_client()
         if client:
@@ -76,10 +80,17 @@ async def get_sheets_config():
                 stock_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_STOCK).id}"
                 accounting_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_ACCOUNTING).id}"
                 logs_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_AUDIT_LOG).id}"
+                usable = True
             except Exception:
-                pass
+                err = "sheet_open_failed"
+        else:
+            err = "google_client_not_ready"
+    else:
+        err = "sheet_missing"
     return DevSheetsConfigOut(
         enabled=enabled,
+        usable=usable,
+        error=err,
         sheet_id=sheet_id,
         key_path=key_path,
         sheet_url=sheet_url,

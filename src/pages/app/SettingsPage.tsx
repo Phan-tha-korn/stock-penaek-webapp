@@ -20,6 +20,8 @@ function Field(props: { label: string; children: React.ReactNode }) {
 
 const EMPTY_GOOGLE_CFG: GoogleSetupConfig = {
   configured: false,
+  usable: false,
+  error: '',
   workspace_email: '',
   drive_folder_name: '',
   default_sheet_title: '',
@@ -50,6 +52,9 @@ export function SettingsPage() {
   const [googleCfg, setGoogleCfg] = useState<GoogleSetupConfig | null>(null)
   const [googleBusy, setGoogleBusy] = useState(false)
   const [googleOauthSecretDraft, setGoogleOauthSecretDraft] = useState('')
+  const [googleWizardOpen, setGoogleWizardOpen] = useState(false)
+  const [googleResultOpen, setGoogleResultOpen] = useState(false)
+  const [googleResultOk, setGoogleResultOk] = useState(false)
 
   useEffect(() => {
     if (config) setForm(config)
@@ -61,6 +66,14 @@ export function SettingsPage() {
       .then((data) => {
         setGoogleCfg(data)
         setGoogleOauthSecretDraft('')
+        setGoogleWizardOpen(!data.usable)
+        const pending = window.localStorage.getItem('google_oauth_pending')
+        if (pending) {
+          window.localStorage.removeItem('google_oauth_pending')
+          setGoogleResultOk(Boolean(data.usable))
+          setGoogleResultOpen(true)
+          window.setTimeout(() => setGoogleResultOpen(false), 3000)
+        }
       })
       .catch((e: any) => {
         setError(e?.response?.data?.detail || 'โหลด Google setup ไม่สำเร็จ')
@@ -77,6 +90,16 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-4">
+      {googleResultOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[color:var(--color-card)]/95 p-6 text-center shadow-2xl">
+            <div className="text-xl font-semibold">{googleResultOk ? 'เชื่อม Google สำเร็จ' : 'เชื่อม Google ไม่สำเร็จ'}</div>
+            <div className="mt-2 text-sm text-white/65">
+              {googleResultOk ? 'เชื่อมแล้วและข้อมูลพร้อมใช้งาน สามารถกลับไปใช้งานโซน Google Sheets ได้เลย' : 'ข้อมูลยังไม่พร้อมใช้งาน กรุณาตรวจสอบ Client ID/Secret และ Redirect URI แล้วลองใหม่'}
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
         <div className="text-sm font-semibold">{t('settings.title')}</div>
         <div className="mt-1 text-xs text-white/60">{t('settings.subtitle')}</div>
@@ -397,9 +420,41 @@ export function SettingsPage() {
 
       {canManageGlobal ? (
         <div id="google-setup" className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
-          <div className="mb-3 text-sm font-semibold">Google Sheets Setup Wizard</div>
-          <div className="mb-3 text-xs text-white/60">กำหนด Gmail/Drive/ชื่อไฟล์หลักของร้าน แล้วให้ระบบสร้างหรือสลับไปใช้ Google Sheets ใหม่อัตโนมัติ</div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Google Sheets Setup Wizard</div>
+              <div className="mt-1 text-xs text-white/60">เชื่อม Google เพื่อให้ระบบสร้างชีตอัตโนมัติ และ sync ข้อมูลขึ้น Google Sheets</div>
+            </div>
+            {googleCfg?.usable ? (
+              <button
+                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+                type="button"
+                onClick={() => setGoogleWizardOpen((prev) => !prev)}
+              >
+                {googleWizardOpen ? 'ยุบ' : 'แก้ไข/เปลี่ยน Google'}
+              </button>
+            ) : null}
+          </div>
+
+          <div className={`mt-3 rounded border ${googleCfg?.usable ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100' : 'border-amber-500/30 bg-amber-500/10 text-amber-100'} px-3 py-2 text-xs`}>
+            {googleCfg?.usable
+              ? `เชื่อมแล้วและข้อมูลใช้ได้ • Sheet: ${googleCfg.current_sheet_id || '-'}`
+              : `ยังใช้ Google Sheets ไม่ได้ • สาเหตุ: ${googleCfg?.error || 'not_configured'}`}
+          </div>
+          {!googleCfg?.usable ? (
+            <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3 text-xs text-white/65">
+              <div className="font-semibold text-white/85">วิธีแก้แบบเร็ว</div>
+              <div className="mt-2 space-y-1">
+                <div>- ใส่ OAuth Client ID/Secret ให้ครบ แล้วกด Sign in with Google</div>
+                <div>- ตรวจว่า Redirect URI ใน Google Cloud Console ตรงกับที่ใส่ในช่อง OAuth Redirect URI</div>
+                <div>- ถ้า Sheet หาย/ลิงก์เสีย ให้กด “เชื่อม Google และสร้าง Sheets อัตโนมัติ” เพื่อสร้างใหม่ แล้วระบบจะ sync ข้อมูลจากฐานข้อมูลขึ้นชีตใหม่ให้</div>
+                <div>- ถ้าข้อมูลเก่าอยู่ในชีตเดิมอย่างเดียว ให้ไปหน้า Dev แล้วกด Import Stock → DB จากชีตเดิมก่อน จากนั้นค่อย sync ไปชีตใหม่</div>
+              </div>
+            </div>
+          ) : null}
+
+          {!googleWizardOpen && googleCfg?.usable ? null : (
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field label="Gmail ที่ใช้ดูแล Google Drive">
               <input
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
@@ -465,10 +520,9 @@ export function SettingsPage() {
                 placeholder="C:\Stock Penaek Webapp\credentials\google_oauth_token.json"
               />
             </Field>
-          </div>
-          <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3 text-xs text-white/65">
-            {googleCfg?.configured ? `พร้อมใช้งานแล้ว • Sheet ปัจจุบัน: ${googleCfg.current_sheet_id || '-'}${googleCfg.oauth_connected ? ' • OAuth Connected' : ''}` : 'ยังไม่ได้ตั้งค่า Google ให้พร้อมใช้งาน'}
-          </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
@@ -570,6 +624,7 @@ export function SettingsPage() {
                   })
                   setGoogleCfg(next)
                   setGoogleOauthSecretDraft('')
+                  window.localStorage.setItem('google_oauth_pending', '1')
                   const returnTo = `${window.location.origin}/settings#google-setup`
                   const res = await startGoogleOAuthLogin(returnTo)
                   setOk('กำลังพาไปหน้า Sign in with Google...')

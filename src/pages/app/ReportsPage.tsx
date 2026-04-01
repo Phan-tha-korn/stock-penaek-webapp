@@ -254,7 +254,24 @@ export function ReportsPage() {
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
         <div className="text-sm font-semibold">โหลดผ่าน Google Sheets</div>
         <div className="mt-1 text-xs text-white/60">เปิดดูแบบแยกหมวดได้ทั้ง Stock, บัญชี และ Log โดยข้อมูลจะจัดแท็บสีให้อ่านง่าย</div>
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {!sheetsCfg?.usable ? (
+          <div className="mt-4 relative overflow-hidden rounded border border-[color:var(--color-border)] bg-black/20 p-5">
+            <div className="absolute inset-0 bg-black/55 backdrop-blur-md" />
+            <div className="relative text-center">
+              <div className="text-base font-semibold">โซน Google Sheets ยังใช้งานไม่ได้</div>
+              <div className="mt-2 text-sm text-white/65">ไปหน้า Config เพื่อเชื่อม Google และให้ระบบสร้าง/เชื่อม Sheets อัตโนมัติก่อนใช้งานโซนนี้</div>
+              <div className="mt-1 text-xs text-white/45">สถานะ: {sheetsCfg?.error || 'not_configured'}</div>
+              <button
+                className="mt-4 rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+                type="button"
+                onClick={() => (window.location.href = '/settings#google-setup')}
+              >
+                ไปเชื่อม Google ใน Config
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
             <div className="text-sm font-semibold text-green-100">Stock Sheets</div>
             <div className="mt-1 text-xs text-green-100/80">ข้อมูลสินค้า สถานะสต็อก และรายการใกล้หมด</div>
@@ -292,8 +309,10 @@ export function ReportsPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
+      {sheetsCfg?.usable ? (
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
         <div className="text-sm font-semibold">ข้อมูลดิบเพิ่มเติม</div>
         <div className="mt-1 text-xs text-white/60">ใช้สำหรับตรวจละเอียดต่อใน Excel หรือ Google Sheets</div>
@@ -355,6 +374,7 @@ export function ReportsPage() {
           </button>
         </div>
       </div>
+      ) : null}
     </div>
   )
 }
