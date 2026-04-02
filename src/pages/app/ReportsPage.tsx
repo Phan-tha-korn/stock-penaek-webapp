@@ -14,6 +14,19 @@ type HealthInfo = {
   uptime_seconds: number
 }
 
+const GOOGLE_OAUTH_PENDING_KEY = 'google_oauth_pending_until'
+
+function hasPendingGoogleOauth() {
+  const raw = window.localStorage.getItem(GOOGLE_OAUTH_PENDING_KEY)
+  const until = Number(raw || '0')
+  if (!until || Number.isNaN(until)) return false
+  if (until <= Date.now()) {
+    window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
+    return false
+  }
+  return true
+}
+
 function downloadText(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -128,6 +141,8 @@ export function ReportsPage() {
   const [kpis, setKpis] = useState<Kpis | null>(null)
   const [stockSummary, setStockSummary] = useState<StockSummary | null>(null)
   const [sheetsCfg, setSheetsCfg] = useState<DevSheetsConfig | null>(null)
+  const [sheetsLoading, setSheetsLoading] = useState(true)
+  const [googleSheetsPending, setGoogleSheetsPending] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -142,9 +157,31 @@ export function ReportsPage() {
         setHealth(healthRes)
         setKpis(kpisRes)
         setStockSummary(stockRes)
+        const pending = hasPendingGoogleOauth()
+        setGoogleSheetsPending(pending)
+        setSheetsLoading(true)
         try {
-          setSheetsCfg(await getDevSheetsConfig())
-        } catch {}
+          let cfg = await getDevSheetsConfig()
+          if (cancelled) return
+          setSheetsCfg(cfg)
+          if (pending && !cfg.usable) {
+            const startedAt = Date.now()
+            while (!cancelled && Date.now() - startedAt < 15_000 && !cfg.usable) {
+              await new Promise((resolve) => window.setTimeout(resolve, 1200))
+              cfg = await getDevSheetsConfig()
+              if (cancelled) return
+              setSheetsCfg(cfg)
+              if (cfg.usable || cfg.enabled) break
+            }
+          }
+        } catch {
+        } finally {
+          if (pending) window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
+          if (!cancelled) {
+            setGoogleSheetsPending(false)
+            setSheetsLoading(false)
+          }
+        }
       } catch {}
     })()
     return () => {
@@ -258,6 +295,13 @@ export function ReportsPage() {
           <div className="mt-4 relative overflow-hidden rounded border border-[color:var(--color-border)] bg-black/20 p-5">
             <div className="absolute inset-0 bg-black/55 backdrop-blur-md" />
             <div className="relative text-center">
+              {sheetsLoading || googleSheetsPending ? (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/85 px-4 text-center">
+                  <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[color:var(--color-primary)]" />
+                  <div className="text-base font-semibold text-sky-100">กำลังโหลดข้อมูล Google Sheets</div>
+                  <div className="mt-2 text-sm text-sky-50/85">เชื่อม Google แล้ว ระบบกำลังดึงสถานะล่าสุดและเตรียมข้อมูลสำหรับหน้า Report กรุณารอสักครู่</div>
+                </div>
+              ) : null}
               <div className="text-base font-semibold">โซน Google Sheets ยังใช้งานไม่ได้</div>
               <div className="mt-2 text-sm text-white/65">ไปหน้า Config เพื่อเชื่อม Google และให้ระบบสร้าง/เชื่อม Sheets อัตโนมัติก่อนใช้งานโซนนี้</div>
               <div className="mt-1 text-xs text-white/45">สถานะ: {sheetsCfg?.error || 'not_configured'}</div>
@@ -378,4 +422,3 @@ export function ReportsPage() {
     </div>
   )
 }
-

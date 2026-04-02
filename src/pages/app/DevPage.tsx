@@ -14,6 +14,19 @@ import { useAuthStore } from '../../store/authStore'
 import type { ActivityItem } from '../../services/dashboard'
 import type { AppConfig } from '../../types/models'
 
+const GOOGLE_OAUTH_PENDING_KEY = 'google_oauth_pending_until'
+
+function hasPendingGoogleOauth() {
+  const raw = window.localStorage.getItem(GOOGLE_OAUTH_PENDING_KEY)
+  const until = Number(raw || '0')
+  if (!until || Number.isNaN(until)) return false
+  if (until <= Date.now()) {
+    window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
+    return false
+  }
+  return true
+}
+
 export function DevPage() {
   const navigate = useNavigate()
   const role = useAuthStore((s) => s.role)
@@ -27,6 +40,8 @@ export function DevPage() {
   const [sheetMsg, setSheetMsg] = useState<string | null>(null)
   const [sheetAction, setSheetAction] = useState<'sync' | 'force-sync' | 'import' | null>(null)
   const [sheetsCfg, setSheetsCfg] = useState<DevSheetsConfig | null>(null)
+  const [sheetsLoading, setSheetsLoading] = useState(true)
+  const [googleSheetsPending, setGoogleSheetsPending] = useState(false)
   const [sheetCreateTitle, setSheetCreateTitle] = useState('')
   const [sheetShareEmails, setSheetShareEmails] = useState('')
   const [sheetCreateBusy, setSheetCreateBusy] = useState(false)
@@ -250,10 +265,27 @@ export function DevPage() {
       }
     })()
     ;(async () => {
+      const pending = hasPendingGoogleOauth()
+      setGoogleSheetsPending(pending)
+      setSheetsLoading(true)
       try {
-        const c = await getDevSheetsConfig()
+        let c = await getDevSheetsConfig()
         setSheetsCfg(c)
-      } catch {}
+        if (pending && !c.usable) {
+          const startedAt = Date.now()
+          while (Date.now() - startedAt < 15_000 && !c.usable) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1200))
+            c = await getDevSheetsConfig()
+            setSheetsCfg(c)
+            if (c.usable || c.enabled) break
+          }
+        }
+      } catch {
+      } finally {
+        if (pending) window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
+        setGoogleSheetsPending(false)
+        setSheetsLoading(false)
+      }
     })()
   }, [])
 
@@ -272,8 +304,8 @@ export function DevPage() {
         <div className="mt-1 text-xs text-white/60">Health / Config / Activity / Google Sheets</div>
       </div>
 
-      <div className="card relative overflow-hidden rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
-        {!sheetsCfg?.enabled ? (
+      <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
+        {false ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-md">
             <div className="mx-4 max-w-lg rounded-2xl border border-white/10 bg-[color:var(--color-card)]/90 p-6 text-center shadow-2xl">
               <div className="text-lg font-semibold">ยังไม่ได้ตั้งค่า Google Sheets</div>
@@ -1081,6 +1113,14 @@ export function DevPage() {
                 {sheetAction === 'import' ? 'กำลัง Import...' : 'Import Stock → DB'}
               </button>
             </div>
+          ) : sheetsLoading || googleSheetsPending ? (
+            <button
+              className="rounded border border-sky-400/30 px-4 py-2 text-sm font-semibold text-sky-100"
+              type="button"
+              disabled
+            >
+              กำลังโหลดข้อมูล Google Sheets...
+            </button>
           ) : (
             <button
               className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
@@ -1231,6 +1271,15 @@ export function DevPage() {
               ) : null}
             </div>
           </>
+        ) : sheetsLoading || googleSheetsPending ? (
+          <div className="mt-3 relative overflow-hidden rounded border border-sky-500/30 bg-sky-500/10 p-5">
+            <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
+            <div className="relative text-center">
+              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[color:var(--color-primary)]" />
+              <div className="text-base font-semibold text-sky-100">กำลังโหลดข้อมูล Google Sheets</div>
+              <div className="mt-2 text-sm text-sky-50/85">เชื่อม Google แล้ว ระบบกำลังดึงสถานะล่าสุดและเตรียมข้อมูลให้พร้อมใช้งาน กรุณารอสักครู่โดยไม่ต้องกดเชื่อมซ้ำ</div>
+            </div>
+          </div>
         ) : (
           <div className="mt-3 relative overflow-hidden rounded border border-[color:var(--color-border)] bg-black/20 p-5">
             <div className="absolute inset-0 bg-black/55 backdrop-blur-md" />

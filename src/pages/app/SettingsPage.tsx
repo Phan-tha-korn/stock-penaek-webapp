@@ -35,6 +35,20 @@ const EMPTY_GOOGLE_CFG: GoogleSetupConfig = {
   current_sheet_url: '',
 }
 
+const GOOGLE_OAUTH_PENDING_KEY = 'google_oauth_pending_until'
+const GOOGLE_OAUTH_PENDING_MS = 90_000
+
+function hasPendingGoogleOauth() {
+  const raw = window.localStorage.getItem(GOOGLE_OAUTH_PENDING_KEY)
+  const until = Number(raw || '0')
+  if (!until || Number.isNaN(until)) return false
+  if (until <= Date.now()) {
+    window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
+    return false
+  }
+  return true
+}
+
 export function SettingsPage() {
   const { t } = useTranslation()
   const config = useConfigStore((s) => s.config)
@@ -55,6 +69,7 @@ export function SettingsPage() {
   const [googleWizardOpen, setGoogleWizardOpen] = useState(false)
   const [googleResultOpen, setGoogleResultOpen] = useState(false)
   const [googleResultOk, setGoogleResultOk] = useState(false)
+  const [googleResultState, setGoogleResultState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
 
   useEffect(() => {
     if (config) setForm(config)
@@ -80,6 +95,55 @@ export function SettingsPage() {
       })
   }, [canManageGlobal])
 
+  useEffect(() => {
+    if (!canManageGlobal || !hasPendingGoogleOauth()) return
+    let active = true
+    let hideTimer: number | null = null
+    setGoogleResultState('loading')
+    setGoogleResultOpen(true)
+    ;(async () => {
+      try {
+        let data = await fetchGoogleSetupConfig()
+        if (active) {
+          setGoogleCfg(data)
+          setGoogleOauthSecretDraft('')
+          setGoogleWizardOpen(!data.usable)
+        }
+        const startedAt = Date.now()
+        while (active && Date.now() - startedAt < 15_000 && !data.usable) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1200))
+          if (!active) return
+          data = await fetchGoogleSetupConfig()
+          if (!active) return
+          setGoogleCfg(data)
+          setGoogleOauthSecretDraft('')
+          setGoogleWizardOpen(!data.usable)
+          if (data.usable || data.oauth_connected || data.configured) break
+        }
+        window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
+        if (!active) return
+        const ok = Boolean(data.usable)
+        setGoogleResultOk(ok)
+        setGoogleResultState(ok ? 'success' : 'error')
+        setGoogleResultOpen(true)
+        hideTimer = window.setTimeout(() => {
+          if (!active) return
+          setGoogleResultOpen(false)
+          setGoogleResultState('idle')
+        }, ok ? 1800 : 3200)
+      } catch (e: any) {
+        if (!active) return
+        window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
+        setGoogleResultState('error')
+        setError(e?.response?.data?.detail || 'โหลด Google setup ไม่สำเร็จ')
+      }
+    })()
+    return () => {
+      active = false
+      if (hideTimer !== null) window.clearTimeout(hideTimer)
+    }
+  }, [canManageGlobal])
+
   if (!form) {
     return (
       <div className="rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)] p-4 text-sm text-white/70">
@@ -92,7 +156,14 @@ export function SettingsPage() {
     <div className="space-y-4">
       {googleResultOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[color:var(--color-card)]/95 p-6 text-center shadow-2xl">
+          <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[color:var(--color-card)]/95 p-6 text-center shadow-2xl">
+            {googleResultState === 'loading' ? (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[color:var(--color-card)]/96 px-6 text-center">
+                <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[color:var(--color-primary)]" />
+                <div className="text-xl font-semibold">กำลังเชื่อม Google และโหลดข้อมูล</div>
+                <div className="mt-2 text-sm text-white/65">เชื่อม Google แล้ว ระบบกำลังตรวจสอบสิทธิ์และโหลดข้อมูล Google Sheets กรุณารอสักครู่โดยไม่ต้องกดซ้ำ</div>
+              </div>
+            ) : null}
             <div className="text-xl font-semibold">{googleResultOk ? 'เชื่อม Google สำเร็จ' : 'เชื่อม Google ไม่สำเร็จ'}</div>
             <div className="mt-2 text-sm text-white/65">
               {googleResultOk ? 'เชื่อมแล้วและข้อมูลพร้อมใช้งาน สามารถกลับไปใช้งานโซน Google Sheets ได้เลย' : 'ข้อมูลยังไม่พร้อมใช้งาน กรุณาตรวจสอบ Client ID/Secret และ Redirect URI แล้วลองใหม่'}
@@ -635,7 +706,7 @@ export function SettingsPage() {
                   })
                   setGoogleCfg(next)
                   setGoogleOauthSecretDraft('')
-                  window.localStorage.setItem('google_oauth_pending', '1')
+                  window.localStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, String(Date.now() + GOOGLE_OAUTH_PENDING_MS))
                   const returnTo = `${window.location.origin}/settings#google-setup`
                   const res = await startGoogleOAuthLogin(returnTo)
                   setOk('กำลังพาไปหน้า Sign in with Google...')
