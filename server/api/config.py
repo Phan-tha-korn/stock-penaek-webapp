@@ -32,6 +32,7 @@ from server.services.gsheets import (
     TAB_STOCK,
     TAB_STOCK_ALERTS,
     TAB_USERS,
+    _find_existing_tab,
     create_stock_workbook,
     get_client,
     sync_all_to_sheets,
@@ -273,7 +274,7 @@ async def get_google_setup(user: User = Depends(get_current_user)):
         else:
             try:
                 sheet = client.open_by_key(sheet_id)
-                _ensure_tab(sheet, TAB_STOCK)
+                _find_existing_tab(sheet, TAB_STOCK)
                 usable = True
             except Exception:
                 err = "sheet_open_failed"
