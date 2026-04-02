@@ -101,7 +101,7 @@ class LoginIn(BaseModel):
     username: str
     password: str
     totp: str | None = None
-    secret_phrase: str | None = Field(default=None, alias="secret_phrase")
+    secret_phrase: str | None = None
 
 
 class RefreshIn(BaseModel):
