@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from pathlib import Path
@@ -37,6 +38,7 @@ import asyncio
 
 
 router = APIRouter(tags=["config"])
+logger = logging.getLogger(__name__)
 
 _HEX = re.compile(r"^#?[0-9a-fA-F]{6}$")
 
@@ -393,7 +395,8 @@ async def google_oauth_callback(request: Request):
         redirect_uri=redirect_uri,
     )
     try:
-        flow.fetch_token(authorization_response=str(request.url))
+        authorization_response = f"{redirect_uri}?{request.url.query}" if request.url.query else redirect_uri
+        flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
         token_path = _resolve_repo_path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path))
         token_path.parent.mkdir(parents=True, exist_ok=True)
