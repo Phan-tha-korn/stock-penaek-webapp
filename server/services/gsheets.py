@@ -750,13 +750,13 @@ def _sync_stock_sheet(ws: gspread.Worksheet, products: list[dict]) -> None:
     msg_idx = _get_col_idx(header, ["ข้อความแจ้งเตือน", "Message"])
     updated_idx = _get_col_idx(header, ["อัปเดตล่าสุด", "Last_Updated"])
 
-    row_by_id: dict[str, int] = {}
+    row_by_id: dict[str, list[str]] = {}
     for i in range(1, len(values)):
         row = values[i]
         if id_idx < len(row):
             key = (row[id_idx] or "").strip()
             if key:
-                row_by_id[key] = i
+                row_by_id[key] = row
 
     now = datetime.utcnow().isoformat(timespec="seconds")
 
@@ -765,7 +765,9 @@ def _sync_stock_sheet(ws: gspread.Worksheet, products: list[dict]) -> None:
             return r + [""] * (len(header) - len(r))
         return r[: len(header)]
 
-    for p in products:
+    next_values = [ensure_len(header)]
+
+    for p in sorted(products, key=lambda item: str(item.get("sku") or "")):
         pid = str(p.get("sku") or "").strip()
         if not pid:
             continue
@@ -777,14 +779,9 @@ def _sync_stock_sheet(ws: gspread.Worksheet, products: list[dict]) -> None:
         total_value = qty * unit_price
         pct = (qty / max_qty * 100.0) if max_qty > 0 else 0.0
 
-        existing_row_idx = row_by_id.get(pid)
-        if existing_row_idx is None:
-            row = ensure_len([""] * len(header))
-            row[id_idx] = pid
-            values.append(row)
-            existing_row_idx = len(values) - 1
-        else:
-            row = ensure_len(values[existing_row_idx])
+        existing_row = row_by_id.get(pid)
+        row = ensure_len(existing_row if existing_row is not None else [""] * len(header))
+        row[id_idx] = pid
 
         if name_idx is not None:
             row[name_idx] = str(p.get("name_th") or "")
@@ -823,11 +820,12 @@ def _sync_stock_sheet(ws: gspread.Worksheet, products: list[dict]) -> None:
                 warn = f"{p.get('name_th') or ''} หมดสต็อก"
             row[msg_idx] = warn
 
-        values[existing_row_idx] = row
+        next_values.append(row)
 
     col_count = len(header)
     end_col = gspread.utils.rowcol_to_a1(1, col_count).split("1")[0]
-    ws.update(f"A1:{end_col}{len(values)}", values)
+    ws.clear()
+    ws.update(f"A1:{end_col}{len(next_values)}", next_values)
 
 
 async def import_stock_from_sheet(
