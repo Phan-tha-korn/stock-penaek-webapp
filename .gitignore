@@ -24,3 +24,8 @@ config.json
 credentials/*.json
 **/google_oauth_token*.json
 
+
+config.json
+credentials/*.json
+**/google_oauth_token*.json
+
