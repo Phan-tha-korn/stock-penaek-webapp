@@ -1,23 +1,24 @@
-import { Suspense, lazy } from 'react'
+import { Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { SessionGuard } from './components/auth/SessionGuard'
 import { AppShell } from './components/layout/AppShell'
 import { AppErrorBoundary } from './components/system/AppErrorBoundary'
+import { lazyWithRetry } from './utils/lazyWithRetry'
 
-const DashboardPage = lazy(() => import('./pages/app/DashboardPage').then((m) => ({ default: m.DashboardPage })))
-const ProductsPage = lazy(() => import('./pages/app/ProductsPage').then((m) => ({ default: m.ProductsPage })))
-const TransactionsPage = lazy(() => import('./pages/app/TransactionsPage').then((m) => ({ default: m.TransactionsPage })))
-const ReportsPage = lazy(() => import('./pages/app/ReportsPage').then((m) => ({ default: m.ReportsPage })))
-const UsersPage = lazy(() => import('./pages/app/UsersPage').then((m) => ({ default: m.UsersPage })))
-const DevPage = lazy(() => import('./pages/app/DevPage').then((m) => ({ default: m.DevPage })))
-const OwnerCheckPage = lazy(() => import('./pages/app/OwnerCheckPage').then((m) => ({ default: m.OwnerCheckPage })))
-const SettingsPage = lazy(() => import('./pages/app/SettingsPage').then((m) => ({ default: m.SettingsPage })))
-const LoginPage = lazy(() => import('./pages/public/LoginPage').then((m) => ({ default: m.LoginPage })))
-const ForbiddenPage = lazy(() => import('./pages/public/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })))
-const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
-const PublicProductPage = lazy(() => import('./pages/public/PublicProductPage').then((m) => ({ default: m.PublicProductPage })))
+const DashboardPage = lazyWithRetry(() => import('./pages/app/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const ProductsPage = lazyWithRetry(() => import('./pages/app/ProductsPage').then((m) => ({ default: m.ProductsPage })))
+const TransactionsPage = lazyWithRetry(() => import('./pages/app/TransactionsPage').then((m) => ({ default: m.TransactionsPage })))
+const ReportsPage = lazyWithRetry(() => import('./pages/app/ReportsPage').then((m) => ({ default: m.ReportsPage })))
+const UsersPage = lazyWithRetry(() => import('./pages/app/UsersPage').then((m) => ({ default: m.UsersPage })))
+const DevPage = lazyWithRetry(() => import('./pages/app/DevPage').then((m) => ({ default: m.DevPage })))
+const OwnerCheckPage = lazyWithRetry(() => import('./pages/app/OwnerCheckPage').then((m) => ({ default: m.OwnerCheckPage })))
+const SettingsPage = lazyWithRetry(() => import('./pages/app/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const LoginPage = lazyWithRetry(() => import('./pages/public/LoginPage').then((m) => ({ default: m.LoginPage })))
+const ForbiddenPage = lazyWithRetry(() => import('./pages/public/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })))
+const NotFoundPage = lazyWithRetry(() => import('./pages/public/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
+const PublicProductPage = lazyWithRetry(() => import('./pages/public/PublicProductPage').then((m) => ({ default: m.PublicProductPage })))
 
 function AppFallback() {
   return <div className="flex min-h-screen items-center justify-center text-sm text-white/70">กำลังโหลด...</div>
