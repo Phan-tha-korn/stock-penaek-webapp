@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -81,6 +82,15 @@ def _mask_secret(value: str) -> str:
     return f"{text[:4]}...{text[-4:]}"
 
 
+def _allow_local_oauth_http(redirect_uri: str) -> None:
+    parsed = urlsplit(redirect_uri)
+    if parsed.scheme != "http":
+        return
+    if parsed.hostname not in {"localhost", "127.0.0.1"}:
+        return
+    os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+
 def _oauth_client_config(cfg: dict, request: Request | None = None) -> tuple[dict, str]:
     client_id = str(cfg.get("google_oauth_client_id") or "")
     client_secret = str(cfg.get("google_oauth_client_secret") or "")
@@ -102,6 +112,7 @@ def _oauth_client_config(cfg: dict, request: Request | None = None) -> tuple[dic
                 redirect_uri = request_redirect_uri
     if not redirect_uri:
         raise HTTPException(status_code=400, detail="google_oauth_redirect_missing")
+    _allow_local_oauth_http(redirect_uri)
     config = {
         "web": {
             "client_id": client_id,
