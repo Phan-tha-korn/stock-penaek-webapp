@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.deps import get_current_user
 from server.api.schemas import ConfigUpdateIn, GoogleOAuthStartOut, GoogleSetupIn, GoogleSetupOut, PublicConfig
-from server.config.config_loader import load_master_config, write_master_config
+from server.config.config_loader import load_master_config, repo_root, write_master_config
 from server.config.settings import settings
 from server.db.database import get_db
 from server.db.models import Role, User
@@ -110,6 +110,15 @@ def _safe_return_to(value: str, cfg: dict) -> str:
     if web_url:
         return f"{web_url}/settings#google-setup"
     return "/settings#google-setup"
+
+
+def _resolve_repo_path(value: str) -> Path:
+    p = Path(str(value or "").strip())
+    if not p:
+        return p
+    if p.is_absolute():
+        return p
+    return repo_root() / p
 
 
 
@@ -363,7 +372,7 @@ async def google_oauth_callback(request: Request):
     try:
         flow.fetch_token(authorization_response=str(request.url))
         credentials = flow.credentials
-        token_path = Path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path))
+        token_path = _resolve_repo_path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path))
         token_path.parent.mkdir(parents=True, exist_ok=True)
         token_path.write_text(credentials.to_json(), encoding="utf-8")
         cfg["google_oauth_token_path"] = str(token_path)

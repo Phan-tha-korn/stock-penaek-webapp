@@ -19,3 +19,8 @@ server/db/app.backup.db
 
 __pycache__/
 *.pyc
+
+config.json
+credentials/*.json
+**/google_oauth_token*.json
+

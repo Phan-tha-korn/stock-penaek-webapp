@@ -11,6 +11,7 @@ from google.oauth2.service_account import Credentials
 from sqlalchemy import select
 
 from server.config.config_loader import load_master_config
+from server.config.config_loader import repo_root
 from server.config.settings import settings
 from server.db.database import SessionLocal
 from server.db.models import AuditLog, Product, Role, User
@@ -126,7 +127,9 @@ async def _with_retries(coro_factory, retries: int = 3, delay_sec: float = 2.0):
         raise last_err
 
 def get_client() -> gspread.client.Client | None:
-    oauth_token_path = Path(settings.google_oauth_token_path)
+    oauth_token_path = Path(str(settings.google_oauth_token_path or "").strip())
+    if oauth_token_path and not oauth_token_path.is_absolute():
+        oauth_token_path = repo_root() / oauth_token_path
     if oauth_token_path.exists():
         try:
             credentials = OAuthCredentials.from_authorized_user_file(str(oauth_token_path), scopes=SCOPES)
@@ -134,7 +137,9 @@ def get_client() -> gspread.client.Client | None:
         except Exception as e:
             logger.error(f"Failed to authorize Google Sheets OAuth client: {e}")
 
-    key_path = Path(settings.google_service_account_key_path)
+    key_path = Path(str(settings.google_service_account_key_path or "").strip())
+    if key_path and not key_path.is_absolute():
+        key_path = repo_root() / key_path
     if not key_path.exists():
         logger.warning(f"Google Sheets service account key not found at {key_path}")
         return None
