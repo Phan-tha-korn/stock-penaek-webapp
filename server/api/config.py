@@ -42,6 +42,13 @@ import asyncio
 router = APIRouter(tags=["config"])
 logger = logging.getLogger(__name__)
 _OAUTH_PENDING: dict[str, dict[str, str | float]] = {}
+_GOOGLE_OAUTH_SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
+]
 
 _HEX = re.compile(r"^#?[0-9a-fA-F]{6}$")
 
@@ -94,6 +101,11 @@ def _allow_local_oauth_http(redirect_uri: str) -> None:
     if parsed.hostname not in {"localhost", "127.0.0.1"}:
         return
     os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+    os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
+
+def _relax_google_scope_warning() -> None:
+    os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 
 def _oauth_client_config(cfg: dict, request: Request | None = None) -> tuple[dict, str]:
@@ -118,6 +130,7 @@ def _oauth_client_config(cfg: dict, request: Request | None = None) -> tuple[dic
     if not redirect_uri:
         raise HTTPException(status_code=400, detail="google_oauth_redirect_missing")
     _allow_local_oauth_http(redirect_uri)
+    _relax_google_scope_warning()
     config = {
         "web": {
             "client_id": client_id,
@@ -375,13 +388,7 @@ async def start_google_oauth(request: Request, return_to: str = "", user: User =
     _oauth_pending_cleanup()
     flow = Flow.from_client_config(
         client_config,
-        scopes=[
-            "openid",
-            "email",
-            "profile",
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive.file",
-        ],
+        scopes=_GOOGLE_OAUTH_SCOPES,
         redirect_uri=redirect_uri,
     )
     oauth_state = secrets.token_urlsafe(24)
@@ -408,13 +415,7 @@ async def google_oauth_callback(request: Request):
     client_config, redirect_uri = _oauth_client_config(cfg, request)
     flow = Flow.from_client_config(
         client_config,
-        scopes=[
-            "openid",
-            "email",
-            "profile",
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive.file",
-        ],
+        scopes=_GOOGLE_OAUTH_SCOPES,
         redirect_uri=redirect_uri,
     )
     try:
