@@ -1043,6 +1043,25 @@ export function DevPage() {
                 {sheetAction === 'sync' ? 'กำลัง Sync...' : 'Sync ไปชีตตอนนี้'}
               </button>
               <button
+                className="rounded border border-amber-400/30 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/10 disabled:opacity-60"
+                type="button"
+                disabled={sheetAction !== null}
+                onClick={async () => {
+                  setSheetMsg(null)
+                  setSheetAction('force-sync')
+                  setSheetMsg('กำลัง Force Full Sync ทั้ง workbook...')
+                  try {
+                    const res = await forceFullSyncToSheets()
+                    setSheetMsg(res.ok ? 'Force Full Sync เสร็จแล้ว' : `Force Full Sync ไม่สำเร็จ: ${res.error || ''}`)
+                    setSheetsCfg(await getDevSheetsConfig())
+                  } finally {
+                    setSheetAction(null)
+                  }
+                }}
+              >
+                {sheetAction === 'force-sync' ? 'กำลัง Force Sync...' : 'Force Full Sync'}
+              </button>
+              <button
                 className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
                 type="button"
                 disabled={sheetAction !== null}
