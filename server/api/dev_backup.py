@@ -9,9 +9,8 @@ from pydantic import BaseModel
 
 from server.api.deps import require_roles
 from server.db.models import Role
-from server.services.gsheets import sync_all_to_sheets
+from server.services.gsheets import schedule_sheet_sync
 from server.services.system_backup import backups_root, create_backup_archive, preview_backup_archive, restore_backup_archive
-import asyncio
 
 
 router = APIRouter(prefix="/dev/backup", tags=["dev-backup"])
@@ -78,7 +77,7 @@ async def restore_backup(
     try:
         restored = await restore_backup_archive(raw)
         try:
-            asyncio.create_task(sync_all_to_sheets())
+            schedule_sheet_sync()
         except Exception:
             pass
     except ValueError as e:

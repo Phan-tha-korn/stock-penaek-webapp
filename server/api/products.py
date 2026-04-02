@@ -53,10 +53,8 @@ def _is_deleted(p: Product) -> bool:
 
 def _trigger_sheet_sync() -> None:
     try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-
-        asyncio.create_task(sync_all_to_sheets())
+        from server.services.gsheets import schedule_sheet_sync
+        schedule_sheet_sync()
     except Exception:
         pass
 
@@ -239,11 +237,7 @@ async def import_from_sheets(
         after=res,
     )
 
-    try:
-        import asyncio
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return SheetsImportOut(
         ok=True,
@@ -327,12 +321,7 @@ async def create_product(
         after={"sku": p.sku, "name_th": p.name_th},
     )
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return _to_out(p)
 
@@ -564,12 +553,7 @@ async def update_product(
         after={"sku": p.sku, "name_th": p.name_th},
     )
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return _to_out(p)
 
@@ -660,12 +644,7 @@ async def bulk_delete(
         after={"count": done},
     )
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return {"ok": True, "deleted": done}
 
@@ -704,12 +683,7 @@ async def delete_all_test(
         after={"count": done},
     )
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return {"ok": True, "deleted": done}
 
@@ -751,12 +725,7 @@ async def delete_all(
         after={"count": done},
     )
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return {"ok": True, "deleted": done}
 
@@ -794,12 +763,7 @@ async def delete_product(
         after={"sku": p.sku},
     )
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return _to_out(p)
 
@@ -834,12 +798,7 @@ async def restore_product(
         after={"sku": p.sku},
     )
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return _to_out(p)
 
@@ -984,12 +943,7 @@ async def adjust_stock(
     except Exception:
         pass
 
-    try:
-        import asyncio
-        from server.services.gsheets import sync_all_to_sheets
-        asyncio.create_task(sync_all_to_sheets())
-    except Exception:
-        pass
+    _trigger_sheet_sync()
 
     return ProductOut(
         id=product.id,

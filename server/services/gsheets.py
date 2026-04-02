@@ -25,6 +25,7 @@ _SYNC_LOCK = asyncio.Lock()
 _IMPORT_LOCK = asyncio.Lock()
 _QUOTA_COOLDOWN_UNTIL = 0.0
 _QUOTA_COOLDOWN_SECONDS = 90
+_PENDING_SYNC_TASK: asyncio.Task | None = None
 
 
 
@@ -147,6 +148,29 @@ def _set_quota_cooldown() -> None:
 
 def _is_quota_cooling_down() -> bool:
     return _quota_cooldown_remaining() > 0
+
+
+def schedule_sheet_sync(delay_seconds: float = 1.0) -> bool:
+    global _PENDING_SYNC_TASK
+    if _PENDING_SYNC_TASK and not _PENDING_SYNC_TASK.done():
+        return False
+
+    async def _runner() -> None:
+        try:
+            if delay_seconds > 0:
+                await asyncio.sleep(delay_seconds)
+            await sync_all_to_sheets()
+        except Exception:
+            logger.exception("Scheduled Google Sheets sync failed")
+        finally:
+            global _PENDING_SYNC_TASK
+            _PENDING_SYNC_TASK = None
+
+    try:
+        _PENDING_SYNC_TASK = asyncio.create_task(_runner())
+        return True
+    except RuntimeError:
+        return False
 
 def get_client() -> gspread.client.Client | None:
     oauth_token_path = Path(str(settings.google_oauth_token_path or "").strip())

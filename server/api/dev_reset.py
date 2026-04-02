@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import delete, func, select
@@ -11,7 +9,7 @@ from server.api.deps import get_current_user, require_roles
 from server.db.database import get_db
 from server.db.models import Product, Role, StockAlertState, StockTransaction, User
 from server.services.audit import write_audit_log
-from server.services.gsheets import sync_all_to_sheets
+from server.services.gsheets import schedule_sheet_sync
 from server.services.system_backup import create_backup_archive
 
 
@@ -67,7 +65,7 @@ async def reset_stock(
         after={"products": 0, "transactions": 0, "alert_states": 0},
     )
     try:
-        asyncio.create_task(sync_all_to_sheets())
+        schedule_sheet_sync()
     except Exception:
         pass
     return ResetStockOut(
