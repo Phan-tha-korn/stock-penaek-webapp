@@ -990,6 +990,8 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
     audit_rows = [HEADERS[TAB_AUDIT_LOG]]
     add_rows = [HEADERS[TAB_ADD_LOG]]
     sell_rows = [HEADERS[TAB_SELL_LOG]]
+    income_rows = [HEADERS[TAB_INCOME_LOG]]
+    expense_rows = [HEADERS[TAB_EXPENSE_LOG]]
     edit_rows = [HEADERS[TAB_EDIT_LOG]]
     user_rows = [HEADERS[TAB_USERS]]
     total_stock_value = 0.0
@@ -1164,6 +1166,8 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
         _write_rows(ws_audit, audit_rows)
         _write_rows(ws_add, add_rows)
         _write_rows(ws_sell, sell_rows)
+        _write_rows(ws_income, income_rows)
+        _write_rows(ws_expense, expense_rows)
         _write_rows(ws_edit, edit_rows)
         _write_rows(ws_users, user_rows)
         _style_sheet(sheet, [ws_overview, ws_stock, ws_alerts, ws_accounting, ws_audit, ws_add, ws_sell, ws_edit, ws_income, ws_expense, ws_users])
