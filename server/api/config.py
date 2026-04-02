@@ -434,8 +434,9 @@ async def google_oauth_callback(request: Request):
             pass
     except HTTPException:
         raise
-    except Exception:
-        html = f"<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>เชื่อม Google ไม่สำเร็จ กรุณากลับไปลองใหม่<script>setTimeout(function(){{ window.location.href={return_to!r}; }}, 2200)</script></body></html>"
+    except Exception as e:
+        logger.exception("Google OAuth callback failed. redirect_uri=%s query=%s", redirect_uri, request.url.query)
+        html = f"<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>?????? Google ????????? ??????????????????<script>setTimeout(function(){{ window.location.href={return_to!r}; }}, 2200)</script></body></html>"
         return HTMLResponse(html, status_code=500)
 
     if return_to.startswith("http://") or return_to.startswith("https://"):
