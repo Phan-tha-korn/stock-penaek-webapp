@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   adjustStock,
@@ -45,6 +46,7 @@ type ProductDraft = {
 }
 
 function StatusBadge(props: { status: string; isTest: boolean }) {
+  const { t } = useTranslation()
   const color =
     props.status === 'OUT'
       ? 'bg-red-600 text-white'
@@ -60,8 +62,8 @@ function StatusBadge(props: { status: string; isTest: boolean }) {
 
   return (
     <span className={`inline-flex items-center gap-2 rounded px-2 py-0.5 text-xs font-semibold ${color}`}>
-      {props.isTest ? <span className="rounded bg-[color:var(--color-primary)] px-1 text-black">TEST</span> : null}
-      <span>{props.status}</span>
+      {props.isTest ? <span className="rounded bg-[color:var(--color-primary)] px-1 text-black">{t('stockStatus.TEST')}</span> : null}
+      <span>{t(`stockStatus.${props.status}`, { defaultValue: props.status })}</span>
     </span>
   )
 }
