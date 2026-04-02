@@ -5,7 +5,7 @@ import { api } from '../../services/api'
 import { createDevBackup, getDevBackupDownloadUrl, previewDevBackup, restoreDevBackup, type DevBackupPreviewResult } from '../../services/devBackup'
 import { fetchConfig } from '../../services/config'
 import { fetchActivity } from '../../services/dashboard'
-import { importFromSheets, syncToSheets } from '../../services/products'
+import { forceFullSyncToSheets, importFromSheets, syncToSheets } from '../../services/products'
 import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist, type GarbageFileItem } from '../../services/devGarbage'
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
 import { createDevSheet, getDevSheetsConfig, resolveDevSheetUrl, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
@@ -25,7 +25,7 @@ export function DevPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
 
   const [sheetMsg, setSheetMsg] = useState<string | null>(null)
-  const [sheetAction, setSheetAction] = useState<'sync' | 'import' | null>(null)
+  const [sheetAction, setSheetAction] = useState<'sync' | 'force-sync' | 'import' | null>(null)
   const [sheetsCfg, setSheetsCfg] = useState<DevSheetsConfig | null>(null)
   const [sheetCreateTitle, setSheetCreateTitle] = useState('')
   const [sheetShareEmails, setSheetShareEmails] = useState('')
@@ -284,6 +284,25 @@ export function DevPage() {
                 onClick={() => navigate('/settings#google-setup')}
               >
                 ไปตั้งค่า Google ใน Config
+              </button>
+              <button
+                className="rounded border border-amber-400/30 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/10"
+                type="button"
+                disabled={sheetAction !== null}
+                onClick={async () => {
+                  setSheetMsg(null)
+                  setSheetAction('force-sync')
+                  setSheetMsg('กำลัง Force Full Sync ทั้ง workbook...')
+                  try {
+                    const res = await forceFullSyncToSheets()
+                    setSheetMsg(res.ok ? 'Force Full Sync เสร็จแล้ว' : `Force Full Sync ไม่สำเร็จ: ${res.error || ''}`)
+                    setSheetsCfg(await getDevSheetsConfig())
+                  } finally {
+                    setSheetAction(null)
+                  }
+                }}
+              >
+                {sheetAction === 'force-sync' ? 'กำลัง Force Sync...' : 'Force Full Sync'}
               </button>
             </div>
           </div>

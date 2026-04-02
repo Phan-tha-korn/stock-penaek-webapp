@@ -161,3 +161,8 @@ export async function syncToSheets() {
   const res = await api.post<{ ok: boolean; error?: string }>('/products/sync-to-sheets', {})
   return res.data
 }
+
+export async function forceFullSyncToSheets() {
+  const res = await api.post<{ ok: boolean; error?: string }>('/products/sync-to-sheets/full', {})
+  return res.data
+}

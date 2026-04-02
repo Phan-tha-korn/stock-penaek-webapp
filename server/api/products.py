@@ -266,6 +266,25 @@ async def sync_to_sheets():
         return SheetsSyncOut(ok=False, error=str(e))
 
 
+@router.post(
+    "/sync-to-sheets/full",
+    response_model=SheetsSyncOut,
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV]))],
+)
+async def force_full_sync_to_sheets():
+    try:
+        from server.services.gsheets import sync_all_to_sheets
+    except Exception:
+        return SheetsSyncOut(ok=False, error="sheets_not_available")
+    try:
+        ok = await sync_all_to_sheets(fail_if_busy=True)
+        if not ok:
+            return SheetsSyncOut(ok=False, error="sync_skipped")
+        return SheetsSyncOut(ok=True)
+    except Exception as e:
+        return SheetsSyncOut(ok=False, error=str(e))
+
+
 @router.post("", response_model=ProductOut, dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))])
 async def create_product(
     payload: ProductCreateIn,
