@@ -6,6 +6,7 @@ import { adjustStock, listProducts } from '../../services/products'
 import type { Product } from '../../types/models'
 import { useAuthStore } from '../../store/authStore'
 import { getSocket } from '../../services/socketManager'
+import { productDisplayName } from '../../utils/product'
 
 function typeLabel(t: (k: string) => string, v: TransactionItem['type']) {
   if (v === 'STOCK_IN') return t('product.stockIn')
@@ -176,11 +177,11 @@ export function TransactionsPage() {
                       className="cursor-pointer border-b border-white/5 px-3 py-2 hover:bg-white/10"
                       onClick={() => {
                         setFormSku(p.sku)
-                        setFormNote((prev) => prev || `สินค้า: ${p.name.th}`)
+                        setFormNote((prev) => prev || `สินค้า: ${productDisplayName(p)}`)
                         setSkuSuggestions([])
                       }}
                     >
-                      <div className="text-sm text-white/90">{p.name.th}</div>
+                      <div className="text-sm text-white/90">{productDisplayName(p)}</div>
                       <div className="text-xs text-white/60">{p.sku}</div>
                     </div>
                   ))}

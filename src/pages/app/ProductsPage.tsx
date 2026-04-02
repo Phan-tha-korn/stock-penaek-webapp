@@ -22,6 +22,7 @@ import type { InventoryRuleSettings, Product, ProductCategory } from '../../type
 import { useAuthStore } from '../../store/authStore'
 import { getSocket } from '../../services/socketManager'
 import { ProductDetailModal } from '../../components/products/ProductDetailModal'
+import { productDisplayName } from '../../utils/product'
 
 const UNCATEGORIZED_VALUE = '__uncategorized__'
 
@@ -451,8 +452,8 @@ export function ProductsPage() {
     setEditing(product)
     setEditingDraft({
       sku: product.sku,
-      name_th: product.name.th,
-      name_en: product.name.en || '',
+      name_th: productDisplayName(product),
+      name_en: product?.name?.en || '',
       category_id: product.category_id || '',
       type: product.type || '',
       unit: product.unit || '',
@@ -963,8 +964,8 @@ export function ProductsPage() {
                   ) : null}
                   <td className="px-4 py-2 font-mono text-xs text-white/80">{p.sku}</td>
                   <td className="px-4 py-2">
-                    <div className="text-white/90">{p.name.th}</div>
-                    <div className="text-xs text-white/50">{p.name.en}</div>
+                    <div className="text-white/90">{productDisplayName(p)}</div>
+                    <div className="text-xs text-white/50">{p?.name?.en || ''}</div>
                   </td>
                   <td className="px-4 py-2 text-white/80">{categoryLabel(p)}</td>
                   <td className="px-4 py-2 text-white/60">{p.type || '-'}</td>

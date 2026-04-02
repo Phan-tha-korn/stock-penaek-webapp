@@ -5,6 +5,7 @@ import { api } from '../../services/api'
 import { getDevSheetsConfig, type DevSheetsConfig } from '../../services/devSheets'
 import { listProducts } from '../../services/products'
 import { fetchKpis, fetchStockSummary, fetchTransactions, type Kpis, type StockSummary, type TransactionItem } from '../../services/dashboard'
+import { productDisplayName } from '../../utils/product'
 
 type ReportPeriod = 'day' | 'week' | 'month' | 'year'
 
@@ -370,8 +371,8 @@ export function ReportsPage() {
                 const items = await fetchAllProducts()
                 const rows = items.map((p) => ({
                   sku: p.sku,
-                  name_th: p.name.th,
-                  name_en: p.name.en,
+                  name_th: productDisplayName(p),
+                  name_en: p?.name?.en || '',
                   category: p.category,
                   type: p.type,
                   unit: p.unit,

@@ -9,6 +9,7 @@ import { getSocket } from '../../services/socketManager'
 import { useTranslation } from 'react-i18next'
 import { formatTHB } from '../../utils/money'
 import { ProductDetailModal } from '../../components/products/ProductDetailModal'
+import { productDisplayName } from '../../utils/product'
 
 type CardColor = 'blue' | 'green' | 'yellow' | 'amber' | 'red' | 'orange' | 'sky' | 'default'
 const CARD_COLOR_MAP: Record<CardColor, { border: string; bg: string; text: string }> = {
@@ -140,8 +141,8 @@ function matchesWatchlistSearch(product: Product, query: string) {
   if (!normalized) return true
   return [
     product.sku,
-    product.name.th,
-    product.name.en,
+    productDisplayName(product),
+    product?.name?.en || '',
     product.category,
     product.type,
     product.barcode,
@@ -401,7 +402,7 @@ function StockDashboard() {
                   {p.image_url ? <img src={p.image_url} alt="" className="h-full w-full object-cover" /> : '📦'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold truncate">{p.name.th}</div>
+                  <div className="font-semibold truncate">{productDisplayName(p)}</div>
                   <div className="text-xs text-white/50 font-mono">{p.sku}</div>
                 </div>
                 <div className="text-right shrink-0 flex flex-col items-end gap-1">
@@ -504,7 +505,7 @@ function StockDashboard() {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="truncate font-semibold">{product.name.th}</div>
+                              <div className="truncate font-semibold">{productDisplayName(product)}</div>
                               <div className="mt-1 text-xs font-mono text-white/45">{product.sku}</div>
                             </div>
                             <span className={`shrink-0 rounded px-2 py-1 text-[11px] font-semibold ${statusBadgeClass(product.status)}`}>

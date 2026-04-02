@@ -6,6 +6,7 @@ import { useConfigStore } from '../../store/configStore'
 import { useAuthStore } from '../../store/authStore'
 import type { Product } from '../../types/models'
 import { formatTHB } from '../../utils/money'
+import { productDisplayName } from '../../utils/product'
 
 function statusBadgeClass(status: string): string {
   switch (status) {
@@ -174,14 +175,14 @@ export function ProductDetailModal(props: {
           <div className="space-y-4">
             <div className="aspect-square w-full rounded-lg bg-black/30 flex items-center justify-center border border-[color:var(--color-border)] overflow-hidden">
               {product.image_url ? (
-                <img src={product.image_url} alt={product.name?.th || product.sku} className="h-full w-full object-cover" />
+                <img src={product.image_url} alt={productDisplayName(product)} className="h-full w-full object-cover" />
               ) : (
                 <div className="text-white/30 text-4xl">📦</div>
               )}
             </div>
 
             <div>
-              <div className="text-xl font-bold">{product.name?.th || product.sku}</div>
+              <div className="text-xl font-bold">{productDisplayName(product)}</div>
               <div className="text-sm text-white/50">{product.name?.en || ''}</div>
               <div className="mt-2 text-xs text-white/50">อัปเดตล่าสุด: {formatUpdatedAt(product.updated_at)}</div>
             </div>

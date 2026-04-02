@@ -1,5 +1,6 @@
 import { api } from './api'
 import type { Product } from '../types/models'
+import { normalizeProduct, normalizeProductListResponse } from '../utils/product'
 
 export interface ProductListParams {
   q?: string
@@ -15,12 +16,12 @@ export interface ProductListParams {
 
 export async function listProducts(params: ProductListParams) {
   const { data } = await api.get<{ items: Product[]; total: number }>('/products', { params })
-  return data
+  return normalizeProductListResponse(data)
 }
 
 export async function getPublicProduct(sku: string) {
   const { data } = await api.get<Product>(`/products/public/products/${encodeURIComponent(sku)}`)
-  return data
+  return normalizeProduct(data)
 }
 
 export interface StockAdjustData {
@@ -31,7 +32,7 @@ export interface StockAdjustData {
 
 export async function adjustStock(sku: string, data: StockAdjustData) {
   const res = await api.post<Product>(`/products/${encodeURIComponent(sku)}/adjust`, data)
-  return res.data
+  return normalizeProduct(res.data)
 }
 
 export interface ProductCreateData {
@@ -56,14 +57,14 @@ export interface ProductCreateData {
 
 export async function createProduct(data: ProductCreateData) {
   const res = await api.post<Product>('/products', data)
-  return res.data
+  return normalizeProduct(res.data)
 }
 
 export type ProductUpdateData = Partial<Omit<ProductCreateData, 'sku' | 'stock_qty' | 'is_test'>>
 
 export async function updateProduct(sku: string, data: ProductUpdateData) {
   const res = await api.put<Product>(`/products/${encodeURIComponent(sku)}`, data)
-  return res.data
+  return normalizeProduct(res.data)
 }
 
 export async function updateProductWithImage(sku: string, data: ProductUpdateData, imageFile?: File) {
@@ -74,7 +75,7 @@ export async function updateProductWithImage(sku: string, data: ProductUpdateDat
   })
   if (imageFile) form.append('image', imageFile)
   const res = await api.post<Product>(`/products/${encodeURIComponent(sku)}/update-with-image`, form)
-  return res.data
+  return normalizeProduct(res.data)
 }
 
 export async function createProductWithImage(data: ProductCreateData, imageFile?: File) {
@@ -97,7 +98,7 @@ export async function createProductWithImage(data: ProductCreateData, imageFile?
   form.append('notes', data.notes || '')
   if (imageFile) form.append('image', imageFile)
   const res = await api.post<Product>('/products/create-with-image', form)
-  return res.data
+  return normalizeProduct(res.data)
 }
 
 export interface ProductBulkRowResult {
@@ -136,12 +137,12 @@ export async function downloadBulkImportTemplateZip(rows: number) {
 
 export async function deleteProduct(sku: string, reason: string) {
   const res = await api.post<Product>(`/products/${encodeURIComponent(sku)}/delete`, { reason })
-  return res.data
+  return normalizeProduct(res.data)
 }
 
 export async function restoreProduct(sku: string) {
   const res = await api.post<Product>(`/products/${encodeURIComponent(sku)}/restore`, {})
-  return res.data
+  return normalizeProduct(res.data)
 }
 
 export async function bulkDeleteProducts(skus: string[], reason: string) {
@@ -171,7 +172,7 @@ export async function syncToSheets() {
 
 export async function bulkCreateProducts(items: ProductBulkCreateItem[]) {
   const res = await api.post<{ items: Product[]; total: number }>('/products/bulk-create', { items })
-  return res.data
+  return normalizeProductListResponse(res.data)
 }
 
 export async function forceFullSyncToSheets() {
