@@ -52,6 +52,7 @@ export interface ProductName {
 export interface Product {
   id: string
   sku: string
+  category_id: string | null
   name: ProductName
   category: string
   type: string
@@ -70,6 +71,21 @@ export interface Product {
   created_at: string
   updated_at: string
   created_by: string
+}
+
+export interface ProductCategory {
+  id: string
+  name: string
+  description: string
+  is_deleted: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface InventoryRuleSettings {
+  max_multiplier: number
+  min_divisor: number
 }
 
 export type TxnType = 'STOCK_IN' | 'STOCK_OUT' | 'ADJUST'

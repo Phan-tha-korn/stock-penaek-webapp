@@ -116,6 +116,7 @@ class ProductName(BaseModel):
 class ProductOut(BaseModel):
     id: str
     sku: str
+    category_id: str | None = None
     name: ProductName
     category: str
     type: str
@@ -179,6 +180,7 @@ class StockAdjustIn(BaseModel):
 
 class ProductCreateIn(BaseModel):
     sku: str
+    category_id: str | None = None
     name_th: str
     name_en: str = ""
     category: str = ""
@@ -197,6 +199,7 @@ class ProductCreateIn(BaseModel):
 
 
 class ProductUpdateIn(BaseModel):
+    category_id: str | None = None
     name_th: str | None = None
     name_en: str | None = None
     category: str | None = None
@@ -232,6 +235,65 @@ class SheetsImportOut(BaseModel):
 class SheetsSyncOut(BaseModel):
     ok: bool
     error: str | None = None
+
+
+class ProductBulkCreateItemIn(BaseModel):
+    sku: str
+    category_id: str | None = None
+    name_th: str
+    name_en: str = ""
+    category: str = ""
+    type: str = ""
+    unit: str = ""
+    cost_price: float = 0
+    selling_price: float | None = None
+    stock_qty: float = 0
+    min_stock: float = 0
+    max_stock: float = 0
+    is_test: bool = False
+    supplier: str = ""
+    barcode: str = ""
+    notes: str = ""
+
+
+class ProductBulkCreateIn(BaseModel):
+    items: list[ProductBulkCreateItemIn]
+
+
+class ProductCategoryOut(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    is_deleted: bool = False
+    sort_order: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProductCategoryListOut(BaseModel):
+    items: list[ProductCategoryOut]
+
+
+class ProductCategoryCreateIn(BaseModel):
+    name: str
+    description: str = ""
+    sort_order: int = 0
+
+
+class ProductCategoryUpdateIn(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    sort_order: int | None = None
+
+
+class ProductRuleSettingsOut(BaseModel):
+    max_multiplier: float = 2
+    min_divisor: float = 3
+
+
+class ProductRuleSettingsIn(BaseModel):
+    max_multiplier: float = 2
+    min_divisor: float = 3
 
 
 class ProductBulkRowResult(BaseModel):

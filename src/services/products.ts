@@ -4,6 +4,9 @@ import type { Product } from '../types/models'
 export interface ProductListParams {
   q?: string
   status?: string
+  category_id?: string
+  uncategorized_only?: boolean
+  product_type?: string
   is_test?: boolean
   include_deleted?: boolean
   limit?: number
@@ -33,6 +36,7 @@ export async function adjustStock(sku: string, data: StockAdjustData) {
 
 export interface ProductCreateData {
   sku: string
+  category_id?: string | null
   name_th: string
   name_en?: string
   category?: string
@@ -76,6 +80,7 @@ export async function updateProductWithImage(sku: string, data: ProductUpdateDat
 export async function createProductWithImage(data: ProductCreateData, imageFile?: File) {
   const form = new FormData()
   form.append('sku', data.sku)
+  if (data.category_id !== undefined && data.category_id !== null) form.append('category_id', String(data.category_id))
   form.append('name_th', data.name_th)
   form.append('name_en', data.name_en || '')
   form.append('category', data.category || '')
@@ -110,6 +115,8 @@ export interface ProductBulkImportResult {
   failed: number
   items: ProductBulkRowResult[]
 }
+
+export interface ProductBulkCreateItem extends ProductCreateData {}
 
 export async function bulkImportProductsZip(file: File, overwriteExisting = false) {
   const form = new FormData()
@@ -162,7 +169,17 @@ export async function syncToSheets() {
   return res.data
 }
 
+export async function bulkCreateProducts(items: ProductBulkCreateItem[]) {
+  const res = await api.post<{ items: Product[]; total: number }>('/products/bulk-create', { items })
+  return res.data
+}
+
 export async function forceFullSyncToSheets() {
   const res = await api.post<{ ok: boolean; error?: string }>('/products/sync-to-sheets/full', {})
+  return res.data
+}
+
+export async function getProductFilterOptions() {
+  const res = await api.get<{ types: string[] }>('/products/filter-options')
   return res.data
 }

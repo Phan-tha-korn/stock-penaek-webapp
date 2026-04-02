@@ -211,6 +211,76 @@ class ApiSmokeTests(unittest.TestCase):
         self.assertEqual(adjust.status_code, 200, adjust.text)
         self.assertEqual(adjust.json()["stock_qty"], "3.000")
 
+    def test_category_lifecycle_and_bulk_create_flow(self) -> None:
+        headers = self._login("owner", "Owner@1234")
+
+        create_category = self.client.post(
+            "/api/product-categories",
+            headers=headers,
+            json={"name": "อาหาร", "description": "โซนอาหาร", "sort_order": 10},
+        )
+        self.assertEqual(create_category.status_code, 200, create_category.text)
+        category_id = create_category.json()["id"]
+
+        settings_update = self.client.put(
+            "/api/product-categories/settings",
+            headers=headers,
+            json={"max_multiplier": 4, "min_divisor": 2},
+        )
+        self.assertEqual(settings_update.status_code, 200, settings_update.text)
+        self.assertEqual(settings_update.json()["max_multiplier"], 4)
+
+        bulk_create = self.client.post(
+            "/api/products/bulk-create",
+            headers=headers,
+            json={
+                "items": [
+                    {
+                        "sku": "BULK-001",
+                        "name_th": "ข้าวสาร",
+                        "category_id": category_id,
+                        "type": "วัตถุดิบ",
+                        "unit": "ชิ้น",
+                        "stock_qty": 9,
+                        "min_stock": 3,
+                        "max_stock": 18,
+                    },
+                    {
+                        "sku": "BULK-002",
+                        "name_th": "น้ำปลา",
+                        "category_id": category_id,
+                        "type": "เครื่องปรุง",
+                        "unit": "กก.",
+                        "stock_qty": 2.5,
+                        "min_stock": 1,
+                        "max_stock": 5,
+                    },
+                ]
+            },
+        )
+        self.assertEqual(bulk_create.status_code, 200, bulk_create.text)
+        self.assertEqual(bulk_create.json()["total"], 2)
+
+        filtered = self.client.get(f"/api/products?category_id={category_id}", headers=headers)
+        self.assertEqual(filtered.status_code, 200, filtered.text)
+        self.assertEqual(filtered.json()["total"], 2)
+
+        delete_category = self.client.delete(f"/api/product-categories/{category_id}", headers=headers)
+        self.assertEqual(delete_category.status_code, 200, delete_category.text)
+
+        uncategorized = self.client.get("/api/products?uncategorized_only=true", headers=headers)
+        self.assertEqual(uncategorized.status_code, 200, uncategorized.text)
+        returned_skus = {item["sku"] for item in uncategorized.json()["items"]}
+        self.assertIn("BULK-001", returned_skus)
+        self.assertIn("BULK-002", returned_skus)
+
+        restore_category = self.client.post(f"/api/product-categories/{category_id}/restore", headers=headers)
+        self.assertEqual(restore_category.status_code, 200, restore_category.text)
+
+        filtered_again = self.client.get(f"/api/products?category_id={category_id}", headers=headers)
+        self.assertEqual(filtered_again.status_code, 200, filtered_again.text)
+        self.assertEqual(filtered_again.json()["total"], 2)
+
     def test_user_management_flow(self) -> None:
         headers = self._login("owner", "Owner@1234")
 

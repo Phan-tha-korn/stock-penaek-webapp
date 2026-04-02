@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.deps import require_roles, get_current_user
 from server.api.schemas import (
+    ProductBulkCreateIn,
     ProductCreateIn,
     ProductDeleteIn,
     ProductListOut,
@@ -26,7 +27,7 @@ from server.api.schemas import (
     StockAdjustIn,
 )
 from server.db.database import get_db
-from server.db.models import Product, Role, StockAlertState, StockTransaction, TxnType, User
+from server.db.models import Product, ProductCategory, Role, StockAlertState, StockTransaction, TxnType, User
 from server.db.init_db import calc_status
 from server.services.audit import write_audit_log
 from server.services.media_store import choose_image_for_row, parse_products_csv, read_zip_payload, save_product_image_bytes
@@ -38,6 +39,7 @@ from server.config.settings import settings
 router = APIRouter(prefix="/products", tags=["products"])
 
 DELETED_PREFIX = "__DELETED__:"
+UNCATEGORIZED_SENTINEL = "__uncategorized__"
 
 
 def _d(v) -> str:
@@ -89,6 +91,7 @@ def _to_out(p: Product) -> ProductOut:
     return ProductOut(
         id=p.id,
         sku=p.sku,
+        category_id=p.category_id,
         name=ProductName(th=p.name_th, en=p.name_en),
         category=p.category,
         type=p.type,
@@ -110,7 +113,40 @@ def _to_out(p: Product) -> ProductOut:
     )
 
 
+def _is_integer_only_unit(unit: str) -> bool:
+    normalized = (unit or "").strip().lower()
+    return normalized in {"ชิ้น", "piece", "pcs", "pc"}
+
+
+def _round_rule(value: float) -> float:
+    whole = int(value)
+    fraction = abs(value - whole)
+    if fraction <= 0.5:
+        return float(whole)
+    return float(whole + 1)
+
+
+def _coerce_qty(value: float | None, *, unit: str, field_name: str) -> float:
+    numeric = float(value or 0)
+    if numeric < 0:
+        raise HTTPException(status_code=400, detail=f"invalid_{field_name}")
+    if _is_integer_only_unit(unit) and not numeric.is_integer():
+        raise HTTPException(status_code=400, detail=f"{field_name}_must_be_integer")
+    return int(numeric) if _is_integer_only_unit(unit) else numeric
+
+
+async def _resolve_category(db: AsyncSession, category_id: str | None) -> ProductCategory | None:
+    value = (category_id or "").strip()
+    if not value:
+        return None
+    category = await db.scalar(select(ProductCategory).where(ProductCategory.id == value, ProductCategory.is_deleted.is_(False)))
+    if not category:
+        raise HTTPException(status_code=400, detail="invalid_category")
+    return category
+
+
 def _apply_product_payload(p: Product, payload: ProductCreateIn | ProductUpdateIn) -> None:
+    unit_value = ((payload.unit or "") if hasattr(payload, "unit") and payload.unit is not None else p.unit).strip()
     if isinstance(payload, ProductCreateIn) or payload.name_th is not None:
         p.name_th = ((payload.name_th or "") if hasattr(payload, "name_th") else p.name_th).strip()
     if isinstance(payload, ProductCreateIn) or payload.name_en is not None:
@@ -120,7 +156,7 @@ def _apply_product_payload(p: Product, payload: ProductCreateIn | ProductUpdateI
     if isinstance(payload, ProductCreateIn) or payload.type is not None:
         p.type = ((payload.type or "") if hasattr(payload, "type") else p.type).strip()
     if isinstance(payload, ProductCreateIn) or payload.unit is not None:
-        p.unit = ((payload.unit or "") if hasattr(payload, "unit") else p.unit).strip()
+        p.unit = unit_value
     if isinstance(payload, ProductCreateIn) or payload.cost_price is not None:
         p.cost_price = float(getattr(payload, "cost_price", 0) or 0)
     if isinstance(payload, ProductCreateIn):
@@ -128,11 +164,11 @@ def _apply_product_payload(p: Product, payload: ProductCreateIn | ProductUpdateI
     elif payload.selling_price is not None:
         p.selling_price = float(payload.selling_price)
     if isinstance(payload, ProductCreateIn):
-        p.stock_qty = float(payload.stock_qty or 0)
+        p.stock_qty = _coerce_qty(float(payload.stock_qty or 0), unit=unit_value, field_name="stock_qty")
     if isinstance(payload, ProductCreateIn) or payload.min_stock is not None:
-        p.min_stock = float(getattr(payload, "min_stock", 0) or 0)
+        p.min_stock = _coerce_qty(float(getattr(payload, "min_stock", 0) or 0), unit=unit_value, field_name="min_stock")
     if isinstance(payload, ProductCreateIn) or payload.max_stock is not None:
-        p.max_stock = float(getattr(payload, "max_stock", 0) or 0)
+        p.max_stock = _coerce_qty(float(getattr(payload, "max_stock", 0) or 0), unit=unit_value, field_name="max_stock")
     if isinstance(payload, ProductCreateIn):
         p.is_test = bool(payload.is_test)
     if isinstance(payload, ProductCreateIn) or payload.supplier is not None:
@@ -153,6 +189,9 @@ async def list_products(
     user: User = Depends(get_current_user),
     q: str | None = None,
     status: str | None = None,
+    category_id: str | None = None,
+    uncategorized_only: bool = False,
+    product_type: str | None = None,
     is_test: bool | None = None,
     include_deleted: bool = False,
     limit: int = Query(default=50, ge=1, le=200),
@@ -174,13 +213,22 @@ async def list_products(
                         func.lower(Product.sku).like(qs),
                         func.lower(Product.name_th).like(qs),
                         func.lower(Product.name_en).like(qs),
+                        func.lower(Product.category).like(qs),
+                        func.lower(Product.type).like(qs),
                         func.lower(Product.barcode).like(qs),
+                        func.lower(Product.supplier).like(qs),
                     )
                 )
             stmt = stmt.where(and_(*token_conds))
 
     if status:
         stmt = stmt.where(Product.status == status)
+    if uncategorized_only:
+        stmt = stmt.where(Product.category_id.is_(None))
+    elif category_id:
+        stmt = stmt.where(Product.category_id == category_id)
+    if product_type:
+        stmt = stmt.where(func.lower(Product.type) == product_type.strip().lower())
     if is_test is not None:
         stmt = stmt.where(Product.is_test.is_(is_test))
 
@@ -285,6 +333,18 @@ async def force_full_sync_to_sheets():
         return SheetsSyncOut(ok=False, error=str(e))
 
 
+@router.get("/filter-options", response_model=dict, dependencies=[Depends(require_roles([Role.STOCK, Role.ADMIN, Role.OWNER, Role.DEV, Role.ACCOUNTANT]))])
+async def product_filter_options(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    stmt = select(Product.type).where(Product.type.is_not(None), Product.type != "")
+    if user.role not in (Role.OWNER, Role.DEV):
+        stmt = stmt.where(~Product.notes.like(f"{DELETED_PREFIX}%"))
+    types = sorted({str(x[0]).strip() for x in (await db.execute(stmt)).all() if str(x[0]).strip()}, key=str.lower)
+    return {"types": types}
+
+
 @router.post("", response_model=ProductOut, dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))])
 async def create_product(
     payload: ProductCreateIn,
@@ -299,9 +359,12 @@ async def create_product(
     existing = await db.scalar(select(Product).where(Product.sku == sku))
     if existing:
         raise HTTPException(status_code=409, detail="sku_exists")
+    category = await _resolve_category(db, payload.category_id)
 
     p = Product(
         sku=sku,
+        category_id=None,
+        last_category_id=None,
         name_th="",
         name_en="",
         category="",
@@ -323,6 +386,9 @@ async def create_product(
         updated_at=datetime.utcnow(),
     )
     _apply_product_payload(p, payload)
+    p.category_id = category.id if category else None
+    p.last_category_id = category.id if category else p.last_category_id
+    p.category = category.name if category else (p.category or "")
     db.add(p)
     await db.commit()
     await db.refresh(p)
@@ -351,6 +417,7 @@ async def create_product_with_image(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
     sku: str = Form(...),
+    category_id: str | None = Form(None),
     name_th: str = Form(...),
     name_en: str = Form(""),
     category: str = Form(""),
@@ -369,6 +436,7 @@ async def create_product_with_image(
 ):
     payload = ProductCreateIn(
         sku=sku,
+        category_id=category_id,
         name_th=name_th,
         name_en=name_en,
         category=category,
@@ -391,6 +459,98 @@ async def create_product_with_image(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     return await create_product(payload=payload, request=request, db=db, user=user)
+
+
+@router.post("/bulk-create", response_model=ProductListOut, dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))])
+async def bulk_create_products(
+    payload: ProductBulkCreateIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if len(payload.items) < 2:
+        raise HTTPException(status_code=400, detail="bulk_items_too_few")
+
+    normalized: list[Product] = []
+    seen: set[str] = set()
+    for item in payload.items:
+        sku = item.sku.strip()
+        if not sku or not item.name_th.strip():
+            raise HTTPException(status_code=400, detail="invalid_bulk_item")
+        if sku in seen:
+            raise HTTPException(status_code=400, detail="duplicate_bulk_sku")
+        seen.add(sku)
+        existing = await db.scalar(select(Product).where(Product.sku == sku))
+        if existing and not _is_deleted(existing):
+            raise HTTPException(status_code=409, detail=f"sku_exists:{sku}")
+        category = await _resolve_category(db, item.category_id)
+        product = Product(
+            sku=sku,
+            category_id=category.id if category else None,
+            last_category_id=category.id if category else None,
+            name_th="",
+            name_en="",
+            category=category.name if category else "",
+            type="",
+            unit="",
+            cost_price=0,
+            selling_price=None,
+            stock_qty=0,
+            min_stock=0,
+            max_stock=0,
+            status=calc_status(0, 0, 0, False),
+            is_test=False,
+            supplier="",
+            barcode="",
+            image_url=None,
+            notes="",
+            created_by=user.id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        _apply_product_payload(
+            product,
+            ProductCreateIn(
+                sku=sku,
+                category_id=item.category_id,
+                name_th=item.name_th,
+                name_en=item.name_en,
+                category=category.name if category else (item.category or ""),
+                type=item.type,
+                unit=item.unit,
+                cost_price=item.cost_price,
+                selling_price=item.selling_price,
+                stock_qty=item.stock_qty,
+                min_stock=item.min_stock,
+                max_stock=item.max_stock,
+                is_test=item.is_test,
+                supplier=item.supplier,
+                barcode=item.barcode,
+                notes=item.notes,
+            ),
+        )
+        normalized.append(product)
+
+    for product in normalized:
+        db.add(product)
+    await db.commit()
+    for product in normalized:
+        await db.refresh(product)
+
+    await write_audit_log(
+        db,
+        request=request,
+        actor=user,
+        action="PRODUCT_BULK_CREATE",
+        entity="product",
+        entity_id=None,
+        success=True,
+        message="bulk_created",
+        before=None,
+        after={"count": len(normalized)},
+    )
+    _trigger_sheet_sync()
+    return ProductListOut(items=[_to_out(product) for product in normalized], total=len(normalized))
 
 
 @router.get("/bulk-import-template-zip", dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))])
@@ -553,6 +713,15 @@ async def update_product(
         raise HTTPException(status_code=404, detail="Product not found")
 
     before = {"sku": p.sku, "name_th": p.name_th}
+    fields_set = getattr(payload, "model_fields_set", set())
+    if "category_id" in fields_set:
+        category = await _resolve_category(db, payload.category_id)
+        p.category_id = category.id if category else None
+        if category:
+            p.last_category_id = category.id
+            p.category = category.name
+        else:
+            p.category = ""
 
     _apply_product_payload(p, payload)
 
@@ -583,6 +752,7 @@ async def update_product_with_image(
     request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    category_id: str | None = Form(None),
     name_th: str | None = Form(None),
     name_en: str | None = Form(None),
     category: str | None = Form(None),
@@ -602,6 +772,7 @@ async def update_product_with_image(
         raise HTTPException(status_code=404, detail="Product not found")
 
     payload = ProductUpdateIn(
+        category_id=category_id,
         name_th=name_th,
         name_en=name_en,
         category=category,
@@ -837,7 +1008,7 @@ async def adjust_stock(
 
     old_status = product.status.value
     old_qty = float(product.stock_qty)
-    adjust_amount = payload.qty
+    adjust_amount = _coerce_qty(payload.qty, unit=product.unit, field_name="qty")
     if payload.type in (TxnType.STOCK_IN, TxnType.STOCK_OUT) and adjust_amount <= 0:
         raise HTTPException(status_code=400, detail="qty_must_be_positive")
 

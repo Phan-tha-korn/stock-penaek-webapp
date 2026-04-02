@@ -10,9 +10,18 @@ import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
 import { createDevSheet, getDevSheetsConfig, resolveDevSheetUrl, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
 import { resetStock } from '../../services/devReset'
+import {
+  createProductCategory,
+  deleteProductCategory,
+  getInventoryRuleSettings,
+  listProductCategories,
+  restoreProductCategory,
+  updateInventoryRuleSettings,
+  updateProductCategory,
+} from '../../services/productCategories'
 import { useAuthStore } from '../../store/authStore'
 import type { ActivityItem } from '../../services/dashboard'
-import type { AppConfig } from '../../types/models'
+import type { AppConfig, InventoryRuleSettings, ProductCategory } from '../../types/models'
 
 const GOOGLE_OAUTH_PENDING_KEY = 'google_oauth_pending_until'
 
@@ -40,6 +49,13 @@ export function DevPage() {
   const [sheetMsg, setSheetMsg] = useState<string | null>(null)
   const [sheetAction, setSheetAction] = useState<'sync' | 'force-sync' | 'import' | null>(null)
   const [sheetsCfg, setSheetsCfg] = useState<DevSheetsConfig | null>(null)
+  const [categoryBusy, setCategoryBusy] = useState(false)
+  const [categoryMsg, setCategoryMsg] = useState<string | null>(null)
+  const [categoryName, setCategoryName] = useState('')
+  const [categoryDescription, setCategoryDescription] = useState('')
+  const [categorySort, setCategorySort] = useState('0')
+  const [categoryItems, setCategoryItems] = useState<ProductCategory[]>([])
+  const [inventoryRules, setInventoryRules] = useState<InventoryRuleSettings>({ max_multiplier: 2, min_divisor: 3 })
   const [sheetsLoading, setSheetsLoading] = useState(true)
   const [googleSheetsPending, setGoogleSheetsPending] = useState(false)
   const [sheetCreateTitle, setSheetCreateTitle] = useState('')
@@ -101,6 +117,15 @@ export function DevPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function reloadCategoryTools() {
+    const [cats, rules] = await Promise.all([
+      listProductCategories(true),
+      getInventoryRuleSettings(),
+    ])
+    setCategoryItems(cats.items)
+    setInventoryRules(rules)
   }
 
   async function scanNow() {
@@ -243,6 +268,7 @@ export function DevPage() {
   useEffect(() => {
     reload()
     scanNow()
+    void reloadCategoryTools().catch(() => {})
     ;(async () => {
       try {
         const cfg = await getNotificationConfig()
@@ -524,6 +550,222 @@ export function DevPage() {
             ซ่อนรายละเอียดรายการไว้แล้ว กด “ดูรายการ” เพื่อเปิดตารางไฟล์ขยะและ whitelist
           </div>
         )}
+      </div>
+
+      <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold">Inventory Categories + Rules</div>
+            <div className="text-xs text-white/60">สร้าง/แก้ชื่อ/ลบ/กู้คืนหมวดหมู่สินค้า และตั้งสูตร Min/Max สำหรับหน้าเพิ่มสินค้า</div>
+          </div>
+          <button
+            className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+            type="button"
+            onClick={() => void reloadCategoryTools().catch(() => {})}
+          >
+            รีโหลดหมวดหมู่
+          </button>
+        </div>
+        {categoryMsg ? <div className="mt-3 text-xs text-white/70">{categoryMsg}</div> : null}
+
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
+          <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-4">
+            <div className="text-sm font-semibold">สร้างหมวดหมู่ใหม่</div>
+            <div className="mt-3 space-y-3">
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                placeholder="ชื่อหมวดหมู่"
+              />
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={categoryDescription}
+                onChange={(e) => setCategoryDescription(e.target.value)}
+                placeholder="รายละเอียด"
+              />
+              <input
+                className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                value={categorySort}
+                onChange={(e) => setCategorySort(e.target.value)}
+                inputMode="numeric"
+                placeholder="ลำดับแสดงผล"
+              />
+              <button
+                className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
+                type="button"
+                disabled={categoryBusy}
+                onClick={async () => {
+                  if (!categoryName.trim()) {
+                    setCategoryMsg('กรุณากรอกชื่อหมวดหมู่')
+                    return
+                  }
+                  setCategoryBusy(true)
+                  setCategoryMsg('กำลังสร้างหมวดหมู่และกระจายแพตช์...')
+                  try {
+                    await createProductCategory({
+                      name: categoryName.trim(),
+                      description: categoryDescription.trim(),
+                      sort_order: Number(categorySort || 0),
+                    })
+                    setCategoryName('')
+                    setCategoryDescription('')
+                    setCategorySort('0')
+                    await reloadCategoryTools()
+                    setCategoryMsg('สร้างหมวดหมู่สำเร็จ')
+                  } catch (e: any) {
+                    setCategoryMsg(e?.response?.data?.detail || e?.message || 'สร้างหมวดหมู่ไม่สำเร็จ')
+                  } finally {
+                    setCategoryBusy(false)
+                  }
+                }}
+              >
+                {categoryBusy ? 'กำลังบันทึก...' : 'สร้างหมวดหมู่'}
+              </button>
+            </div>
+
+            <div className="mt-6 border-t border-[color:var(--color-border)] pt-4">
+              <div className="text-sm font-semibold">สูตรคำนวณ Min / Max</div>
+              <div className="mt-2 text-xs text-white/55">Max = จำนวนตั้งต้น x ตัวคูณ, Min = จำนวนตั้งต้น ÷ ตัวหาร</div>
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <input
+                  className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                  value={String(inventoryRules.max_multiplier)}
+                  onChange={(e) => setInventoryRules((prev) => ({ ...prev, max_multiplier: Number(e.target.value || 0) }))}
+                  inputMode="decimal"
+                  placeholder="ตัวคูณ Max"
+                />
+                <input
+                  className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+                  value={String(inventoryRules.min_divisor)}
+                  onChange={(e) => setInventoryRules((prev) => ({ ...prev, min_divisor: Number(e.target.value || 0) }))}
+                  inputMode="decimal"
+                  placeholder="ตัวหาร Min"
+                />
+              </div>
+              <button
+                className="mt-3 rounded border border-[color:var(--color-border)] px-4 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-60"
+                type="button"
+                disabled={categoryBusy}
+                onClick={async () => {
+                  setCategoryBusy(true)
+                  setCategoryMsg('กำลังอัปเดตสูตร...')
+                  try {
+                    const next = await updateInventoryRuleSettings(inventoryRules)
+                    setInventoryRules(next)
+                    setCategoryMsg('บันทึกสูตรคำนวณแล้ว')
+                  } catch (e: any) {
+                    setCategoryMsg(e?.response?.data?.detail || e?.message || 'อัปเดตสูตรไม่สำเร็จ')
+                  } finally {
+                    setCategoryBusy(false)
+                  }
+                }}
+              >
+                บันทึกสูตรคำนวณ
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-4">
+            <div className="text-sm font-semibold">รายการหมวดหมู่ทั้งหมด</div>
+            <div className="mt-3 space-y-3">
+              {categoryItems.length === 0 ? (
+                <div className="rounded border border-dashed border-[color:var(--color-border)] px-4 py-6 text-sm text-white/45">
+                  ยังไม่มีหมวดหมู่สินค้า
+                </div>
+              ) : (
+                categoryItems.map((item) => (
+                  <div key={item.id} className="rounded border border-[color:var(--color-border)] bg-white/5 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-semibold">{item.name}</div>
+                          {item.is_deleted ? <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs text-red-200">ลบแล้ว</span> : null}
+                          <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-white/60">sort {item.sort_order}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-white/55">{item.description || 'ไม่มีรายละเอียด'}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {!item.is_deleted ? (
+                          <>
+                            <button
+                              className="rounded border border-[color:var(--color-border)] px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                              type="button"
+                              onClick={async () => {
+                                const nextName = window.prompt('แก้ชื่อหมวดหมู่', item.name)
+                                if (nextName == null) return
+                                const nextDescription = window.prompt('แก้รายละเอียด', item.description || '') ?? item.description
+                                const nextSort = window.prompt('ลำดับแสดงผล', String(item.sort_order ?? 0))
+                                setCategoryBusy(true)
+                                setCategoryMsg('กำลังอัปเดตหมวดหมู่...')
+                                try {
+                                  await updateProductCategory(item.id, {
+                                    name: nextName.trim(),
+                                    description: nextDescription.trim(),
+                                    sort_order: Number(nextSort || 0),
+                                  })
+                                  await reloadCategoryTools()
+                                  setCategoryMsg('อัปเดตหมวดหมู่แล้ว')
+                                } catch (e: any) {
+                                  setCategoryMsg(e?.response?.data?.detail || e?.message || 'อัปเดตหมวดหมู่ไม่สำเร็จ')
+                                } finally {
+                                  setCategoryBusy(false)
+                                }
+                              }}
+                            >
+                              แก้ไขชื่อ
+                            </button>
+                            <button
+                              className="rounded border border-red-500/30 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                              type="button"
+                              onClick={async () => {
+                                const ok = window.confirm(`ลบหมวดหมู่ ${item.name}? สินค้าจะย้ายไปไม่ระบุหมวด`)
+                                if (!ok) return
+                                setCategoryBusy(true)
+                                setCategoryMsg('กำลังลบหมวดหมู่และย้ายสินค้า...')
+                                try {
+                                  await deleteProductCategory(item.id)
+                                  await reloadCategoryTools()
+                                  setCategoryMsg('ลบหมวดหมู่แล้ว สินค้าย้ายไปไม่ระบุหมวด')
+                                } catch (e: any) {
+                                  setCategoryMsg(e?.response?.data?.detail || e?.message || 'ลบหมวดหมู่ไม่สำเร็จ')
+                                } finally {
+                                  setCategoryBusy(false)
+                                }
+                              }}
+                            >
+                              ลบหมวด
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="rounded border border-emerald-500/30 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-500/10"
+                            type="button"
+                            onClick={async () => {
+                              setCategoryBusy(true)
+                              setCategoryMsg('กำลังกู้คืนหมวดหมู่...')
+                              try {
+                                await restoreProductCategory(item.id)
+                                await reloadCategoryTools()
+                                setCategoryMsg('กู้คืนหมวดหมู่แล้ว')
+                              } catch (e: any) {
+                                setCategoryMsg(e?.response?.data?.detail || e?.message || 'กู้คืนหมวดหมู่ไม่สำเร็จ')
+                              } finally {
+                                setCategoryBusy(false)
+                              }
+                            }}
+                          >
+                            กู้คืนหมวด
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">

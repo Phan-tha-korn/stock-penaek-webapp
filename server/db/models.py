@@ -37,6 +37,19 @@ class TxnType(str, enum.Enum):
     ADJUST = "ADJUST"
 
 
+class ProductCategory(Base):
+    __tablename__ = "product_categories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -87,6 +100,8 @@ class Product(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     sku: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    category_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    last_category_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
     name_th: Mapped[str] = mapped_column(String(255))
     name_en: Mapped[str] = mapped_column(String(255))
     category: Mapped[str] = mapped_column(String(255), index=True)

@@ -28,6 +28,14 @@ def calc_status(qty: float, min_stock: float, max_stock: float, is_test: bool) -
 async def create_all() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        driver = conn.engine.url.get_backend_name()
+        if driver == "sqlite":
+            rows = await conn.exec_driver_sql("PRAGMA table_info(products)")
+            cols = {str(row[1]) for row in rows.fetchall()}
+            if "category_id" not in cols:
+                await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN category_id VARCHAR(36)")
+            if "last_category_id" not in cols:
+                await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN last_category_id VARCHAR(36)")
 
 
 async def seed_if_empty(db: AsyncSession) -> None:

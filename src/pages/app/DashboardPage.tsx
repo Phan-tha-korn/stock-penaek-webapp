@@ -135,6 +135,22 @@ function getRestockQty(product: Product) {
   return Math.max(0, Number(product.max_stock) - Number(product.stock_qty))
 }
 
+function matchesWatchlistSearch(product: Product, query: string) {
+  const normalized = query.trim().toLowerCase()
+  if (!normalized) return true
+  return [
+    product.sku,
+    product.name.th,
+    product.name.en,
+    product.category,
+    product.type,
+    product.barcode,
+    product.supplier,
+  ]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(normalized))
+}
+
 function StockDashboard() {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
@@ -159,6 +175,12 @@ function StockDashboard() {
     LOW: [],
     CRITICAL: [],
     OUT: [],
+  })
+  const [watchlistQuery, setWatchlistQuery] = useState('')
+  const [watchlistPage, setWatchlistPage] = useState<Record<StockAlertSectionKey, number>>({
+    LOW: 1,
+    CRITICAL: 1,
+    OUT: 1,
   })
   const { toasts, addToast } = useToast()
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -187,9 +209,9 @@ function StockDashboard() {
     setAlertsBusy(true)
     try {
       const [low, critical, out] = await Promise.all([
-        listProducts({ status: 'LOW', limit: 8 }),
-        listProducts({ status: 'CRITICAL', limit: 8 }),
-        listProducts({ status: 'OUT', limit: 8 }),
+        listProducts({ status: 'LOW', limit: 100 }),
+        listProducts({ status: 'CRITICAL', limit: 100 }),
+        listProducts({ status: 'OUT', limit: 100 }),
       ])
       setAlertSections({
         LOW: low.items,
@@ -426,9 +448,25 @@ function StockDashboard() {
           <div className="text-xs text-white/40">อัปเดตตามสถานะล่าสุดของคลังสินค้า</div>
         </div>
 
+        <div className="mb-4">
+          <input
+            className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] md:max-w-md"
+            value={watchlistQuery}
+            onChange={(e) => {
+              setWatchlistQuery(e.target.value)
+              setWatchlistPage({ LOW: 1, CRITICAL: 1, OUT: 1 })
+            }}
+            placeholder="ค้นหาในโซนเฝ้าระวัง"
+          />
+        </div>
+
         <div className="grid gap-4 xl:grid-cols-3">
           {STOCK_ALERT_META.map((section) => {
             const items = alertSections[section.key]
+            const filteredItems = items.filter((product) => matchesWatchlistSearch(product, watchlistQuery))
+            const totalPages = Math.max(1, Math.ceil(filteredItems.length / 5))
+            const currentPage = Math.min(watchlistPage[section.key], totalPages)
+            const pageItems = filteredItems.slice((currentPage - 1) * 5, currentPage * 5)
             return (
               <div key={section.key} className="rounded-xl border border-[color:var(--color-border)] bg-black/20">
                 <div className="flex items-start justify-between gap-3 border-b border-[color:var(--color-border)] px-4 py-4">
@@ -437,7 +475,7 @@ function StockDashboard() {
                     <div className="text-xs text-white/50">{section.description}</div>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${section.badgeClass}`}>
-                    {items.length} รายการ
+                    {filteredItems.length} ??????
                   </span>
                 </div>
 
@@ -450,12 +488,12 @@ function StockDashboard() {
                         <div className="mt-4 h-16 rounded skeleton" />
                       </div>
                     ))
-                  ) : items.length === 0 ? (
+                  ) : filteredItems.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-[color:var(--color-border)] bg-white/5 px-4 py-8 text-center text-sm text-white/45">
-                      ไม่มีรายการในโซนนี้
+                      ?????????????????????????
                     </div>
                   ) : (
-                    items.map((product) => {
+                    pageItems.map((product) => {
                       const restockQty = getRestockQty(product)
                       return (
                         <button
@@ -498,6 +536,29 @@ function StockDashboard() {
                       )
                     })
                   )}
+                  {!alertsBusy && filteredItems.length > 5 ? (
+                    <div className="flex items-center justify-between border-t border-[color:var(--color-border)] pt-3 text-xs text-white/60">
+                      <div>Page {currentPage} / {totalPages}</div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="rounded border border-[color:var(--color-border)] px-2 py-1 hover:bg-white/10 disabled:opacity-40"
+                          disabled={currentPage <= 1}
+                          onClick={() => setWatchlistPage((prev) => ({ ...prev, [section.key]: Math.max(1, prev[section.key] - 1) }))}
+                        >
+                          Previous
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-[color:var(--color-border)] px-2 py-1 hover:bg-white/10 disabled:opacity-40"
+                          disabled={currentPage >= totalPages}
+                          onClick={() => setWatchlistPage((prev) => ({ ...prev, [section.key]: Math.min(totalPages, prev[section.key] + 1) }))}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )
