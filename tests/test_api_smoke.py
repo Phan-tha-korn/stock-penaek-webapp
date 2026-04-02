@@ -74,6 +74,24 @@ class ApiSmokeTests(unittest.TestCase):
                 password_hash=hash_password("Dev@1234"),
                 totp_secret=None,
             )
+            admin = User(
+                username="admin",
+                display_name="Admin",
+                role=Role.ADMIN,
+                is_active=True,
+                language="th",
+                password_hash=hash_password("Admin@1234"),
+                totp_secret=None,
+            )
+            accountant = User(
+                username="accountant",
+                display_name="Accountant",
+                role=Role.ACCOUNTANT,
+                is_active=True,
+                language="th",
+                password_hash=hash_password("Acc@1234"),
+                totp_secret=None,
+            )
             stock = User(
                 username="stock",
                 display_name="Stock",
@@ -83,7 +101,7 @@ class ApiSmokeTests(unittest.TestCase):
                 password_hash=hash_password("Stock@1234"),
                 totp_secret=None,
             )
-            db.add_all([owner, dev, stock])
+            db.add_all([owner, dev, admin, accountant, stock])
             await db.flush()
 
             db.add(
@@ -428,6 +446,94 @@ class ApiSmokeTests(unittest.TestCase):
         sheets_cfg = self.client.get("/api/dev/sheets/config", headers=dev_headers)
         self.assertEqual(sheets_cfg.status_code, 200, sheets_cfg.text)
         self.assertIn("enabled", sheets_cfg.json())
+
+    def test_role_access_matrix(self) -> None:
+        owner_headers = self._login("owner", "Owner@1234")
+        dev_headers = self._login("dev", "Dev@1234")
+        admin_headers = self._login("admin", "Admin@1234")
+        accountant_headers = self._login("accountant", "Acc@1234")
+        stock_headers = self._login("stock", "Stock@1234")
+
+        owner_users = self.client.get("/api/users?limit=5", headers=owner_headers)
+        self.assertEqual(owner_users.status_code, 200, owner_users.text)
+
+        dev_garbage = self.client.get("/api/dev/garbage/scan", headers=dev_headers)
+        self.assertEqual(dev_garbage.status_code, 200, dev_garbage.text)
+
+        admin_products = self.client.get("/api/products?limit=5", headers=admin_headers)
+        self.assertEqual(admin_products.status_code, 200, admin_products.text)
+        admin_google_setup = self.client.get("/api/config/google-setup", headers=admin_headers)
+        self.assertEqual(admin_google_setup.status_code, 403, admin_google_setup.text)
+
+        accountant_transactions = self.client.get("/api/dashboard/transactions?limit=5", headers=accountant_headers)
+        self.assertEqual(accountant_transactions.status_code, 200, accountant_transactions.text)
+        accountant_products = self.client.get("/api/products?limit=5", headers=accountant_headers)
+        self.assertEqual(accountant_products.status_code, 403, accountant_products.text)
+
+        stock_products = self.client.get("/api/products?limit=5", headers=stock_headers)
+        self.assertEqual(stock_products.status_code, 200, stock_products.text)
+        stock_dev_sheets = self.client.get("/api/dev/sheets/config", headers=stock_headers)
+        self.assertEqual(stock_dev_sheets.status_code, 403, stock_dev_sheets.text)
+
+    def test_accountant_can_post_in_out_but_not_adjust_absolute(self) -> None:
+        accountant_headers = self._login("accountant", "Acc@1234")
+
+        stock_in = self.client.post(
+            "/api/products/SKU-0001/adjust",
+            headers=accountant_headers,
+            json={"qty": 3, "type": "STOCK_IN", "reason": "accountant_in"},
+        )
+        self.assertEqual(stock_in.status_code, 200, stock_in.text)
+        self.assertEqual(stock_in.json()["stock_qty"], "23.000")
+
+        stock_out = self.client.post(
+            "/api/products/SKU-0001/adjust",
+            headers=accountant_headers,
+            json={"qty": 5, "type": "STOCK_OUT", "reason": "accountant_out"},
+        )
+        self.assertEqual(stock_out.status_code, 200, stock_out.text)
+        self.assertEqual(stock_out.json()["stock_qty"], "18.000")
+
+        adjust_absolute = self.client.post(
+            "/api/products/SKU-0001/adjust",
+            headers=accountant_headers,
+            json={"qty": 99, "type": "ADJUST", "reason": "accountant_adjust"},
+        )
+        self.assertEqual(adjust_absolute.status_code, 403, adjust_absolute.text)
+
+    def test_stock_role_read_surface_and_forbidden_mutations(self) -> None:
+        stock_headers = self._login("stock", "Stock@1234")
+
+        products = self.client.get("/api/products?limit=10", headers=stock_headers)
+        self.assertEqual(products.status_code, 200, products.text)
+        self.assertGreaterEqual(products.json()["total"], 1)
+
+        dashboard = self.client.get("/api/dashboard/kpis", headers=stock_headers)
+        self.assertEqual(dashboard.status_code, 200, dashboard.text)
+
+        create_product = self.client.post(
+            "/api/products",
+            headers=stock_headers,
+            json={
+                "sku": "STOCK-CREATE-001",
+                "name_th": "Stock Should Not Create",
+                "category": "General",
+                "unit": "pcs",
+            },
+        )
+        self.assertEqual(create_product.status_code, 403, create_product.text)
+
+        create_user = self.client.post(
+            "/api/users",
+            headers=stock_headers,
+            json={
+                "username": "blocked",
+                "display_name": "Blocked",
+                "role": "STOCK",
+                "password": "Blocked@123",
+            },
+        )
+        self.assertEqual(create_user.status_code, 403, create_user.text)
 
 
 if __name__ == "__main__":
