@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     google_oauth_client_secret: str = ""
     google_oauth_redirect_uri: str = ""
     google_oauth_token_path: str = "./credentials/google_oauth_token.json"
-    google_sheets_sync_interval_seconds: int = 30
+    google_sheets_sync_interval_seconds: int = 10
     line_token_stock: str = ""
     line_token_admin: str = ""
     line_token_accountant: str = ""

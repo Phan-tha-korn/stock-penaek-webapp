@@ -61,7 +61,7 @@ if dist_dir.exists():
     fastapi_app.mount("/", SPAStaticFiles(directory=str(dist_dir), html=True), name="frontend")
 
 
-from server.services.gsheets import init_sheets, start_import_loop, start_sync_loop
+from server.services.gsheets import init_sheets, start_sync_loop
 
 @fastapi_app.on_event("startup")
 async def _startup():
@@ -73,7 +73,6 @@ async def _startup():
     import asyncio
     asyncio.create_task(init_sheets())
     asyncio.create_task(start_sync_loop())
-    asyncio.create_task(start_import_loop())
 
 
 app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
