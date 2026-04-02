@@ -113,9 +113,9 @@ export function DevPage() {
     return `${gb.toFixed(2)} GB`
   }
 
-  async function downloadProtectedFile(downloadUrl: string, fileName: string) {
+  async function downloadAuthorizedFile(downloadUrl: string, fileName: string) {
     const token = useAuthStore.getState().tokens?.access_token
-    const res = await fetch(getDevBackupDownloadUrl(downloadUrl), {
+    const res = await fetch(downloadUrl, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (!res.ok) throw new Error('download_failed')
@@ -128,6 +128,10 @@ export function DevPage() {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
+  }
+
+  async function downloadProtectedFile(downloadUrl: string, fileName: string) {
+    await downloadAuthorizedFile(getDevBackupDownloadUrl(downloadUrl), fileName)
   }
 
   function requireSheetsReady(action: () => void, mode: 'missing' | 'sync' = 'missing') {
@@ -148,6 +152,25 @@ export function DevPage() {
         return
       }
       window.open(target, '_blank', 'noopener,noreferrer')
+    }, mode)
+  }
+
+  function downloadSheetFile(url?: string, fileName = 'stock-sheet.csv', mode: 'missing' | 'sync' = 'sync') {
+    requireSheetsReady(() => {
+      const target = resolveDevSheetUrl(String(url || ''))
+      if (!target) {
+        setSheetMsg('ยังไม่พบลิงก์ดาวน์โหลดสำหรับรายการนี้')
+        return
+      }
+      setSheetMsg(null)
+      void (async () => {
+        try {
+          await downloadAuthorizedFile(target, fileName)
+          setSheetMsg(`ดาวน์โหลดไฟล์แล้ว: ${fileName}`)
+        } catch (e: any) {
+          setSheetMsg(e?.response?.data?.detail || e?.message || 'ดาวน์โหลดไฟล์จาก Google Sheets ไม่สำเร็จ')
+        }
+      })()
     }, mode)
   }
 
@@ -1039,19 +1062,19 @@ export function DevPage() {
               <div className="mt-2 text-xs text-white/50 break-words">
                 sheet_id: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | key: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
                   <div className="text-sm font-semibold text-green-100">โซน Stock</div>
                   <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_tab_url, 'sync')}>
-                      เปิดแท็บ Stock
+                      เปิดแท็บสต็อก
                     </button>
                     <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
                       โหลดทั้งชีต .xlsx
                     </button>
-                    <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_download_url, 'sync')}>
-                      โหลดเฉพาะ Stock .csv
+                    <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.stock_download_url, 'stock-summary.csv', 'sync')}>
+                      โหลดเฉพาะสต็อก .csv
                     </button>
                   </div>
                 </div>
@@ -1065,7 +1088,7 @@ export function DevPage() {
                     <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.sheet_url, 'sync')}>
                       เปิดสมุดทั้งหมด
                     </button>
-                    <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.accounting_download_url, 'sync')}>
+                    <button className="rounded border border-violet-400/30 px-3 py-2 text-xs text-violet-50 hover:bg-violet-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.accounting_download_url, 'accounting-summary.csv', 'sync')}>
                       โหลดเฉพาะบัญชี .csv
                     </button>
                   </div>
@@ -1080,8 +1103,23 @@ export function DevPage() {
                     <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
                       โหลดทั้งชีต .xlsx
                     </button>
-                    <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_download_url, 'sync')}>
+                    <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.logs_download_url, 'audit-log.csv', 'sync')}>
                       โหลดเฉพาะ Log .csv
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded border border-sky-500/30 bg-sky-500/10 p-3">
+                  <div className="text-sm font-semibold text-sky-100">โซนบัญชีผู้ใช้</div>
+                  <div className="mt-1 text-xs text-sky-100/80">รวมข้อมูลบัญชีของผู้ใช้ในระบบเพื่อใช้ดูสรุปและ export เป็นไฟล์</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="rounded border border-sky-400/30 px-3 py-2 text-xs text-sky-50 hover:bg-sky-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.users_tab_url, 'sync')}>
+                      เปิดแท็บผู้ใช้
+                    </button>
+                    <button className="rounded border border-sky-400/30 px-3 py-2 text-xs text-sky-50 hover:bg-sky-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
+                      โหลดทั้งชีต .xlsx
+                    </button>
+                    <button className="rounded border border-sky-400/30 px-3 py-2 text-xs text-sky-50 hover:bg-sky-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.users_download_url, 'user-accounts.csv', 'sync')}>
+                      โหลดบัญชีผู้ใช้ .csv
                     </button>
                   </div>
                 </div>

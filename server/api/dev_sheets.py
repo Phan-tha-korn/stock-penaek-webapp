@@ -11,19 +11,13 @@ from server.api.deps import require_roles
 from server.config.config_loader import load_master_config, write_master_config
 from server.db.models import Role
 from server.services.gsheets import (
-    get_client,
-    _ensure_tab,
-    _style_sheet,
     TAB_ACCOUNTING,
-    TAB_ADD_LOG,
     TAB_AUDIT_LOG,
-    TAB_EDIT_LOG,
-    TAB_EXPENSE_LOG,
-    TAB_INCOME_LOG,
-    TAB_OVERVIEW,
-    TAB_SELL_LOG,
     TAB_STOCK,
-    TAB_STOCK_ALERTS,
+    TAB_USERS,
+    _ensure_tab,
+    create_stock_workbook,
+    get_client,
 )
 from server.config.settings import settings
 
@@ -42,9 +36,11 @@ class DevSheetsConfigOut(BaseModel):
     stock_tab_url: str
     accounting_tab_url: str
     logs_tab_url: str
+    users_tab_url: str
     stock_download_url: str
     accounting_download_url: str
     logs_download_url: str
+    users_download_url: str
 
 
 class DevSheetsCreateIn(BaseModel):
@@ -70,6 +66,7 @@ async def get_sheets_config():
     stock_tab_url = sheet_url
     accounting_tab_url = sheet_url
     logs_tab_url = sheet_url
+    users_tab_url = sheet_url
     usable = False
     err = ""
     if enabled:
@@ -80,6 +77,7 @@ async def get_sheets_config():
                 stock_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_STOCK).id}"
                 accounting_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_ACCOUNTING).id}"
                 logs_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_AUDIT_LOG).id}"
+                users_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_USERS).id}"
                 usable = True
             except Exception:
                 err = "sheet_open_failed"
@@ -98,9 +96,11 @@ async def get_sheets_config():
         stock_tab_url=stock_tab_url,
         accounting_tab_url=accounting_tab_url,
         logs_tab_url=logs_tab_url,
+        users_tab_url=users_tab_url,
         stock_download_url="/api/dev/sheets/export/stock" if enabled else "",
         accounting_download_url="/api/dev/sheets/export/accounting" if enabled else "",
         logs_download_url="/api/dev/sheets/export/logs" if enabled else "",
+        users_download_url="/api/dev/sheets/export/users" if enabled else "",
     )
 
 
@@ -115,20 +115,7 @@ async def create_new_sheet(payload: DevSheetsCreateIn):
         raise HTTPException(status_code=400, detail="gsheets_not_configured")
 
     try:
-        sheet = client.create(title)
-        tabs = [
-            _ensure_tab(sheet, TAB_OVERVIEW),
-            _ensure_tab(sheet, TAB_STOCK),
-            _ensure_tab(sheet, TAB_STOCK_ALERTS),
-            _ensure_tab(sheet, TAB_ACCOUNTING),
-            _ensure_tab(sheet, TAB_AUDIT_LOG),
-            _ensure_tab(sheet, TAB_EDIT_LOG),
-            _ensure_tab(sheet, TAB_ADD_LOG),
-            _ensure_tab(sheet, TAB_SELL_LOG),
-            _ensure_tab(sheet, TAB_INCOME_LOG),
-            _ensure_tab(sheet, TAB_EXPENSE_LOG),
-        ]
-        _style_sheet(sheet, tabs)
+        sheet = create_stock_workbook(client, title)
 
         for e in payload.share_emails or []:
             email = str(e).strip()
@@ -166,6 +153,7 @@ async def export_sheet(kind: str):
         "stock": TAB_STOCK,
         "accounting": TAB_ACCOUNTING,
         "logs": TAB_AUDIT_LOG,
+        "users": TAB_USERS,
     }
     tab = mapping.get((kind or "").strip().lower())
     if not tab:

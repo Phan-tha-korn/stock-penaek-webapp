@@ -26,8 +26,8 @@ from server.services.gsheets import (
     TAB_SELL_LOG,
     TAB_STOCK,
     TAB_STOCK_ALERTS,
-    _ensure_tab,
-    _style_sheet,
+    TAB_USERS,
+    create_stock_workbook,
     get_client,
     sync_all_to_sheets,
 )
@@ -280,20 +280,7 @@ async def update_google_setup(
             raise HTTPException(status_code=400, detail="google_not_ready")
         title = cfg["google_default_sheet_title"]
         try:
-            sheet = client.create(title)
-            tabs = [
-                _ensure_tab(sheet, TAB_OVERVIEW),
-                _ensure_tab(sheet, TAB_STOCK),
-                _ensure_tab(sheet, TAB_STOCK_ALERTS),
-                _ensure_tab(sheet, TAB_ACCOUNTING),
-                _ensure_tab(sheet, TAB_AUDIT_LOG),
-                _ensure_tab(sheet, TAB_EDIT_LOG),
-                _ensure_tab(sheet, TAB_ADD_LOG),
-                _ensure_tab(sheet, TAB_SELL_LOG),
-                _ensure_tab(sheet, TAB_INCOME_LOG),
-                _ensure_tab(sheet, TAB_EXPENSE_LOG),
-            ]
-            _style_sheet(sheet, tabs)
+            sheet = create_stock_workbook(client, title)
             new_sheet_id = str(getattr(sheet, "id", "") or "")
         except Exception:
             raise HTTPException(status_code=500, detail="google_sheet_create_failed")
@@ -398,20 +385,7 @@ async def google_oauth_callback(request: Request):
             settings.google_sheets_id = ""
             client = get_client()
             if client:
-                sheet = client.create(str(cfg.get("google_default_sheet_title") or "Stock Penaek"))
-                tabs = [
-                    _ensure_tab(sheet, TAB_OVERVIEW),
-                    _ensure_tab(sheet, TAB_STOCK),
-                    _ensure_tab(sheet, TAB_STOCK_ALERTS),
-                    _ensure_tab(sheet, TAB_ACCOUNTING),
-                    _ensure_tab(sheet, TAB_AUDIT_LOG),
-                    _ensure_tab(sheet, TAB_EDIT_LOG),
-                    _ensure_tab(sheet, TAB_ADD_LOG),
-                    _ensure_tab(sheet, TAB_SELL_LOG),
-                    _ensure_tab(sheet, TAB_INCOME_LOG),
-                    _ensure_tab(sheet, TAB_EXPENSE_LOG),
-                ]
-                _style_sheet(sheet, tabs)
+                sheet = create_stock_workbook(client, str(cfg.get("google_default_sheet_title") or "Stock Penaek"))
                 sheet_id = str(getattr(sheet, "id", "") or "")
                 cfg["google_sheets_id"] = sheet_id
                 google_sheets["sheet_id"] = sheet_id
@@ -432,4 +406,3 @@ async def google_oauth_callback(request: Request):
     if return_to.startswith("http://") or return_to.startswith("https://"):
         return RedirectResponse(return_to, status_code=302)
     return RedirectResponse("/settings#google-setup", status_code=302)
-

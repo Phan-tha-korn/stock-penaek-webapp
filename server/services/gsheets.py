@@ -10,9 +10,10 @@ from google.oauth2.credentials import Credentials as OAuthCredentials
 from google.oauth2.service_account import Credentials
 from sqlalchemy import select
 
+from server.config.config_loader import load_master_config
 from server.config.settings import settings
 from server.db.database import SessionLocal
-from server.db.models import AuditLog, Product, User
+from server.db.models import AuditLog, Product, Role, User
 from server.db.init_db import calc_status
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"]
 
@@ -21,44 +22,73 @@ logger = logging.getLogger(__name__)
 
 
 
-TAB_STOCK = "Stock"
-TAB_OVERVIEW = "Overview"
-TAB_STOCK_ALERTS = "StockAlerts"
-TAB_EDIT_LOG = "EditLog"
-TAB_ADD_LOG = "AddLog"
-TAB_SELL_LOG = "SellLog"
-TAB_AUDIT_LOG = "AuditLog"
-TAB_ACCOUNTING = "Accounting"
-TAB_INCOME_LOG = "IncomeLog"
-TAB_EXPENSE_LOG = "ExpenseLog"
+TAB_STOCK = "สต็อกสินค้า"
+TAB_OVERVIEW = "ภาพรวมระบบ"
+TAB_STOCK_ALERTS = "สินค้าเฝ้าระวัง"
+TAB_EDIT_LOG = "บันทึกแก้ไข"
+TAB_ADD_LOG = "บันทึกรับเข้า"
+TAB_SELL_LOG = "บันทึกเบิกออก"
+TAB_AUDIT_LOG = "บันทึกตรวจสอบ"
+TAB_ACCOUNTING = "สรุปบัญชี"
+TAB_INCOME_LOG = "รายรับเพิ่มเติม"
+TAB_EXPENSE_LOG = "รายจ่ายเพิ่มเติม"
+TAB_USERS = "ข้อมูลบัญชีผู้ใช้"
+
+WORKBOOK_TABS = [
+    TAB_OVERVIEW,
+    TAB_STOCK,
+    TAB_STOCK_ALERTS,
+    TAB_ACCOUNTING,
+    TAB_AUDIT_LOG,
+    TAB_EDIT_LOG,
+    TAB_ADD_LOG,
+    TAB_SELL_LOG,
+    TAB_INCOME_LOG,
+    TAB_EXPENSE_LOG,
+    TAB_USERS,
+]
+
+LEGACY_TAB_ALIASES = {
+    TAB_OVERVIEW: ["Overview"],
+    TAB_STOCK: ["Stock"],
+    TAB_STOCK_ALERTS: ["StockAlerts"],
+    TAB_ACCOUNTING: ["Accounting"],
+    TAB_AUDIT_LOG: ["AuditLog"],
+    TAB_EDIT_LOG: ["EditLog"],
+    TAB_ADD_LOG: ["AddLog"],
+    TAB_SELL_LOG: ["SellLog"],
+    TAB_INCOME_LOG: ["IncomeLog"],
+    TAB_EXPENSE_LOG: ["ExpenseLog"],
+    TAB_USERS: ["Users", "Accounts"],
+}
 
 HEADERS = {
     TAB_OVERVIEW: ["หัวข้อ", "ค่า", "รายละเอียด"],
     TAB_STOCK: [
-        "ID",
+        "รหัสสินค้า",
         "ชื่อสินค้า",
-        "ประเภท",
-        "หน่วย",
-        "จำนวนปัจจุบัน",
+        "หมวดหมู่",
+        "หน่วยนับ",
+        "จำนวนคงเหลือ",
         "จำนวนที่ควรมี",
         "ราคาต่อหน่วย",
         "มูลค่ารวม",
-        "% คงเหลือ",
-        "สถานะ",
-        "เกณฑ์แจ้งเตือน%",
-        "LINE_USER_ID",
-        "LINE_GROUP_ID",
+        "เปอร์เซ็นต์คงเหลือ",
+        "สถานะสต็อก",
+        "เกณฑ์แจ้งเตือน (%)",
+        "ไลน์ผู้ใช้",
+        "ไลน์กลุ่ม",
         "ข้อความแจ้งเตือน",
         "อัปเดตล่าสุด",
     ],
-    TAB_STOCK_ALERTS: ["ระดับ", "SKU", "ชื่อสินค้า", "คงเหลือ", "ขั้นต่ำ", "ควรมี", "สถานะ", "อัปเดตล่าสุด", "หมายเหตุ"],
-    TAB_EDIT_LOG: ["วันที่-เวลา", "ประเภทการกระทำ", "ID สินค้า", "ชื่อสินค้า", "รายละเอียด", "ผู้ทำรายการ"],
+    TAB_STOCK_ALERTS: ["ระดับความสำคัญ", "รหัสสินค้า", "ชื่อสินค้า", "คงเหลือ", "ขั้นต่ำ", "ควรมี", "สถานะ", "อัปเดตล่าสุด", "หมายเหตุ"],
+    TAB_EDIT_LOG: ["วันที่-เวลา", "ประเภทการกระทำ", "รหัสสินค้า", "ชื่อสินค้า", "รายละเอียด", "ผู้ทำรายการ"],
     TAB_ADD_LOG: [
         "วันที่-เวลา",
-        "ID สินค้า",
+        "รหัสสินค้า",
         "ชื่อสินค้า",
         "จำนวนเพิ่ม",
-        "หน่วย",
+        "หน่วยนับ",
         "จากเดิม",
         "คงเหลือหลังเพิ่ม",
         "หมายเหตุ",
@@ -66,19 +96,20 @@ HEADERS = {
     ],
     TAB_SELL_LOG: [
         "วันที่-เวลา",
-        "ID สินค้า",
+        "รหัสสินค้า",
         "ชื่อสินค้า",
         "จำนวนเบิก/ขาย",
-        "หน่วย",
+        "หน่วยนับ",
         "จากเดิม",
         "คงเหลือหลังเบิก",
         "หมายเหตุ",
         "ผู้ทำรายการ",
     ],
-    TAB_AUDIT_LOG: ["ระดับ", "วันที่-เวลา", "Action", "Entity", "SKU", "ชื่อสินค้า", "ข้อความ", "ผู้ทำรายการ"],
+    TAB_AUDIT_LOG: ["ระดับความสำคัญ", "วันที่-เวลา", "การกระทำ", "ประเภทข้อมูล", "รหัสสินค้า", "ชื่อสินค้า", "รายละเอียด", "ผู้ทำรายการ"],
     TAB_ACCOUNTING: ["หัวข้อ", "ค่า", "รายละเอียด"],
     TAB_INCOME_LOG: ["วันที่-เวลา", "หมวดรายรับ", "รายละเอียด", "จำนวนเงิน", "ช่องทาง", "อ้างอิง", "ผู้บันทึก"],
     TAB_EXPENSE_LOG: ["วันที่-เวลา", "หมวดรายจ่าย", "รายละเอียด", "จำนวนเงิน", "ช่องทาง", "อ้างอิง", "ผู้บันทึก"],
+    TAB_USERS: ["รหัสผู้ใช้", "ชื่อผู้ใช้", "ชื่อแสดงผล", "บทบาท", "สถานะบัญชี", "ภาษา", "วันที่สร้าง", "อัปเดตล่าสุด"],
 }
 
 
@@ -95,9 +126,6 @@ async def _with_retries(coro_factory, retries: int = 3, delay_sec: float = 2.0):
         raise last_err
 
 def get_client() -> gspread.client.Client | None:
-    if not settings.google_sheets_id:
-        return None
-
     oauth_token_path = Path(settings.google_oauth_token_path)
     if oauth_token_path.exists():
         try:
@@ -139,6 +167,64 @@ def _status_th(s: str) -> str:
     return "⬜ ปกติ"
 
 
+def _role_th(role: Role | str | None) -> str:
+    value = str(getattr(role, "value", role) or "").upper()
+    return {
+        "STOCK": "พนักงานสต็อก",
+        "ADMIN": "ผู้ดูแลระบบ",
+        "ACCOUNTANT": "ฝ่ายบัญชี",
+        "OWNER": "เจ้าของระบบ",
+        "DEV": "นักพัฒนา",
+    }.get(value, value or "-")
+
+
+def _action_th(action: str) -> str:
+    value = str(action or "").strip().upper()
+    mapping = {
+        "LOGIN": "เข้าสู่ระบบ",
+        "TOKEN_REFRESH": "ต่ออายุโทเคน",
+        "CONFIG_UPDATE": "อัปเดตการตั้งค่า",
+        "CONFIG_GOOGLE_SETUP": "ตั้งค่า Google Sheets",
+        "USER_CREATE": "สร้างบัญชีผู้ใช้",
+        "USER_UPDATE": "แก้ไขบัญชีผู้ใช้",
+        "USER_RESET_PASSWORD": "รีเซ็ตรหัสผ่านผู้ใช้",
+        "USER_DELETE": "ลบบัญชีผู้ใช้",
+        "PRODUCT_CREATE": "สร้างสินค้า",
+        "PRODUCT_UPDATE": "แก้ไขสินค้า",
+        "PRODUCT_DELETE": "ลบสินค้า",
+        "PRODUCT_DELETE_ALL": "ลบสินค้าทั้งหมด",
+        "PRODUCT_DELETE_ALL_TEST": "ลบสินค้าทดสอบทั้งหมด",
+        "PRODUCT_BULK_DELETE": "ลบสินค้าหลายรายการ",
+        "PRODUCT_BULK_IMPORT_ZIP": "นำเข้าสินค้าจากไฟล์ ZIP",
+        "PRODUCT_RESTORE": "กู้คืนสินค้า",
+        "STOCK_STOCK_IN": "รับสินค้าเข้า",
+        "STOCK_STOCK_OUT": "เบิกหรือขายสินค้าออก",
+        "SHEETS_IMPORT": "นำเข้าข้อมูลจาก Google Sheets",
+        "DEV_GARBAGE_DELETE": "ลบไฟล์ขยะ",
+        "DEV_RESET_STOCK": "ล้างข้อมูลสต็อก",
+        "BACKUP_CREATE": "สร้างไฟล์สำรองข้อมูล",
+        "BACKUP_RESTORE": "กู้คืนไฟล์สำรองข้อมูล",
+    }
+    return mapping.get(value, "การทำงานของระบบ")
+
+
+def _entity_th(entity: str) -> str:
+    value = str(entity or "").strip().lower()
+    mapping = {
+        "config": "การตั้งค่า",
+        "user": "บัญชีผู้ใช้",
+        "users": "บัญชีผู้ใช้",
+        "product": "สินค้า",
+        "products": "สินค้า",
+        "stock": "สต็อก",
+        "sheet": "Google Sheets",
+        "sheets": "Google Sheets",
+        "backup": "ไฟล์สำรองข้อมูล",
+        "auth": "การยืนยันตัวตน",
+    }
+    return mapping.get(value, "ข้อมูลระบบ")
+
+
 def _pct_str(v: float) -> str:
     return f"{max(0.0, min(100.0, v)):.0f}%"
 
@@ -153,11 +239,80 @@ def _parse_json(s: str | None) -> dict:
         return {}
 
 
-def _ensure_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet:
+def _mix_channel(a: float, b: float, ratio: float) -> float:
+    return round(a * (1 - ratio) + b * ratio, 4)
+
+
+def _rgb(red: float, green: float, blue: float) -> dict:
+    return {"red": red, "green": green, "blue": blue}
+
+
+def _mix_color(base: dict, target: dict, ratio: float) -> dict:
+    return _rgb(
+        _mix_channel(base["red"], target["red"], ratio),
+        _mix_channel(base["green"], target["green"], ratio),
+        _mix_channel(base["blue"], target["blue"], ratio),
+    )
+
+
+def _hex_to_rgb(value: str, fallback: dict) -> dict:
+    raw = str(value or "").strip().lstrip("#")
+    if len(raw) != 6:
+        return dict(fallback)
     try:
-        ws = sheet.worksheet(title)
+        return _rgb(int(raw[0:2], 16) / 255.0, int(raw[2:4], 16) / 255.0, int(raw[4:6], 16) / 255.0)
     except Exception:
+        return dict(fallback)
+
+
+def _theme_sheet_styles() -> dict[str, dict]:
+    cfg = load_master_config()
+    primary = _hex_to_rgb(str(cfg.get("primary_color") or "#FF6B00"), _rgb(1.0, 0.42, 0.0))
+    secondary = _hex_to_rgb(str(cfg.get("secondary_color") or "#1E6FD9"), _rgb(0.12, 0.44, 0.85))
+    white = _rgb(1.0, 1.0, 1.0)
+    black = _rgb(0.0, 0.0, 0.0)
+    amber = _rgb(0.96, 0.65, 0.14)
+    red = _rgb(0.83, 0.2, 0.2)
+    green = _rgb(0.18, 0.62, 0.32)
+
+    accent = _mix_color(primary, secondary, 0.45)
+    soft_primary = _mix_color(primary, white, 0.78)
+    soft_secondary = _mix_color(secondary, white, 0.8)
+    soft_accent = _mix_color(accent, white, 0.82)
+
+    return {
+        TAB_OVERVIEW: {"tab": _mix_color(secondary, black, 0.12), "header": soft_secondary},
+        TAB_STOCK: {"tab": _mix_color(primary, black, 0.1), "header": soft_primary},
+        TAB_STOCK_ALERTS: {"tab": amber, "header": _mix_color(amber, white, 0.76)},
+        TAB_ACCOUNTING: {"tab": _mix_color(accent, black, 0.08), "header": soft_accent},
+        TAB_AUDIT_LOG: {"tab": red, "header": _mix_color(red, white, 0.82)},
+        TAB_EDIT_LOG: {"tab": _mix_color(primary, amber, 0.38), "header": _mix_color(primary, white, 0.84)},
+        TAB_ADD_LOG: {"tab": green, "header": _mix_color(green, white, 0.82)},
+        TAB_SELL_LOG: {"tab": _mix_color(primary, amber, 0.64), "header": _mix_color(amber, white, 0.8)},
+        TAB_INCOME_LOG: {"tab": _mix_color(green, secondary, 0.2), "header": _mix_color(green, white, 0.86)},
+        TAB_EXPENSE_LOG: {"tab": _mix_color(red, primary, 0.2), "header": _mix_color(red, white, 0.86)},
+        TAB_USERS: {"tab": _mix_color(secondary, primary, 0.28), "header": _mix_color(accent, white, 0.84)},
+    }
+
+
+def _find_existing_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet | None:
+    for candidate in [title, *LEGACY_TAB_ALIASES.get(title, [])]:
+        try:
+            return sheet.worksheet(candidate)
+        except Exception:
+            continue
+    return None
+
+
+def _ensure_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet:
+    ws = _find_existing_tab(sheet, title)
+    if ws is None:
         ws = sheet.add_worksheet(title=title, rows=2000, cols=max(20, len(HEADERS.get(title, []))))
+    elif ws.title != title:
+        try:
+            ws.update_title(title)
+        except Exception:
+            pass
 
     header = HEADERS.get(title)
     if header:
@@ -169,24 +324,11 @@ def _ensure_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet:
     return ws
 
 
-TAB_STYLES = {
-    TAB_OVERVIEW: {"tab": {"red": 0.24, "green": 0.48, "blue": 0.98}, "header": {"red": 0.87, "green": 0.92, "blue": 1}},
-    TAB_STOCK: {"tab": {"red": 0.22, "green": 0.65, "blue": 0.33}, "header": {"red": 0.87, "green": 0.95, "blue": 0.88}},
-    TAB_STOCK_ALERTS: {"tab": {"red": 0.95, "green": 0.7, "blue": 0.12}, "header": {"red": 1, "green": 0.96, "blue": 0.82}},
-    TAB_ACCOUNTING: {"tab": {"red": 0.42, "green": 0.28, "blue": 0.75}, "header": {"red": 0.91, "green": 0.88, "blue": 1}},
-    TAB_AUDIT_LOG: {"tab": {"red": 0.83, "green": 0.2, "blue": 0.2}, "header": {"red": 1, "green": 0.87, "blue": 0.87}},
-    TAB_EDIT_LOG: {"tab": {"red": 0.85, "green": 0.47, "blue": 0.14}, "header": {"red": 1, "green": 0.93, "blue": 0.85}},
-    TAB_ADD_LOG: {"tab": {"red": 0.22, "green": 0.65, "blue": 0.33}, "header": {"red": 0.87, "green": 0.95, "blue": 0.88}},
-    TAB_SELL_LOG: {"tab": {"red": 0.98, "green": 0.56, "blue": 0.12}, "header": {"red": 1, "green": 0.91, "blue": 0.84}},
-    TAB_INCOME_LOG: {"tab": {"red": 0.13, "green": 0.55, "blue": 0.13}, "header": {"red": 0.86, "green": 0.96, "blue": 0.86}},
-    TAB_EXPENSE_LOG: {"tab": {"red": 0.75, "green": 0.13, "blue": 0.13}, "header": {"red": 0.97, "green": 0.87, "blue": 0.87}},
-}
-
-
 def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]) -> None:
+    styles = _theme_sheet_styles()
     requests: list[dict] = []
     for ws in worksheets:
-        style = TAB_STYLES.get(ws.title)
+        style = styles.get(ws.title)
         if not style:
             continue
         requests.append(
@@ -221,6 +363,18 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
         )
     if requests:
         sheet.batch_update({"requests": requests})
+
+
+def ensure_workbook_template(sheet: gspread.Spreadsheet) -> list[gspread.Worksheet]:
+    tabs = [_ensure_tab(sheet, title) for title in WORKBOOK_TABS]
+    _style_sheet(sheet, tabs)
+    return tabs
+
+
+def create_stock_workbook(client: gspread.client.Client, title: str) -> gspread.Spreadsheet:
+    sheet = client.create(title)
+    ensure_workbook_template(sheet)
+    return sheet
 
 
 def _get_col_idx(header: list[str], keys: list[str]) -> int | None:
@@ -271,22 +425,22 @@ def _sync_stock_sheet(ws: gspread.Worksheet, products: list[dict]) -> None:
         header = HEADERS[TAB_STOCK]
         values = [header]
 
-    id_idx = _get_col_idx(header, ["ID", "Sku", "SKU"])
+    id_idx = _get_col_idx(header, ["รหัสสินค้า", "ID", "Sku", "SKU"])
     if id_idx is None:
         header = HEADERS[TAB_STOCK]
         values = [header]
         id_idx = 0
 
     name_idx = _get_col_idx(header, ["ชื่อสินค้า", "Name"])
-    type_idx = _get_col_idx(header, ["ประเภท", "หมวดหมู่", "Category"])
-    unit_idx = _get_col_idx(header, ["หน่วย", "Unit"])
-    qty_idx = _get_col_idx(header, ["จำนวนปัจจุบัน", "Current_Qty"])
+    type_idx = _get_col_idx(header, ["หมวดหมู่", "ประเภท", "Category"])
+    unit_idx = _get_col_idx(header, ["หน่วยนับ", "หน่วย", "Unit"])
+    qty_idx = _get_col_idx(header, ["จำนวนคงเหลือ", "จำนวนปัจจุบัน", "Current_Qty"])
     max_idx = _get_col_idx(header, ["จำนวนที่ควรมี", "Max_Stock"])
     price_idx = _get_col_idx(header, ["ราคาต่อหน่วย", "Unit_Price"])
     total_idx = _get_col_idx(header, ["มูลค่ารวม", "Total_Value"])
-    pct_idx = _get_col_idx(header, ["% คงเหลือ", "%", "Pct"])
-    status_idx = _get_col_idx(header, ["สถานะ", "Status"])
-    threshold_idx = _get_col_idx(header, ["เกณฑ์แจ้งเตือน%", "Threshold%"])
+    pct_idx = _get_col_idx(header, ["เปอร์เซ็นต์คงเหลือ", "% คงเหลือ", "%", "Pct"])
+    status_idx = _get_col_idx(header, ["สถานะสต็อก", "สถานะ", "Status"])
+    threshold_idx = _get_col_idx(header, ["เกณฑ์แจ้งเตือน (%)", "เกณฑ์แจ้งเตือน%", "Threshold%"])
     msg_idx = _get_col_idx(header, ["ข้อความแจ้งเตือน", "Message"])
     updated_idx = _get_col_idx(header, ["อัปเดตล่าสุด", "Last_Updated"])
 
@@ -391,14 +545,14 @@ async def import_stock_from_sheet(
         return {"ok": True, "created": 0, "updated": 0, "skipped": 0}
 
     header = values[0]
-    id_idx = _get_col_idx(header, ["ID", "SKU", "Sku"])
+    id_idx = _get_col_idx(header, ["รหัสสินค้า", "ID", "SKU", "Sku"])
     name_idx = _get_col_idx(header, ["ชื่อสินค้า", "Name"])
-    type_idx = _get_col_idx(header, ["ประเภท", "หมวดหมู่", "Category"])
-    unit_idx = _get_col_idx(header, ["หน่วย", "Unit"])
-    qty_idx = _get_col_idx(header, ["จำนวนปัจจุบัน", "Current_Qty"])
+    type_idx = _get_col_idx(header, ["หมวดหมู่", "ประเภท", "Category"])
+    unit_idx = _get_col_idx(header, ["หน่วยนับ", "หน่วย", "Unit"])
+    qty_idx = _get_col_idx(header, ["จำนวนคงเหลือ", "จำนวนปัจจุบัน", "Current_Qty"])
     max_idx = _get_col_idx(header, ["จำนวนที่ควรมี", "Max_Stock"])
     price_idx = _get_col_idx(header, ["ราคาต่อหน่วย", "Unit_Price"])
-    threshold_idx = _get_col_idx(header, ["เกณฑ์แจ้งเตือน%", "Threshold%"])
+    threshold_idx = _get_col_idx(header, ["เกณฑ์แจ้งเตือน (%)", "เกณฑ์แจ้งเตือน%", "Threshold%"])
 
     if id_idx is None or name_idx is None:
         return {"ok": False, "error": "missing_required_columns"}
@@ -486,6 +640,7 @@ async def import_stock_from_sheet(
 
 
 async def sync_all_to_sheets() -> None:
+    cfg = load_master_config()
     products_data: list[dict] = []
     product_by_id: dict[str, dict] = {}
     status_counts = {"FULL": 0, "NORMAL": 0, "LOW": 0, "CRITICAL": 0, "OUT": 0}
@@ -496,6 +651,7 @@ async def sync_all_to_sheets() -> None:
     add_rows = [HEADERS[TAB_ADD_LOG]]
     sell_rows = [HEADERS[TAB_SELL_LOG]]
     edit_rows = [HEADERS[TAB_EDIT_LOG]]
+    user_rows = [HEADERS[TAB_USERS]]
     total_stock_value = 0.0
     total_sell_qty = 0.0
     total_income_value = 0.0
@@ -576,18 +732,34 @@ async def sync_all_to_sheets() -> None:
                 continue
 
             if x.action.startswith("STOCK_") or x.action.startswith("PRODUCT_"):
-                edit_rows.append([ts, x.action, sku, name_th, msg, actor])
+                edit_rows.append([ts, _action_th(x.action), sku, name_th, msg, actor])
 
             audit_rows.append([
                 _severity_label(x.action, bool(x.success)),
                 ts,
-                x.action,
-                x.entity,
+                _action_th(x.action),
+                _entity_th(x.entity),
                 sku,
                 name_th,
                 msg,
                 actor,
             ])
+
+        res = await db.execute(select(User).order_by(User.role.asc(), User.username.asc()))
+        users = res.scalars().all()
+        for user in users:
+            user_rows.append(
+                [
+                    user.id,
+                    user.username,
+                    user.display_name or "",
+                    _role_th(user.role),
+                    "ใช้งาน" if user.is_active else "ปิดใช้งาน",
+                    user.language or "th",
+                    user.created_at.isoformat(sep=" ", timespec="seconds") if user.created_at else "",
+                    user.updated_at.isoformat(sep=" ", timespec="seconds") if user.updated_at else "",
+                ]
+            )
 
     total_income_value = 0.0
     for row in sell_rows[1:]:
@@ -599,26 +771,31 @@ async def sync_all_to_sheets() -> None:
 
     overview_rows.extend(
         [
+            ["โหมดการใช้งาน", "ดูข้อมูลและสรุปผล", "ชีตนี้เน้นใช้ติดตามและสรุปผลเป็นหลัก"],
             ["ระบบ Stock ทำงาน", datetime.utcnow().isoformat(timespec="seconds"), "เวลาที่ sync ขึ้นชีตล่าสุด"],
+            ["ชื่อระบบ", str(cfg.get("app_name") or "ระบบจัดการสต็อกองค์กร"), "ชื่อเว็บไซต์ที่เชื่อมต่ออยู่"],
+            ["บัญชี Google ที่เชื่อมต่อ", str(cfg.get("google_workspace_email") or "-"), "บัญชีที่ใช้สร้างหรือดูแลไฟล์ Google Sheets นี้"],
             ["สินค้าทั้งหมด", len(products_data), "จำนวนสินค้าที่ใช้งานอยู่ในระบบ"],
+            ["บัญชีผู้ใช้งานทั้งหมด", max(0, len(user_rows) - 1), f"ดูรายละเอียดต่อในแท็บ {TAB_USERS}"],
             ["สต็อกเต็ม", status_counts.get("FULL", 0), "สีเขียว = เต็ม"],
             ["สต็อกปกติ", status_counts.get("NORMAL", 0), "สีฟ้า = ปกติ"],
             ["สินค้าใกล้หมด", status_counts.get("LOW", 0), "สีเหลือง = เฝ้าระวัง"],
             ["สินค้าควรเติม", status_counts.get("CRITICAL", 0), "สีส้ม/แดง = ควรเติมด่วน"],
             ["สินค้าหมด", status_counts.get("OUT", 0), "สีแดง = หมดสต็อก"],
             ["มูลค่าสต็อกโดยประมาณ", f"{total_stock_value:.2f}", "อิงจากต้นทุนสินค้า"],
-            ["จำนวนรายการแจ้งเตือน", max(0, len(alert_rows) - 1), "ดูรายละเอียดต่อในแท็บ StockAlerts"],
+            ["จำนวนรายการแจ้งเตือน", max(0, len(alert_rows) - 1), f"ดูรายละเอียดต่อในแท็บ {TAB_STOCK_ALERTS}"],
         ]
     )
     accounting_rows.extend(
         [
-            ["รายการรับเข้า", max(0, len(add_rows) - 1), "มาจากธุรกรรม STOCK_IN"],
-            ["รายการขาย/เบิกออก", max(0, len(sell_rows) - 1), "มาจากธุรกรรม STOCK_OUT"],
-            ["จำนวนรับเข้ารวม", f"{total_expense_value:.2f}", "หน่วยรวมจาก AddLog"],
-            ["จำนวนขาย/เบิกรวม", f"{total_sell_qty:.2f}", "หน่วยรวมจาก SellLog"],
+            ["รายการรับเข้า", max(0, len(add_rows) - 1), "มาจากรายการรับสินค้าเข้า"],
+            ["รายการขาย/เบิกออก", max(0, len(sell_rows) - 1), "มาจากรายการเบิกหรือขายสินค้าออก"],
+            ["จำนวนรับเข้ารวม", f"{total_expense_value:.2f}", f"หน่วยรวมจากแท็บ {TAB_ADD_LOG}"],
+            ["จำนวนขาย/เบิกรวม", f"{total_sell_qty:.2f}", f"หน่วยรวมจากแท็บ {TAB_SELL_LOG}"],
             ["มูลค่าสต็อกปัจจุบัน", f"{total_stock_value:.2f}", "อิงจากต้นทุนสินค้าในคลัง"],
             ["แท็บรายรับ", TAB_INCOME_LOG, "ใช้เก็บรายรับเพิ่มเติมได้"],
             ["แท็บรายจ่าย", TAB_EXPENSE_LOG, "ใช้เก็บรายจ่ายเพิ่มเติมได้"],
+            ["แท็บบัญชีผู้ใช้งาน", TAB_USERS, "รวมข้อมูลบัญชีของผู้ใช้งานในระบบนี้"],
         ]
     )
 
@@ -627,16 +804,18 @@ async def sync_all_to_sheets() -> None:
         if not client:
             return
         sheet = client.open_by_key(settings.google_sheets_id)
-        ws_overview = _ensure_tab(sheet, TAB_OVERVIEW)
-        ws_stock = _ensure_tab(sheet, TAB_STOCK)
-        ws_alerts = _ensure_tab(sheet, TAB_STOCK_ALERTS)
-        ws_accounting = _ensure_tab(sheet, TAB_ACCOUNTING)
-        ws_audit = _ensure_tab(sheet, TAB_AUDIT_LOG)
-        ws_edit = _ensure_tab(sheet, TAB_EDIT_LOG)
-        ws_add = _ensure_tab(sheet, TAB_ADD_LOG)
-        ws_sell = _ensure_tab(sheet, TAB_SELL_LOG)
-        ws_income = _ensure_tab(sheet, TAB_INCOME_LOG)
-        ws_expense = _ensure_tab(sheet, TAB_EXPENSE_LOG)
+        workbook_tabs = {ws.title: ws for ws in ensure_workbook_template(sheet)}
+        ws_overview = workbook_tabs[TAB_OVERVIEW]
+        ws_stock = workbook_tabs[TAB_STOCK]
+        ws_alerts = workbook_tabs[TAB_STOCK_ALERTS]
+        ws_accounting = workbook_tabs[TAB_ACCOUNTING]
+        ws_audit = workbook_tabs[TAB_AUDIT_LOG]
+        ws_edit = workbook_tabs[TAB_EDIT_LOG]
+        ws_add = workbook_tabs[TAB_ADD_LOG]
+        ws_sell = workbook_tabs[TAB_SELL_LOG]
+        ws_income = workbook_tabs[TAB_INCOME_LOG]
+        ws_expense = workbook_tabs[TAB_EXPENSE_LOG]
+        ws_users = workbook_tabs[TAB_USERS]
 
         _write_rows(ws_overview, overview_rows)
         _sync_stock_sheet(ws_stock, products_data)
@@ -646,7 +825,8 @@ async def sync_all_to_sheets() -> None:
         _write_rows(ws_add, add_rows)
         _write_rows(ws_sell, sell_rows)
         _write_rows(ws_edit, edit_rows)
-        _style_sheet(sheet, [ws_overview, ws_stock, ws_alerts, ws_accounting, ws_audit, ws_add, ws_sell, ws_edit, ws_income, ws_expense])
+        _write_rows(ws_users, user_rows)
+        _style_sheet(sheet, [ws_overview, ws_stock, ws_alerts, ws_accounting, ws_audit, ws_add, ws_sell, ws_edit, ws_income, ws_expense, ws_users])
 
     try:
         await _with_retries(lambda: asyncio.to_thread(_sync_blocking), retries=3, delay_sec=2.0)
