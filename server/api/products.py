@@ -264,7 +264,9 @@ async def sync_to_sheets():
     except Exception:
         return SheetsSyncOut(ok=False, error="sheets_not_available")
     try:
-        await sync_all_to_sheets()
+        ok = await sync_all_to_sheets(fail_if_busy=True)
+        if not ok:
+            return SheetsSyncOut(ok=False, error="sync_skipped")
         return SheetsSyncOut(ok=True)
     except Exception as e:
         return SheetsSyncOut(ok=False, error=str(e))

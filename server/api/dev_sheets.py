@@ -15,6 +15,7 @@ from server.services.gsheets import (
     TAB_AUDIT_LOG,
     TAB_STOCK,
     TAB_USERS,
+    _find_existing_tab,
     _ensure_tab,
     create_stock_workbook,
     get_client,
@@ -74,10 +75,14 @@ async def get_sheets_config():
         if client:
             try:
                 sheet = client.open_by_key(sheet_id)
-                stock_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_STOCK).id}"
-                accounting_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_ACCOUNTING).id}"
-                logs_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_AUDIT_LOG).id}"
-                users_tab_url = f"{sheet_url}#gid={_ensure_tab(sheet, TAB_USERS).id}"
+                stock_ws = _find_existing_tab(sheet, TAB_STOCK)
+                accounting_ws = _find_existing_tab(sheet, TAB_ACCOUNTING)
+                logs_ws = _find_existing_tab(sheet, TAB_AUDIT_LOG)
+                users_ws = _find_existing_tab(sheet, TAB_USERS)
+                stock_tab_url = f"{sheet_url}#gid={stock_ws.id}" if stock_ws else sheet_url
+                accounting_tab_url = f"{sheet_url}#gid={accounting_ws.id}" if accounting_ws else sheet_url
+                logs_tab_url = f"{sheet_url}#gid={logs_ws.id}" if logs_ws else sheet_url
+                users_tab_url = f"{sheet_url}#gid={users_ws.id}" if users_ws else sheet_url
                 usable = True
             except Exception:
                 err = "sheet_open_failed"
@@ -165,7 +170,7 @@ async def export_sheet(kind: str):
         raise HTTPException(status_code=400, detail="gsheets_not_configured")
     try:
         sheet = client.open_by_key(sheet_id)
-        ws = _ensure_tab(sheet, tab)
+        ws = _ensure_tab(sheet, tab, write_header=False)
         rows = ws.get_all_values()
         buf = io.StringIO()
         writer = csv.writer(buf)

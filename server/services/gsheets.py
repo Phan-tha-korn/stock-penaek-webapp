@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +21,10 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapi
 
 DELETED_PREFIX = "__DELETED__:"
 logger = logging.getLogger(__name__)
+_SYNC_LOCK = asyncio.Lock()
+_IMPORT_LOCK = asyncio.Lock()
+_QUOTA_COOLDOWN_UNTIL = 0.0
+_QUOTA_COOLDOWN_SECONDS = 90
 
 
 
@@ -125,6 +130,23 @@ async def _with_retries(coro_factory, retries: int = 3, delay_sec: float = 2.0):
                 await asyncio.sleep(delay_sec * (i + 1))
     if last_err:
         raise last_err
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    return "quota exceeded" in str(exc).lower()
+
+
+def _quota_cooldown_remaining() -> int:
+    return max(0, int(_QUOTA_COOLDOWN_UNTIL - time.time()))
+
+
+def _set_quota_cooldown() -> None:
+    global _QUOTA_COOLDOWN_UNTIL
+    _QUOTA_COOLDOWN_UNTIL = time.time() + _QUOTA_COOLDOWN_SECONDS
+
+
+def _is_quota_cooling_down() -> bool:
+    return _quota_cooldown_remaining() > 0
 
 def get_client() -> gspread.client.Client | None:
     oauth_token_path = Path(str(settings.google_oauth_token_path or "").strip())
@@ -309,7 +331,7 @@ def _find_existing_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksh
     return None
 
 
-def _ensure_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet:
+def _ensure_tab(sheet: gspread.Spreadsheet, title: str, *, write_header: bool = True) -> gspread.Worksheet:
     ws = _find_existing_tab(sheet, title)
     if ws is None:
         ws = sheet.add_worksheet(title=title, rows=2000, cols=max(20, len(HEADERS.get(title, []))))
@@ -320,7 +342,7 @@ def _ensure_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet:
             pass
 
     header = HEADERS.get(title)
-    if header:
+    if write_header and header:
         try:
             ws.update([header], range_name="A1")
         except Exception:
@@ -625,8 +647,8 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
         sheet.batch_update({"requests": requests})
 
 
-def ensure_workbook_template(sheet: gspread.Spreadsheet) -> list[gspread.Worksheet]:
-    tabs = [_ensure_tab(sheet, title) for title in WORKBOOK_TABS]
+def ensure_workbook_template(sheet: gspread.Spreadsheet, *, write_headers: bool = True) -> list[gspread.Worksheet]:
+    tabs = [_ensure_tab(sheet, title, write_header=write_headers) for title in WORKBOOK_TABS]
     _style_sheet(sheet, tabs)
     return tabs
 
@@ -789,16 +811,39 @@ async def import_stock_from_sheet(
     actor_id: str | None = None,
     overwrite_stock_qty: bool = False,
     overwrite_prices: bool = False,
+    fail_if_busy: bool = False,
 ) -> dict:
+    if _is_quota_cooling_down():
+        remaining = _quota_cooldown_remaining()
+        if fail_if_busy:
+            raise RuntimeError(f"google_sheets_quota_cooldown:{remaining}")
+        logger.warning("Skipping Google Sheets import during quota cooldown (%ss remaining)", remaining)
+        return {"ok": False, "error": "google_sheets_quota_cooldown"}
+
+    if _IMPORT_LOCK.locked():
+        if fail_if_busy:
+            raise RuntimeError("google_sheets_import_in_progress")
+        logger.info("Skipping overlapping Google Sheets import request")
+        return {"ok": False, "error": "google_sheets_import_in_progress"}
+
     def _read_values_blocking():
         client = get_client()
         if not client:
             return None
         sheet = client.open_by_key(settings.google_sheets_id)
-        ws = _ensure_tab(sheet, TAB_STOCK)
+        ws = _ensure_tab(sheet, TAB_STOCK, write_header=False)
         return ws.get_all_values()
 
-    values = await _with_retries(lambda: asyncio.to_thread(_read_values_blocking), retries=3, delay_sec=1.5)
+    async with _IMPORT_LOCK:
+        try:
+            values = await _with_retries(lambda: asyncio.to_thread(_read_values_blocking), retries=3, delay_sec=1.5)
+        except Exception as e:
+            if _is_quota_error(e):
+                _set_quota_cooldown()
+            if fail_if_busy:
+                raise
+            logger.error(f"Google Sheets import failed: {e}")
+            return {"ok": False, "error": str(e)}
     if not values:
         return {"ok": False, "error": "sheets_not_configured"}
     if not values or len(values) < 2:
@@ -899,7 +944,20 @@ async def import_stock_from_sheet(
     return {"ok": True, "created": created, "updated": updated, "skipped": skipped}
 
 
-async def sync_all_to_sheets() -> None:
+async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
+    if _is_quota_cooling_down():
+        remaining = _quota_cooldown_remaining()
+        if fail_if_busy:
+            raise RuntimeError(f"google_sheets_quota_cooldown:{remaining}")
+        logger.warning("Skipping Google Sheets sync during quota cooldown (%ss remaining)", remaining)
+        return False
+
+    if _SYNC_LOCK.locked():
+        if fail_if_busy:
+            raise RuntimeError("google_sheets_sync_in_progress")
+        logger.info("Skipping overlapping Google Sheets sync request")
+        return False
+
     cfg = load_master_config()
     products_data: list[dict] = []
     product_by_id: dict[str, dict] = {}
@@ -1064,7 +1122,7 @@ async def sync_all_to_sheets() -> None:
         if not client:
             return
         sheet = client.open_by_key(settings.google_sheets_id)
-        workbook_tabs = {ws.title: ws for ws in ensure_workbook_template(sheet)}
+        workbook_tabs = {ws.title: ws for ws in ensure_workbook_template(sheet, write_headers=False)}
         ws_overview = workbook_tabs[TAB_OVERVIEW]
         ws_stock = workbook_tabs[TAB_STOCK]
         ws_alerts = workbook_tabs[TAB_STOCK_ALERTS]
@@ -1088,12 +1146,18 @@ async def sync_all_to_sheets() -> None:
         _write_rows(ws_users, user_rows)
         _style_sheet(sheet, [ws_overview, ws_stock, ws_alerts, ws_accounting, ws_audit, ws_add, ws_sell, ws_edit, ws_income, ws_expense, ws_users])
 
-    try:
-        await _with_retries(lambda: asyncio.to_thread(_sync_blocking), retries=3, delay_sec=2.0)
-        logger.info("Google Sheets sync completed")
-    except Exception as e:
-        logger.error(f"Google Sheets sync failed: {e}")
-        raise
+    async with _SYNC_LOCK:
+        try:
+            await _with_retries(lambda: asyncio.to_thread(_sync_blocking), retries=3, delay_sec=2.0)
+            logger.info("Google Sheets sync completed")
+            return True
+        except Exception as e:
+            if _is_quota_error(e):
+                _set_quota_cooldown()
+            logger.error(f"Google Sheets sync failed: {e}")
+            if fail_if_busy:
+                raise
+            return False
 
 async def init_sheets() -> None:
     try:
