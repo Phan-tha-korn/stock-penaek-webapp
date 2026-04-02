@@ -129,6 +129,9 @@ export function UsersPage() {
                 onChange={(e) => setNewSecretKey(e.target.value)}
               />
               <div className="text-xs text-white/60">ถ้าตั้งรหัสลับ ผู้ใช้จะต้องใส่รหัส TOTP ตอนล็อกอิน</div>
+              <div className="rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                Secret Key ต้องเป็นค่า Base32 สำหรับ TOTP เท่านั้น ถ้าไม่มีความจำเป็นให้ปล่อยว่างไว้เพื่อให้ผู้ใช้ล็อกอินด้วยรหัสผ่านได้ทันที
+              </div>
               <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <button
                   className="rounded border border-[color:var(--color-border)] px-4 py-2 text-sm text-white/80 hover:bg-white/10"

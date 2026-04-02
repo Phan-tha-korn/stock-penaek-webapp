@@ -1,20 +1,39 @@
 from __future__ import annotations
 
+import base64
+import binascii
 from datetime import datetime
 
+import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.deps import get_current_user, require_roles
 from server.api.schemas import UserCreateIn, UserListOut, UserOut, UserResetPasswordIn, UserUpdateIn
 from server.db.database import get_db
-from server.db.models import Role, User
+from server.db.models import RefreshSession, Role, User
 from server.services.audit import write_audit_log
 from server.services.security import hash_password
 
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+def _normalize_totp_secret(secret: str | None) -> str | None:
+    value = (secret or "").strip().replace(" ", "").upper()
+    if not value:
+        return None
+    try:
+        base64.b32decode(value, casefold=True)
+        pyotp.TOTP(value).now()
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=400, detail="invalid_totp_secret")
+    return value
+
+
+async def _revoke_user_sessions(db: AsyncSession, user_id: str) -> None:
+    await db.execute(delete(RefreshSession).where(RefreshSession.user_id == user_id))
 
 
 def _to_out(u: User) -> UserOut:
@@ -66,6 +85,8 @@ async def create_user(
     if existing:
         raise HTTPException(status_code=409, detail="username_exists")
 
+    totp_secret = _normalize_totp_secret(payload.secret_key)
+
     u = User(
         username=username,
         display_name=(payload.display_name or "").strip(),
@@ -73,7 +94,7 @@ async def create_user(
         is_active=True,
         language=(payload.language or "th").strip() or "th",
         password_hash=hash_password(payload.password),
-        totp_secret=(payload.secret_key.strip() if payload.secret_key and payload.secret_key.strip() else None),
+        totp_secret=totp_secret,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -110,6 +131,7 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     before = {"role": u.role.value, "is_active": u.is_active, "language": u.language, "display_name": u.display_name}
+    revoke_sessions = False
 
     if payload.username is not None:
         username = payload.username.strip()
@@ -118,16 +140,21 @@ async def update_user(
         other = await db.scalar(select(User).where(User.username == username, User.id != u.id))
         if other:
             raise HTTPException(status_code=409, detail="username_exists")
+        revoke_sessions = revoke_sessions or username != u.username
         u.username = username
     if payload.display_name is not None:
         u.display_name = payload.display_name.strip()
     if payload.role is not None:
+        revoke_sessions = revoke_sessions or payload.role != u.role
         u.role = payload.role
     if payload.is_active is not None:
+        revoke_sessions = revoke_sessions or bool(payload.is_active) != u.is_active or not bool(payload.is_active)
         u.is_active = bool(payload.is_active)
     if payload.language is not None:
         u.language = payload.language.strip() or u.language
     u.updated_at = datetime.utcnow()
+    if revoke_sessions:
+        await _revoke_user_sessions(db, u.id)
 
     await db.commit()
     await db.refresh(u)
@@ -165,6 +192,7 @@ async def reset_password(
 
     u.password_hash = hash_password(payload.password)
     u.updated_at = datetime.utcnow()
+    await _revoke_user_sessions(db, u.id)
     await db.commit()
     await db.refresh(u)
 
@@ -198,6 +226,7 @@ async def delete_user(
         raise HTTPException(status_code=400, detail="cannot_delete_self")
 
     username = u.username
+    await _revoke_user_sessions(db, u.id)
     await db.delete(u)
     await db.commit()
 

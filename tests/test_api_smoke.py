@@ -127,13 +127,16 @@ class ApiSmokeTests(unittest.TestCase):
             await db.commit()
 
     def _login(self, username: str, password: str) -> dict[str, str]:
+        data = self._login_tokens(username, password)
+        return {"Authorization": f"Bearer {data['access_token']}"}
+
+    def _login_tokens(self, username: str, password: str) -> dict[str, str]:
         response = self.client.post(
             "/api/auth/login",
             json={"username": username, "password": password, "secret_phrase": ""},
         )
         self.assertEqual(response.status_code, 200, response.text)
-        data = response.json()
-        return {"Authorization": f"Bearer {data['access_token']}"}
+        return response.json()
 
     def test_health_and_public_config(self) -> None:
         health = self.client.get("/api/health")
@@ -247,6 +250,98 @@ class ApiSmokeTests(unittest.TestCase):
         delete = self.client.delete(f"/api/users/{user_id}", headers=headers)
         self.assertEqual(delete.status_code, 200)
         self.assertTrue(delete.json()["ok"])
+
+    def test_new_user_can_login_and_deleted_user_is_blocked_immediately(self) -> None:
+        owner_headers = self._login("owner", "Owner@1234")
+
+        create = self.client.post(
+            "/api/users",
+            headers=owner_headers,
+            json={
+                "username": "freshuser",
+                "display_name": "Fresh User",
+                "role": "STOCK",
+                "password": "FreshUser@123",
+                "language": "th",
+            },
+        )
+        self.assertEqual(create.status_code, 200, create.text)
+        user_id = create.json()["id"]
+
+        fresh_tokens = self._login_tokens("freshuser", "FreshUser@123")
+        me_before_delete = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {fresh_tokens['access_token']}"})
+        self.assertEqual(me_before_delete.status_code, 200, me_before_delete.text)
+
+        delete = self.client.delete(f"/api/users/{user_id}", headers=owner_headers)
+        self.assertEqual(delete.status_code, 200, delete.text)
+
+        relogin = self.client.post(
+            "/api/auth/login",
+            json={"username": "freshuser", "password": "FreshUser@123", "secret_phrase": ""},
+        )
+        self.assertEqual(relogin.status_code, 401, relogin.text)
+
+        me_after_delete = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {fresh_tokens['access_token']}"})
+        self.assertEqual(me_after_delete.status_code, 401, me_after_delete.text)
+
+        refresh_after_delete = self.client.post("/api/auth/refresh", json={"refresh_token": fresh_tokens["refresh_token"]})
+        self.assertEqual(refresh_after_delete.status_code, 401, refresh_after_delete.text)
+
+    def test_invalid_totp_secret_is_rejected_and_reset_password_revokes_sessions(self) -> None:
+        owner_headers = self._login("owner", "Owner@1234")
+
+        invalid_secret = self.client.post(
+            "/api/users",
+            headers=owner_headers,
+            json={
+                "username": "badtotp",
+                "display_name": "Bad Totp",
+                "role": "STOCK",
+                "password": "BadTotp@123",
+                "secret_key": "123456",
+                "language": "th",
+            },
+        )
+        self.assertEqual(invalid_secret.status_code, 400, invalid_secret.text)
+        self.assertEqual(invalid_secret.json()["detail"], "invalid_totp_secret")
+
+        create = self.client.post(
+            "/api/users",
+            headers=owner_headers,
+            json={
+                "username": "resetme",
+                "display_name": "Reset Me",
+                "role": "ADMIN",
+                "password": "ResetMe@123",
+                "language": "th",
+            },
+        )
+        self.assertEqual(create.status_code, 200, create.text)
+        user_id = create.json()["id"]
+
+        tokens = self._login_tokens("resetme", "ResetMe@123")
+
+        reset = self.client.post(
+            f"/api/users/{user_id}/reset-password",
+            headers=owner_headers,
+            json={"password": "ResetMe@456"},
+        )
+        self.assertEqual(reset.status_code, 200, reset.text)
+
+        refresh_old = self.client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+        self.assertEqual(refresh_old.status_code, 401, refresh_old.text)
+
+        login_old_password = self.client.post(
+            "/api/auth/login",
+            json={"username": "resetme", "password": "ResetMe@123", "secret_phrase": ""},
+        )
+        self.assertEqual(login_old_password.status_code, 401, login_old_password.text)
+
+        login_new_password = self.client.post(
+            "/api/auth/login",
+            json={"username": "resetme", "password": "ResetMe@456", "secret_phrase": ""},
+        )
+        self.assertEqual(login_new_password.status_code, 200, login_new_password.text)
 
     def test_dev_and_google_read_only_endpoints(self) -> None:
         owner_headers = self._login("owner", "Owner@1234")
