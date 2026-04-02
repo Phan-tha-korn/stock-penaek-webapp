@@ -8,6 +8,7 @@ import { getSocket } from '../../services/socketManager'
 
 import { useTranslation } from 'react-i18next'
 import { formatTHB } from '../../utils/money'
+import { ProductDetailModal } from '../../components/products/ProductDetailModal'
 
 type CardColor = 'blue' | 'green' | 'yellow' | 'amber' | 'red' | 'orange' | 'sky' | 'default'
 const CARD_COLOR_MAP: Record<CardColor, { border: string; bg: string; text: string }> = {
@@ -132,224 +133,6 @@ function formatUpdatedAt(value: string) {
 
 function getRestockQty(product: Product) {
   return Math.max(0, Number(product.max_stock) - Number(product.stock_qty))
-}
-
-function ProductDetailModal({ product, onClose, onUpdate, onToast }: { product: Product; onClose: () => void; onUpdate: (p: Product) => void; onToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) {
-  const { t } = useTranslation()
-  const config = useConfigStore(s => s.config)
-  const role = useAuthStore((s) => s.role)
-  const canAdjust = role === 'ADMIN' || role === 'OWNER' || role === 'DEV'
-  const barcodeRef = useRef<SVGSVGElement>(null)
-  const [QRCodeComp, setQRCodeComp] = useState<any>(null)
-  
-  const [adjustQty, setAdjustQty] = useState<number | ''>('')
-  const [adjustReason, setAdjustReason] = useState('')
-  const [adjustBusy, setAdjustBusy] = useState(false)
-  const [adjustError, setAdjustError] = useState<string | null>(null)
-
-  const handleAdjust = async (type: 'STOCK_IN' | 'STOCK_OUT' | 'ADJUST') => {
-    if (adjustQty === '') return
-    if (type !== 'ADJUST' && (!adjustQty || adjustQty <= 0)) return
-    if (type === 'ADJUST' && Number(adjustQty) < 0) return
-    setAdjustBusy(true)
-    setAdjustError(null)
-    try {
-      const updated = await adjustStock(product.sku, {
-        qty: Number(adjustQty),
-        type,
-        reason: adjustReason
-      })
-      onUpdate(updated)
-      setAdjustQty('')
-      setAdjustReason('')
-      onToast(t('product.adjustSuccess'), 'success')
-    } catch (e: any) {
-      if (e?.response?.status === 400) {
-        setAdjustError(t('product.insufficientStock'))
-      } else {
-        setAdjustError(t('errors.generic'))
-      }
-    } finally {
-      setAdjustBusy(false)
-    }
-  }
-
-  useEffect(() => {
-    ;(async () => {
-      if (!barcodeRef.current) return
-      const mod: any = await import('jsbarcode')
-      const fn = mod?.default || mod
-      if (!fn) return
-      fn(barcodeRef.current, product.sku, {
-        format: 'CODE128',
-        width: 1.5,
-        height: 40,
-        displayValue: true,
-        background: 'transparent',
-        lineColor: '#fff',
-        margin: 0
-      })
-    })()
-  }, [product.sku])
-
-  useEffect(() => {
-    if (QRCodeComp) return
-    import('react-qr-code').then((m: any) => setQRCodeComp(() => m.default)).catch(() => {})
-  }, [QRCodeComp])
-
-  const baseUrl = (config?.web_url || window.location.origin).replace(/\/+$/, '')
-  const publicUrl = `${baseUrl}/public/product/${encodeURIComponent(product.sku)}`
-
-  const isLow = product.status === 'LOW' || product.status === 'CRITICAL' || product.status === 'OUT'
-  const restockQty = Math.max(0, Number(product.max_stock) - Number(product.stock_qty))
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm md:items-center">
-      <div className="card w-full max-w-2xl rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)] shadow-2xl flex flex-col max-h-[calc(100vh-2rem)]">
-        <div className="flex items-center justify-between border-b border-[color:var(--color-border)] px-6 py-4">
-          <h3 className="text-lg font-semibold">{t('product.detailTitle')}</h3>
-          <button onClick={onClose} className="text-white/60 hover:text-white">
-            ✕
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 overflow-y-auto">
-          <div className="space-y-4">
-            <div className="aspect-square w-full rounded-lg bg-black/30 flex items-center justify-center border border-[color:var(--color-border)]">
-              {product.image_url ? (
-                <img src={product.image_url} alt={product.name.th} className="h-full w-full object-cover" />
-              ) : (
-                <div className="text-white/30 text-4xl">📦</div>
-              )}
-            </div>
-            
-            <div>
-              <div className="text-xl font-bold">{product.name.th}</div>
-              <div className="text-sm text-white/50">{product.name.en}</div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-white/60">{t('product.sku')}:</div>
-              <div className="font-mono">{product.sku}</div>
-              <div className="text-white/60">{t('product.category')}:</div>
-              <div>{product.category}</div>
-            </div>
-
-            <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-white/60 text-sm">{t('product.status')}</span>
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusBadgeClass(product.status)}`}>
-                  {t(`stockStatus.${product.status}`)}
-                </span>
-              </div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-white/60 text-sm">{t('product.currentStock')}</span>
-                <span className="text-2xl font-bold text-[color:var(--color-primary)]">
-                  {product.stock_qty} <span className="text-sm font-normal text-white/60">{product.unit}</span>
-                </span>
-              </div>
-              {isLow && (
-                <div className="pt-2 mt-2 border-t border-[color:var(--color-border)] text-sm space-y-1">
-                  <div className="flex justify-between text-orange-400">
-                    <span>{t('product.shouldHave')}:</span>
-                    <span>{product.max_stock} {product.unit}</span>
-                  </div>
-                  <div className="flex justify-between text-red-400 font-semibold">
-                    <span>{t('product.needRestock')}:</span>
-                    <span>{restockQty} {product.unit}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {canAdjust ? (
-              <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-4 space-y-3">
-                {adjustError && <div className="text-red-400 text-xs mb-2">{adjustError}</div>}
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    placeholder={t('product.adjustQty')}
-                    value={adjustQty}
-                    onChange={(e) => setAdjustQty(e.target.value ? Number(e.target.value) : '')}
-                    className="w-1/3 rounded border border-[color:var(--color-border)] bg-black/40 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
-                    min="0"
-                  />
-                  <input
-                    type="text"
-                    placeholder={t('product.reason')}
-                    value={adjustReason}
-                    onChange={(e) => setAdjustReason(e.target.value)}
-                    className="w-2/3 rounded border border-[color:var(--color-border)] bg-black/40 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    disabled={adjustBusy || adjustQty === '' || Number(adjustQty) <= 0}
-                    onClick={() => handleAdjust('STOCK_IN')}
-                    className="flex-1 rounded bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-2 text-sm font-semibold hover:bg-green-500/30 disabled:opacity-50"
-                  >
-                    + {t('product.stockIn')}
-                  </button>
-                  <button
-                    disabled={adjustBusy || adjustQty === '' || Number(adjustQty) <= 0}
-                    onClick={() => handleAdjust('STOCK_OUT')}
-                    className="flex-1 rounded bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-2 text-sm font-semibold hover:bg-red-500/30 disabled:opacity-50"
-                  >
-                    - {t('product.stockOut')}
-                  </button>
-                  <button
-                    disabled={adjustBusy || adjustQty === '' || Number(adjustQty) < 0}
-                    onClick={() => handleAdjust('ADJUST')}
-                    className="flex-1 rounded border border-[color:var(--color-border)] bg-white/5 px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 disabled:opacity-50"
-                  >
-                    ตั้งยอด
-                  </button>
-                </div>
-                <div className="text-xs text-white/50">ตั้งยอด: ใส่จำนวนคงเหลือปัจจุบันที่ถูกต้อง (รองรับ 0)</div>
-              </div>
-            ) : (
-              <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-4 text-sm text-white/70">ดูได้อย่างเดียว</div>
-            )}
-
-          </div>
-
-          <div className="flex flex-col items-center justify-start space-y-6 rounded-lg border border-[color:var(--color-border)] bg-white/5 p-6">
-            <div className="text-center">
-              <div className="mb-2 text-sm text-white/60">{t('product.publicScan')}</div>
-              <div className="rounded-xl bg-white p-3 inline-block">
-                {QRCodeComp ? <QRCodeComp value={publicUrl} size={220} level="Q" /> : <div className="h-[220px] w-[220px]" />}
-              </div>
-            </div>
-
-            <div className="text-center w-full overflow-hidden">
-              <div className="mb-2 text-sm text-white/60">{t('product.barcode')}</div>
-              <svg ref={barcodeRef} className="max-w-full" />
-            </div>
-
-            <div className="w-full space-y-2 pt-4 border-t border-[color:var(--color-border)]">
-              <button 
-                className="w-full rounded bg-[color:var(--color-primary)] px-4 py-2 font-semibold text-black hover:opacity-90 flex items-center justify-center gap-2"
-                onClick={() => {
-                  window.open(publicUrl, '_blank')
-                }}
-              >
-                {t('app.printQR')}
-              </button>
-              <button 
-                className="w-full rounded border border-[color:var(--color-border)] px-4 py-2 text-sm text-white/80 hover:bg-white/10"
-                onClick={() => {
-                  navigator.clipboard.writeText(publicUrl)
-                  onToast(t('app.copied'), 'success')
-                }}
-              >
-                {t('app.copyLink')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function StockDashboard() {
@@ -581,9 +364,10 @@ function StockDashboard() {
           </div>
           <div className="max-h-72 overflow-y-auto divide-y divide-[color:var(--color-border)]">
             {searchResults.map(p => (
-              <div 
+              <button
                 key={p.id}
-                className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-white/10 active:bg-white/15"
+                type="button"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/10 active:bg-white/15"
                 onClick={() => {
                   setSelectedProduct(p)
                   setScannedToday(c => c + 1)
@@ -602,7 +386,7 @@ function StockDashboard() {
                   <div className="text-xl font-bold text-[color:var(--color-primary)]">{p.stock_qty} <span className="text-xs font-normal text-white/50">{p.unit}</span></div>
                   <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${statusBadgeClass(p.status)}`}>{t(`stockStatus.${p.status}`)}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>

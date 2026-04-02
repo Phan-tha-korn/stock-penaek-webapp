@@ -16,6 +16,7 @@ import { formatTHB } from '../../utils/money'
 import type { Product } from '../../types/models'
 import { useAuthStore } from '../../store/authStore'
 import { getSocket } from '../../services/socketManager'
+import { ProductDetailModal } from '../../components/products/ProductDetailModal'
 
 function StatusBadge(props: { status: string; isTest: boolean }) {
   const { t } = useTranslation()
@@ -58,6 +59,7 @@ export function ProductsPage() {
   const [busy, setBusy] = useState(true)
   const [items, setItems] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [showDeleted, setShowDeleted] = useState(false)
   const [creating, setCreating] = useState(false)
   const [bulkCreating, setBulkCreating] = useState(false)
@@ -641,86 +643,95 @@ export function ProductsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-start gap-2">
                       <StatusBadge status={p.status} isTest={p.is_test} />
-                      {canManage && (p.notes || '').startsWith('__DELETED__:') ? (
-                        <button
-                          className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
-                          type="button"
-                          onClick={async () => {
-                            await restoreProduct(p.sku)
-                            const res = await listProducts(params)
-                            setItems(res.items)
-                            setTotal(res.total)
-                          }}
-                        >
-                          กู้คืน
-                        </button>
-                      ) : null}
-                      {canManage && !(p.notes || '').startsWith('__DELETED__:') ? (
-                        <button
-                          className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
-                          type="button"
-                          onClick={() => {
-                            setEditing(p)
-                            setEditNameTh(p.name.th)
-                            setEditCategory(p.category || '')
-                            setEditUnit(p.unit || '')
-                            setEditCost(Number(p.cost_price || 0))
-                            setEditSell(p.selling_price ? Number(p.selling_price) : '')
-                            setEditMin(Number(p.min_stock || 0))
-                            setEditMax(Number(p.max_stock || 0))
-                            setEditImageFile(null)
-                          }}
-                        >
-                          แก้ไข
-                        </button>
-                      ) : null}
-                      {canAdjust && !(p.notes || '').startsWith('__DELETED__:') ? (
-                        <button
-                          className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
-                          type="button"
-                          onClick={async () => {
-                            const nextQtyRaw = window.prompt(`ตั้งยอดสต็อก (จำนวนคงเหลือ) สำหรับ ${p.sku}`, String(p.stock_qty || '0'))
-                            if (nextQtyRaw == null) return
-                            const nextQty = Number(nextQtyRaw)
-                            if (!Number.isFinite(nextQty) || nextQty < 0) {
-                              alert('จำนวนไม่ถูกต้อง')
-                              return
-                            }
-                            const reason = window.prompt('หมายเหตุ (ไม่บังคับ)') || ''
-                            try {
-                              const updated = await adjustStock(p.sku, { qty: nextQty, type: 'ADJUST', reason })
-                              setItems((prev) => prev.map((x) => (x.sku === p.sku ? updated : x)))
-                            } catch {
-                              alert('ตั้งยอดไม่สำเร็จ')
-                            }
-                          }}
-                        >
-                          ตั้งยอด
-                        </button>
-                      ) : null}
-                      {canManage && !(p.notes || '').startsWith('__DELETED__:') ? (
-                        <button
-                          className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
-                          type="button"
-                          onClick={async () => {
-                            const ok = window.confirm(`ยืนยันลบสินค้า ${p.sku}?`)
-                            if (!ok) return
-                            try {
-                              const reason = window.prompt('เหตุผลในการลบ (ไม่บังคับ)') || ''
-                              await deleteProduct(p.sku, reason)
+                      <button
+                        className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                        type="button"
+                        onClick={() => setSelectedProduct(p)}
+                      >
+                        รายละเอียด
+                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canManage && (p.notes || '').startsWith('__DELETED__:') ? (
+                          <button
+                            className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                            type="button"
+                            onClick={async () => {
+                              await restoreProduct(p.sku)
                               const res = await listProducts(params)
                               setItems(res.items)
                               setTotal(res.total)
-                            } catch {
-                              alert('ลบสินค้าไม่สำเร็จ')
-                            }
-                          }}
-                        >
-                          ลบ
-                        </button>
-                      ) : null}
+                            }}
+                          >
+                            กู้คืน
+                          </button>
+                        ) : null}
+                        {canManage && !(p.notes || '').startsWith('__DELETED__:') ? (
+                          <button
+                            className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                            type="button"
+                            onClick={() => {
+                              setEditing(p)
+                              setEditNameTh(p.name.th)
+                              setEditCategory(p.category || '')
+                              setEditUnit(p.unit || '')
+                              setEditCost(Number(p.cost_price || 0))
+                              setEditSell(p.selling_price ? Number(p.selling_price) : '')
+                              setEditMin(Number(p.min_stock || 0))
+                              setEditMax(Number(p.max_stock || 0))
+                              setEditImageFile(null)
+                            }}
+                          >
+                            แก้ไข
+                          </button>
+                        ) : null}
+                        {canAdjust && !(p.notes || '').startsWith('__DELETED__:') ? (
+                          <button
+                            className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                            type="button"
+                            onClick={async () => {
+                              const nextQtyRaw = window.prompt(`ตั้งยอดสต็อก (จำนวนคงเหลือ) สำหรับ ${p.sku}`, String(p.stock_qty || '0'))
+                              if (nextQtyRaw == null) return
+                              const nextQty = Number(nextQtyRaw)
+                              if (!Number.isFinite(nextQty) || nextQty < 0) {
+                                alert('จำนวนไม่ถูกต้อง')
+                                return
+                              }
+                              const reason = window.prompt('หมายเหตุ (ไม่บังคับ)') || ''
+                              try {
+                                const updated = await adjustStock(p.sku, { qty: nextQty, type: 'ADJUST', reason })
+                                setItems((prev) => prev.map((x) => (x.sku === p.sku ? updated : x)))
+                              } catch {
+                                alert('ตั้งยอดไม่สำเร็จ')
+                              }
+                            }}
+                          >
+                            ตั้งยอด
+                          </button>
+                        ) : null}
+                        {canManage && !(p.notes || '').startsWith('__DELETED__:') ? (
+                          <button
+                            className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
+                            type="button"
+                            onClick={async () => {
+                              const ok = window.confirm(`ยืนยันลบสินค้า ${p.sku}?`)
+                              if (!ok) return
+                              try {
+                                const reason = window.prompt('เหตุผลในการลบ (ไม่บังคับ)') || ''
+                                await deleteProduct(p.sku, reason)
+                                const res = await listProducts(params)
+                                setItems(res.items)
+                                setTotal(res.total)
+                              } catch {
+                                alert('ลบสินค้าไม่สำเร็จ')
+                              }
+                            }}
+                          >
+                            ลบ
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -736,6 +747,17 @@ export function ProductsPage() {
           </table>
         </div>
       </div>
+
+      {selectedProduct ? (
+        <ProductDetailModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onUpdate={(updated) => {
+            setSelectedProduct(updated)
+            setItems((prev) => prev.map((x) => (x.sku === updated.sku ? updated : x)))
+          }}
+        />
+      ) : null}
     </div>
   )
 }

@@ -282,7 +282,7 @@ def _theme_sheet_styles() -> dict[str, dict]:
 
     return {
         TAB_OVERVIEW: {"tab": _mix_color(secondary, black, 0.12), "header": soft_secondary},
-        TAB_STOCK: {"tab": _mix_color(primary, black, 0.1), "header": soft_primary},
+        TAB_STOCK: {"tab": _mix_color(secondary, black, 0.12), "header": soft_secondary},
         TAB_STOCK_ALERTS: {"tab": amber, "header": _mix_color(amber, white, 0.76)},
         TAB_ACCOUNTING: {"tab": _mix_color(accent, black, 0.08), "header": soft_accent},
         TAB_AUDIT_LOG: {"tab": red, "header": _mix_color(red, white, 0.82)},
@@ -326,41 +326,296 @@ def _ensure_tab(sheet: gspread.Spreadsheet, title: str) -> gspread.Worksheet:
 
 def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]) -> None:
     styles = _theme_sheet_styles()
+    grid_line = _rgb(0.85, 0.88, 0.92)
+    header_row_height = 36
+    data_row_height = 26
+
+    col_widths: dict[str, list[int]] = {
+        TAB_STOCK: [120, 260, 150, 110, 140, 140, 130, 130, 140, 140, 170, 150, 150, 320, 160],
+        TAB_STOCK_ALERTS: [140, 140, 260, 110, 110, 110, 140, 170, 300],
+        TAB_AUDIT_LOG: [140, 170, 180, 150, 140, 260, 360, 170],
+        TAB_EDIT_LOG: [170, 200, 140, 260, 360, 170],
+        TAB_ADD_LOG: [170, 140, 260, 120, 110, 120, 140, 300, 170],
+        TAB_SELL_LOG: [170, 140, 260, 140, 110, 120, 140, 300, 170],
+        TAB_INCOME_LOG: [170, 180, 320, 140, 140, 160, 170],
+        TAB_EXPENSE_LOG: [170, 180, 320, 140, 140, 160, 170],
+        TAB_USERS: [140, 170, 220, 140, 140, 120, 170, 170],
+        TAB_OVERVIEW: [220, 160, 360],
+        TAB_ACCOUNTING: [220, 160, 360],
+    }
+
+    def _luma(color: dict) -> float:
+        return (
+            0.2126 * float(color.get("red", 0.0))
+            + 0.7152 * float(color.get("green", 0.0))
+            + 0.0722 * float(color.get("blue", 0.0))
+        )
+
+    def _text_for(bg: dict) -> dict:
+        return _rgb(0.0, 0.0, 0.0) if _luma(bg) >= 0.62 else _rgb(1.0, 1.0, 1.0)
+
+    def _header_bg_for(title: str, style: dict) -> dict:
+        base = style.get("header") or style.get("tab")
+        if isinstance(base, dict):
+            return base
+        return _rgb(0.12, 0.44, 0.85)
+
+    def _filter_range(ws_id: int, cols: int) -> dict:
+        return {"sheetId": ws_id, "startRowIndex": 0, "endRowIndex": 2000, "startColumnIndex": 0, "endColumnIndex": max(1, cols)}
+
+    def _border_style(color: dict) -> dict:
+        return {"style": "SOLID", "width": 1, "color": color}
+
     requests: list[dict] = []
+
+    cf_counts: dict[int, int] = {}
+    banded_ids: dict[int, list[int]] = {}
+    try:
+        meta = sheet.fetch_sheet_metadata()
+        for sh in meta.get("sheets", []) or []:
+            props = sh.get("properties") or {}
+            sid = props.get("sheetId")
+            if sid is None:
+                continue
+            sid_int = int(sid)
+            cf_counts[sid_int] = len(sh.get("conditionalFormats") or [])
+            banded_ids[sid_int] = [int(x.get("bandedRangeId")) for x in (sh.get("bandedRanges") or []) if x.get("bandedRangeId") is not None]
+    except Exception:
+        pass
+
+    def _repeat_number(ws_id: int, cols: int, col_idx: int, nf_type: str, nf_pattern: str, align: str) -> None:
+        if col_idx < 0 or col_idx >= cols:
+            return
+        requests.append(
+            {
+                "repeatCell": {
+                    "range": {"sheetId": ws_id, "startRowIndex": 1, "endRowIndex": 2000, "startColumnIndex": col_idx, "endColumnIndex": col_idx + 1},
+                    "cell": {
+                        "userEnteredFormat": {
+                            "horizontalAlignment": align,
+                            "verticalAlignment": "MIDDLE",
+                            "numberFormat": {"type": nf_type, "pattern": nf_pattern},
+                        }
+                    },
+                    "fields": "userEnteredFormat(horizontalAlignment,verticalAlignment,numberFormat)",
+                }
+            }
+        )
+
     for ws in worksheets:
-        style = styles.get(ws.title)
-        if not style:
+        header = HEADERS.get(ws.title) or []
+        if not header:
             continue
+        style = styles.get(ws.title) or {}
+        cols = len(header)
+        header_bg = _header_bg_for(ws.title, style)
+        header_text = _text_for(header_bg)
+
+        existing_cf = cf_counts.get(int(ws.id), 0)
+        for idx in range(existing_cf - 1, -1, -1):
+            requests.append({"deleteConditionalFormatRule": {"sheetId": ws.id, "index": idx}})
+        for bid in banded_ids.get(int(ws.id), []) or []:
+            requests.append({"deleteBanding": {"bandedRangeId": bid}})
+
+        frozen_cols = 2 if ws.title == TAB_STOCK else 0
         requests.append(
             {
                 "updateSheetProperties": {
                     "properties": {
                         "sheetId": ws.id,
-                        "gridProperties": {"frozenRowCount": 1},
-                        "tabColor": style["tab"],
+                        "gridProperties": {"frozenRowCount": 1, "frozenColumnCount": frozen_cols, "hideGridlines": True, "rowCount": 2000, "columnCount": max(20, cols)},
+                        "tabColor": style.get("tab") or header_bg,
                     },
-                    "fields": "gridProperties.frozenRowCount,tabColor",
+                    "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount,gridProperties.hideGridlines,gridProperties.rowCount,gridProperties.columnCount,tabColor",
+                }
+            }
+        )
+        requests.append(
+            {
+                "updateDimensionProperties": {
+                    "range": {"sheetId": ws.id, "dimension": "ROWS", "startIndex": 0, "endIndex": 1},
+                    "properties": {"pixelSize": header_row_height},
+                    "fields": "pixelSize",
+                }
+            }
+        )
+        requests.append(
+            {
+                "updateDimensionProperties": {
+                    "range": {"sheetId": ws.id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2000},
+                    "properties": {"pixelSize": data_row_height},
+                    "fields": "pixelSize",
                 }
             }
         )
         requests.append(
             {
                 "repeatCell": {
-                    "range": {
-                        "sheetId": ws.id,
-                        "startRowIndex": 0,
-                        "endRowIndex": 1,
-                    },
+                    "range": {"sheetId": ws.id, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": cols},
                     "cell": {
                         "userEnteredFormat": {
-                            "backgroundColor": style["header"],
-                            "textFormat": {"bold": True},
+                            "backgroundColor": header_bg,
+                            "horizontalAlignment": "CENTER",
+                            "verticalAlignment": "MIDDLE",
+                            "wrapStrategy": "WRAP",
+                            "textFormat": {"bold": True, "fontSize": 10, "foregroundColor": header_text},
                         }
                     },
-                    "fields": "userEnteredFormat(backgroundColor,textFormat)",
+                    "fields": "userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy,textFormat)",
                 }
             }
         )
+        requests.append(
+            {
+                "repeatCell": {
+                    "range": {"sheetId": ws.id, "startRowIndex": 1, "endRowIndex": 2000, "startColumnIndex": 0, "endColumnIndex": cols},
+                    "cell": {
+                        "userEnteredFormat": {
+                            "verticalAlignment": "MIDDLE",
+                            "wrapStrategy": "WRAP",
+                            "textFormat": {"fontSize": 10},
+                        }
+                    },
+                    "fields": "userEnteredFormat(verticalAlignment,wrapStrategy,textFormat)",
+                }
+            }
+        )
+        requests.append(
+            {
+                "updateBorders": {
+                    "range": {"sheetId": ws.id, "startRowIndex": 0, "endRowIndex": 2000, "startColumnIndex": 0, "endColumnIndex": cols},
+                    "top": _border_style(grid_line),
+                    "bottom": _border_style(grid_line),
+                    "left": _border_style(grid_line),
+                    "right": _border_style(grid_line),
+                }
+            }
+        )
+        requests.append({"updateBorders": {"range": {"sheetId": ws.id, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": cols}, "bottom": {"style": "SOLID", "width": 2, "color": grid_line}}})
+        requests.append({"clearBasicFilter": {"sheetId": ws.id}})
+        requests.append({"setBasicFilter": {"filter": {"range": _filter_range(ws.id, cols)}}})
+
+        widths = col_widths.get(ws.title)
+        if widths:
+            for idx, px in enumerate(widths[:cols]):
+                requests.append(
+                    {
+                        "updateDimensionProperties": {
+                            "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": idx, "endIndex": idx + 1},
+                            "properties": {"pixelSize": int(px)},
+                            "fields": "pixelSize",
+                        }
+                    }
+                )
+
+        requests.append(
+            {
+                "addBanding": {
+                    "bandedRange": {
+                        "range": {"sheetId": ws.id, "startRowIndex": 0, "endRowIndex": 2000, "startColumnIndex": 0, "endColumnIndex": cols},
+                        "rowProperties": {
+                            "headerColor": header_bg,
+                            "firstBandColor": _rgb(1.0, 1.0, 1.0),
+                            "secondBandColor": _rgb(0.98, 0.99, 1.0),
+                        },
+                    }
+                }
+            }
+        )
+
+        if ws.title == TAB_STOCK:
+            _repeat_number(ws.id, cols, 4, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 5, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 6, "NUMBER", "฿#,##0.00", "RIGHT")
+            _repeat_number(ws.id, cols, 7, "NUMBER", "฿#,##0.00", "RIGHT")
+            _repeat_number(ws.id, cols, 8, "PERCENT", "0.0%", "RIGHT")
+            _repeat_number(ws.id, cols, 10, "PERCENT", "0%", "RIGHT")
+            _repeat_number(ws.id, cols, 14, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            status_col = 9
+            if status_col < cols:
+                def _cf(text: str, bg: dict, fg: dict) -> dict:
+                    return {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{"sheetId": ws.id, "startRowIndex": 1, "endRowIndex": 2000, "startColumnIndex": status_col, "endColumnIndex": status_col + 1}],
+                                "booleanRule": {
+                                    "condition": {"type": "TEXT_CONTAINS", "values": [{"userEnteredValue": text}]},
+                                    "format": {"backgroundColor": bg, "textFormat": {"foregroundColor": fg, "bold": True}},
+                                },
+                            },
+                            "index": 0,
+                        }
+                    }
+                requests.extend(
+                    [
+                        _cf("Stock หมด", _rgb(0.1, 0.1, 0.1), _text_for(_rgb(0.1, 0.1, 0.1))),
+                        _cf("ควรเติม", _rgb(0.83, 0.2, 0.2), _text_for(_rgb(0.83, 0.2, 0.2))),
+                        _cf("ใกล้หมด", _rgb(0.96, 0.65, 0.14), _rgb(0.0, 0.0, 0.0)),
+                        _cf("Stock เต็ม", _rgb(0.18, 0.62, 0.32), _text_for(_rgb(0.18, 0.62, 0.32))),
+                        _cf("ปกติ", _rgb(0.45, 0.45, 0.45), _text_for(_rgb(0.45, 0.45, 0.45))),
+                    ]
+                )
+
+        if ws.title == TAB_STOCK_ALERTS:
+            _repeat_number(ws.id, cols, 3, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 4, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 5, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 7, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+
+        if ws.title == TAB_EDIT_LOG:
+            _repeat_number(ws.id, cols, 0, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+
+        if ws.title == TAB_ADD_LOG:
+            _repeat_number(ws.id, cols, 0, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            _repeat_number(ws.id, cols, 3, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 5, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 6, "NUMBER", "#,##0.##", "RIGHT")
+
+        if ws.title == TAB_SELL_LOG:
+            _repeat_number(ws.id, cols, 0, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            _repeat_number(ws.id, cols, 3, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 5, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 6, "NUMBER", "#,##0.##", "RIGHT")
+
+        if ws.title == TAB_AUDIT_LOG:
+            _repeat_number(ws.id, cols, 1, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+
+        if ws.title == TAB_INCOME_LOG:
+            _repeat_number(ws.id, cols, 0, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            _repeat_number(ws.id, cols, 3, "NUMBER", "฿#,##0.00", "RIGHT")
+
+        if ws.title == TAB_EXPENSE_LOG:
+            _repeat_number(ws.id, cols, 0, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            _repeat_number(ws.id, cols, 3, "NUMBER", "฿#,##0.00", "RIGHT")
+
+        if ws.title == TAB_USERS:
+            _repeat_number(ws.id, cols, 6, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            _repeat_number(ws.id, cols, 7, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+
+        if ws.title in (TAB_STOCK_ALERTS, TAB_AUDIT_LOG):
+            sev_col = 0
+            if sev_col < cols:
+                def _sev(text: str, bg: dict, fg: dict) -> dict:
+                    return {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{"sheetId": ws.id, "startRowIndex": 1, "endRowIndex": 2000, "startColumnIndex": sev_col, "endColumnIndex": sev_col + 1}],
+                                "booleanRule": {
+                                    "condition": {"type": "TEXT_CONTAINS", "values": [{"userEnteredValue": text}]},
+                                    "format": {"backgroundColor": bg, "textFormat": {"foregroundColor": fg, "bold": True}},
+                                },
+                            },
+                            "index": 0,
+                        }
+                    }
+                requests.extend(
+                    [
+                        _sev("🟥", _rgb(0.83, 0.2, 0.2), _text_for(_rgb(0.83, 0.2, 0.2))),
+                        _sev("🟨", _rgb(0.96, 0.65, 0.14), _rgb(0.0, 0.0, 0.0)),
+                        _sev("🟩", _rgb(0.18, 0.62, 0.32), _text_for(_rgb(0.18, 0.62, 0.32))),
+                    ]
+                )
+
     if requests:
         sheet.batch_update({"requests": requests})
 
