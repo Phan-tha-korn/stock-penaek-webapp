@@ -25,7 +25,10 @@ export async function getMe() {
 
 export async function listUsers(params: { q?: string; limit?: number; offset?: number } = {}) {
   const { data } = await api.get<{ items: User[]; total: number }>('/users', { params })
-  return data
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    total: Number(data?.total || 0),
+  }
 }
 
 export async function createUser(data: {

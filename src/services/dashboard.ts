@@ -50,11 +50,16 @@ export async function fetchStockSummary() {
 
 export async function fetchActivity() {
   const { data } = await api.get<{ items: ActivityItem[] }>('/dashboard/activity')
-  return data
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+  }
 }
 
 export async function fetchTransactions(params: { sku?: string; type?: string; date_from?: string; date_to?: string; limit?: number; offset?: number } = {}) {
   const { data } = await api.get<{ items: TransactionItem[]; total: number }>('/dashboard/transactions', { params })
-  return data
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    total: Number(data?.total || 0),
+  }
 }
 

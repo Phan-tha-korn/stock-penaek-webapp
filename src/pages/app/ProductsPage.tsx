@@ -370,10 +370,10 @@ export function ProductsPage() {
       getProductFilterOptions(),
       getInventoryRuleSettings(),
     ])
-    setItems(productRes.items)
-    setTotal(productRes.total)
-    setCategories(categoryRes.items)
-    setTypeOptions(filterRes.types)
+    setItems(Array.isArray(productRes?.items) ? productRes.items : [])
+    setTotal(Number(productRes?.total || 0))
+    setCategories(Array.isArray(categoryRes?.items) ? categoryRes.items : [])
+    setTypeOptions(Array.isArray(filterRes?.types) ? filterRes.types : [])
     setRuleSettings(rulesRes)
     setSelectedSkus([])
   }
