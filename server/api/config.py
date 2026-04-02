@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import re
+import secrets
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -39,6 +41,7 @@ import asyncio
 
 router = APIRouter(tags=["config"])
 logger = logging.getLogger(__name__)
+_OAUTH_PENDING: dict[str, dict[str, str | float]] = {}
 
 _HEX = re.compile(r"^#?[0-9a-fA-F]{6}$")
 
@@ -144,6 +147,17 @@ def _resolve_repo_path(value: str) -> Path:
     if p.is_absolute():
         return p
     return repo_root() / p
+
+
+def _oauth_pending_cleanup(max_age_seconds: int = 900) -> None:
+    now = time.time()
+    stale_keys = [
+        key
+        for key, value in _OAUTH_PENDING.items()
+        if now - float(value.get("created_at") or 0) > max_age_seconds
+    ]
+    for key in stale_keys:
+        _OAUTH_PENDING.pop(key, None)
 
 
 
@@ -358,6 +372,7 @@ async def start_google_oauth(request: Request, return_to: str = "", user: User =
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     cfg = load_master_config()
     client_config, redirect_uri = _oauth_client_config(cfg, request)
+    _oauth_pending_cleanup()
     flow = Flow.from_client_config(
         client_config,
         scopes=[
@@ -369,19 +384,27 @@ async def start_google_oauth(request: Request, return_to: str = "", user: User =
         ],
         redirect_uri=redirect_uri,
     )
+    oauth_state = secrets.token_urlsafe(24)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
-        state=_safe_return_to(return_to, cfg),
+        state=oauth_state,
     )
+    _OAUTH_PENDING[oauth_state] = {
+        "created_at": time.time(),
+        "return_to": _safe_return_to(return_to, cfg),
+        "code_verifier": str(getattr(flow, "code_verifier", "") or ""),
+    }
     return GoogleOAuthStartOut(auth_url=auth_url)
 
 
 @router.get("/config/google-oauth/callback")
 async def google_oauth_callback(request: Request):
     cfg = load_master_config()
-    return_to = _safe_return_to(str(request.query_params.get("state") or ""), cfg)
+    oauth_state = str(request.query_params.get("state") or "")
+    pending = _OAUTH_PENDING.pop(oauth_state, None)
+    return_to = _safe_return_to(str((pending or {}).get("return_to") or ""), cfg)
     client_config, redirect_uri = _oauth_client_config(cfg, request)
     flow = Flow.from_client_config(
         client_config,
@@ -395,6 +418,9 @@ async def google_oauth_callback(request: Request):
         redirect_uri=redirect_uri,
     )
     try:
+        code_verifier = str((pending or {}).get("code_verifier") or "")
+        if code_verifier:
+            flow.code_verifier = code_verifier
         authorization_response = f"{redirect_uri}?{request.url.query}" if request.url.query else redirect_uri
         flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
@@ -434,9 +460,16 @@ async def google_oauth_callback(request: Request):
             pass
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Google OAuth callback failed. redirect_uri=%s query=%s", redirect_uri, request.url.query)
-        html = f"<html><body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh'>?????? Google ????????? ??????????????????<script>setTimeout(function(){{ window.location.href={return_to!r}; }}, 2200)</script></body></html>"
+        html = (
+            "<html><head><meta charset='utf-8'></head>"
+            "<body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;"
+            "justify-content:center;height:100vh'>"
+            "เชื่อม Google ไม่สำเร็จ กรุณากลับไปลองใหม่"
+            f"<script>setTimeout(function(){{ window.location.href={return_to!r}; }}, 2200)</script>"
+            "</body></html>"
+        )
         return HTMLResponse(html, status_code=500)
 
     if return_to.startswith("http://") or return_to.startswith("https://"):
