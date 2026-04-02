@@ -609,7 +609,18 @@ export function SettingsPage() {
                 try {
                   const apiBaseUrl = String((import.meta as any).env?.VITE_API_URL || `${window.location.origin}/api`).replace(/\/+$/, '')
                   const apiOrigin = apiBaseUrl.endsWith('/api') ? apiBaseUrl.slice(0, -4) : apiBaseUrl
-                  const redirectUri = (googleCfg.oauth_redirect_uri || '').trim() || `${apiOrigin}/api/config/google-oauth/callback`
+                  const savedRedirectUri = (googleCfg.oauth_redirect_uri || '').trim()
+                  let redirectUri = `${apiOrigin}/api/config/google-oauth/callback`
+                  if (savedRedirectUri) {
+                    try {
+                      const saved = new URL(savedRedirectUri)
+                      const current = new URL(apiOrigin)
+                      const sameOrigin = saved.origin === current.origin
+                      redirectUri = sameOrigin ? savedRedirectUri : `${apiOrigin}/api/config/google-oauth/callback`
+                    } catch {
+                      redirectUri = `${apiOrigin}/api/config/google-oauth/callback`
+                    }
+                  }
                   const next = await updateGoogleSetupConfig({
                     workspace_email: googleCfg.workspace_email || '',
                     drive_folder_name: googleCfg.drive_folder_name || '',

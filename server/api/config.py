@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -86,8 +87,19 @@ def _oauth_client_config(cfg: dict, request: Request | None = None) -> tuple[dic
     if not client_id or not client_secret:
         raise HTTPException(status_code=400, detail="google_oauth_not_ready")
     redirect_uri = str(cfg.get("google_oauth_redirect_uri") or "").strip()
-    if not redirect_uri and request is not None:
-        redirect_uri = str(request.base_url).rstrip("/") + "/api/config/google-oauth/callback"
+    if request is not None:
+        request_redirect_uri = str(request.base_url).rstrip("/") + "/api/config/google-oauth/callback"
+        if not redirect_uri:
+            redirect_uri = request_redirect_uri
+        else:
+            configured_origin = urlsplit(redirect_uri)
+            request_origin = urlsplit(request_redirect_uri)
+            same_origin = (
+                configured_origin.scheme == request_origin.scheme
+                and configured_origin.netloc == request_origin.netloc
+            )
+            if not same_origin:
+                redirect_uri = request_redirect_uri
     if not redirect_uri:
         raise HTTPException(status_code=400, detail="google_oauth_redirect_missing")
     config = {
