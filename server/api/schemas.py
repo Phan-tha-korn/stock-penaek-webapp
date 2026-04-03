@@ -329,6 +329,35 @@ class TransactionListOut(BaseModel):
     total: int
 
 
+class OwnerTimelinePointOut(BaseModel):
+    key: str
+    label: str
+    activity_count: int
+    transaction_count: int
+    stock_in_qty: str = "0"
+    stock_out_qty: str = "0"
+    adjust_qty: str = "0"
+
+
+class OwnerStatusSliceOut(BaseModel):
+    name: str
+    value: int
+
+
+class OwnerSummaryOut(BaseModel):
+    period: str
+    total_products: int
+    stock_value: str
+    sales_value: str
+    user_total: int
+    active_users_online: int
+    activity_total: int
+    transaction_total: int
+    status_chart: list[OwnerStatusSliceOut]
+    category_chart: list[OwnerStatusSliceOut]
+    timeline: list[OwnerTimelinePointOut]
+
+
 class GarbageFileOut(BaseModel):
     id: str
     path: str

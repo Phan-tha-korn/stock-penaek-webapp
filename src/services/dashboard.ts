@@ -38,6 +38,35 @@ export interface StockSummary {
   out: number
 }
 
+export interface OwnerChartSlice {
+  name: string
+  value: number
+}
+
+export interface OwnerTimelinePoint {
+  key: string
+  label: string
+  activity_count: number
+  transaction_count: number
+  stock_in_qty: string
+  stock_out_qty: string
+  adjust_qty: string
+}
+
+export interface OwnerSummary {
+  period: 'day' | 'week' | 'month' | 'year'
+  total_products: number
+  stock_value: string
+  sales_value: string
+  user_total: number
+  active_users_online: number
+  activity_total: number
+  transaction_total: number
+  status_chart: OwnerChartSlice[]
+  category_chart: OwnerChartSlice[]
+  timeline: OwnerTimelinePoint[]
+}
+
 export async function fetchKpis() {
   const { data } = await api.get<Kpis>('/dashboard/kpis')
   return data
@@ -61,5 +90,10 @@ export async function fetchTransactions(params: { sku?: string; type?: string; d
     items: Array.isArray(data?.items) ? data.items : [],
     total: Number(data?.total || 0),
   }
+}
+
+export async function fetchOwnerSummary(period: OwnerSummary['period'] = 'week') {
+  const { data } = await api.get<OwnerSummary>('/dashboard/owner_summary', { params: { period } })
+  return data
 }
 
