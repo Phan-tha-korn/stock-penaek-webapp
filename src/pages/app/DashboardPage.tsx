@@ -476,7 +476,7 @@ function StockDashboard() {
                     <div className="text-xs text-white/50">{section.description}</div>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${section.badgeClass}`}>
-                    {filteredItems.length} ??????
+                    {filteredItems.length} รายการ
                   </span>
                 </div>
 
@@ -491,7 +491,7 @@ function StockDashboard() {
                     ))
                   ) : filteredItems.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-[color:var(--color-border)] bg-white/5 px-4 py-8 text-center text-sm text-white/45">
-                      ?????????????????????????
+                      ไม่พบสินค้าที่ตรงกับเงื่อนไข
                     </div>
                   ) : (
                     pageItems.map((product) => {

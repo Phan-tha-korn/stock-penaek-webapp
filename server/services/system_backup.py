@@ -11,22 +11,9 @@ import orjson
 from sqlalchemy import delete, select
 
 from server.config.config_loader import load_master_config, write_master_config
+from server.config.paths import app_db_path, backups_root, media_root, repo_root
 from server.db.database import SessionLocal
 from server.db.models import AuditLog, LoginLock, Product, RefreshSession, Role, StockAlertState, StockStatus, StockTransaction, TxnType, User
-
-
-def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def backups_root() -> Path:
-    path = repo_root() / "backups"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def media_root() -> Path:
-    return repo_root() / "storage" / "media"
 
 
 def _dt(value: datetime | None) -> str | None:
@@ -58,6 +45,11 @@ async def build_backup_payload() -> dict:
     return {
         "meta": {
             "created_at": datetime.utcnow().isoformat() + "Z",
+            "format": "stock-penaek-backup-v2",
+            "database": {
+                "engine": "sqlite",
+                "file_name": app_db_path().name,
+            },
             "counts": {
                 "users": len(users),
                 "products": len(products),
@@ -85,6 +77,8 @@ async def build_backup_payload() -> dict:
             {
                 "id": p.id,
                 "sku": p.sku,
+                "category_id": p.category_id,
+                "last_category_id": p.last_category_id,
                 "name_th": p.name_th,
                 "name_en": p.name_en,
                 "category": p.category,
@@ -161,7 +155,7 @@ async def build_backup_payload() -> dict:
 async def create_backup_archive(label: str = "manual") -> dict:
     ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     safe_label = "".join(ch.lower() if ch.isalnum() else "-" for ch in label).strip("-") or "backup"
-    filename = f"backup-{safe_label}-{ts}.zip"
+    filename = f"stock-penaek-backup-{safe_label}-{ts}.zip"
     path = backups_root() / filename
     payload = await build_backup_payload()
     payload_bytes = orjson.dumps(payload)
@@ -172,7 +166,8 @@ async def create_backup_archive(label: str = "manual") -> dict:
             "backup/manifest.json",
             json.dumps(
                 {
-                    "format": "stock-penaek-backup-v1",
+                    "format": "stock-penaek-backup-v2",
+                    "database_file": app_db_path().name,
                     "created_at": payload["meta"]["created_at"],
                     "label": safe_label,
                     "counts": payload["meta"]["counts"],
@@ -274,6 +269,8 @@ async def restore_backup_archive(zip_bytes: bytes) -> dict:
                 Product(
                     id=str(raw["id"]),
                     sku=str(raw.get("sku") or ""),
+                    category_id=raw.get("category_id"),
+                    last_category_id=raw.get("last_category_id"),
                     name_th=str(raw.get("name_th") or ""),
                     name_en=str(raw.get("name_en") or ""),
                     category=str(raw.get("category") or ""),

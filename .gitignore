@@ -5,8 +5,21 @@ reports/
 .trash-backup/
 .auto-garbage/
 
-storage/
+storage/*
 !storage/.gitkeep
+!storage/README.md
+!storage/data/
+storage/data/*
+!storage/data/.gitkeep
+!storage/data/README.md
+!storage/data/live/
+storage/data/live/*
+!storage/data/live/.gitkeep
+!storage/data/live/README.md
+!storage/backups/
+storage/backups/*
+!storage/backups/.gitkeep
+!storage/backups/README.md
 
 credentials/*.json
 

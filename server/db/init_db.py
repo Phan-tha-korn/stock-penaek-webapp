@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import inspect
 
 from server.config.config_loader import load_master_config
 from server.db.database import Base, engine
@@ -30,12 +31,17 @@ async def create_all() -> None:
         await conn.run_sync(Base.metadata.create_all)
         driver = conn.engine.url.get_backend_name()
         if driver == "sqlite":
-            rows = await conn.exec_driver_sql("PRAGMA table_info(products)")
-            cols = {str(row[1]) for row in rows.fetchall()}
+            def _product_columns(sync_conn) -> set[str]:
+                return {str(col["name"]) for col in inspect(sync_conn).get_columns("products")}
+
+            cols = await conn.run_sync(_product_columns)
             if "category_id" not in cols:
                 await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN category_id VARCHAR(36)")
             if "last_category_id" not in cols:
                 await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN last_category_id VARCHAR(36)")
+        else:
+            await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id VARCHAR(36)")
+            await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS last_category_id VARCHAR(36)")
 
 
 async def seed_if_empty(db: AsyncSession) -> None:

@@ -11,6 +11,8 @@ $paths = @(
   ".auto-garbage",
   "server\db\app.db",
   "server\db\app.backup.db",
+  "storage\data\live\stock-penaek.db",
+  "storage\backups",
   "storage\media"
 )
 

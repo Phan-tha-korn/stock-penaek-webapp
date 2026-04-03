@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .config_loader import load_master_config
+from .paths import app_db_path, ensure_local_data_layout
 
 
 class Settings(BaseSettings):
@@ -115,7 +116,8 @@ class Settings(BaseSettings):
                 url = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(qs), parts.fragment))
 
             return url
-        return "sqlite+aiosqlite:///./server/db/app.db"
+        ensure_local_data_layout()
+        return f"sqlite+aiosqlite:///{app_db_path().resolve().as_posix()}"
 
 
 settings = Settings.from_master_config()
