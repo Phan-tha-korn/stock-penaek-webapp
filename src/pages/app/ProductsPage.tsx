@@ -132,7 +132,7 @@ function emptyDraft(defaultCategoryId = ''): ProductDraft {
 }
 
 function categoryLabel(product: Product) {
-  return product.category?.trim() || 'ไม่ระบุหมวด'
+  return product.category?.trim() || 'ไม่ระบุประเภท'
 }
 
 function FilterSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -216,14 +216,14 @@ function ProductFormFields(props: {
           onChange={(e) => patch({ name_th: e.target.value })}
         />
         <TextInput
-          placeholder="ชื่ออังกฤษ (ไม่บังคับ)"
+          placeholder="ชื่อสินค้าเพิ่มเติม (ถ้ามี)"
           value={draft.name_en}
           onChange={(e) => patch({ name_en: e.target.value })}
         />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <FilterSelect value={draft.category_id} onChange={(e) => patch({ category_id: e.target.value })}>
-          <option value="">ไม่ระบุหมวด</option>
+          <option value="">ไม่ระบุประเภท</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -231,7 +231,7 @@ function ProductFormFields(props: {
           ))}
         </FilterSelect>
         <TextInput
-          placeholder="ประเภท"
+          placeholder="ประเภทย่อย"
           value={draft.type}
           onChange={(e) => patch({ type: e.target.value })}
         />
@@ -287,12 +287,12 @@ function ProductFormFields(props: {
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <TextInput
-          placeholder="????????????"
+          placeholder="ซัพพลายเออร์"
           value={draft.supplier}
           onChange={(e) => patch({ supplier: e.target.value })}
         />
         <TextInput
-          placeholder="????????"
+          placeholder="บาร์โค้ด"
           value={draft.barcode}
           onChange={(e) => patch({ barcode: e.target.value })}
         />
@@ -581,8 +581,8 @@ export function ProductsPage() {
     selectedCategory === 'all'
       ? 'สินค้าทั้งหมด'
       : selectedCategory === UNCATEGORIZED_VALUE
-        ? 'ไม่ระบุหมวด'
-        : categories.find((c) => c.id === selectedCategory)?.name || 'หมวดหมู่'
+        ? 'ไม่ระบุประเภท'
+        : categories.find((c) => c.id === selectedCategory)?.name || 'ประเภททั้งหมด'
 
   return (
     <div className="space-y-3">
@@ -616,7 +616,7 @@ export function ProductsPage() {
         <div className="flex flex-wrap gap-2">
           <FilterSelect value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="min-w-[220px]">
             <option value="all">สินค้าทั้งหมด</option>
-            <option value={UNCATEGORIZED_VALUE}>ไม่ระบุหมวด</option>
+            <option value={UNCATEGORIZED_VALUE}>ไม่ระบุประเภท</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -651,10 +651,10 @@ export function ProductsPage() {
         <TextInput
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="ค้นหา SKU / ชื่อ / บาร์โค้ด / Supplier / ประเภท"
+          placeholder="ค้นหา SKU / ชื่อ / บาร์โค้ด / ซัพพลายเออร์ / ประเภท"
         />
         <FilterSelect value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
-          <option value="all">ทุกประเภท</option>
+          <option value="all">ประเภทย่อยทั้งหมด</option>
           {typeOptions.map((type) => (
             <option key={type} value={type}>
               {type}
@@ -920,12 +920,12 @@ export function ProductsPage() {
               <tr className="border-b border-[color:var(--color-border)]">
                 {canManage ? <th className="px-4 py-2">เลือก</th> : null}
                 <th className="px-4 py-2">SKU</th>
-                <th className="px-4 py-2">??????????</th>
-                <th className="px-4 py-2">หมวดหมู่</th>
-                <th className="px-4 py-2">ประเภท</th>
-                <th className="px-4 py-2">?????</th>
-                <th className="px-4 py-2">????</th>
-                <th className="px-4 py-2">?????</th>
+                <th className="px-4 py-2">ชื่อสินค้า</th>
+                <th className="px-4 py-2">ประเภททั้งหมด</th>
+                <th className="px-4 py-2">ประเภทย่อย</th>
+                <th className="px-4 py-2">สต็อก</th>
+                <th className="px-4 py-2">ราคา</th>
+                <th className="px-4 py-2">สถานะ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--color-border)]">

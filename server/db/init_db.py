@@ -43,6 +43,25 @@ async def create_all() -> None:
             await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id VARCHAR(36)")
             await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS last_category_id VARCHAR(36)")
 
+        if driver == "sqlite":
+            await conn.exec_driver_sql(
+                """
+                UPDATE products
+                SET type = category
+                WHERE trim(COALESCE(type, '')) = ''
+                  AND trim(COALESCE(category, '')) <> ''
+                """
+            )
+        else:
+            await conn.exec_driver_sql(
+                """
+                UPDATE products
+                SET type = category
+                WHERE BTRIM(COALESCE(type, '')) = ''
+                  AND BTRIM(COALESCE(category, '')) <> ''
+                """
+            )
+
 
 async def seed_if_empty(db: AsyncSession) -> None:
     res = await db.execute(select(User).limit(1))
