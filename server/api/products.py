@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import re
+import unicodedata
 import zipfile
 from decimal import Decimal
 from datetime import datetime
@@ -48,6 +50,24 @@ def _d(v) -> str:
     if isinstance(v, Decimal):
         return format(v, "f")
     return str(v)
+
+
+def _clean_type_label(value: str | None) -> str:
+    text = unicodedata.normalize("NFKC", (value or "")).replace("\u200b", "").strip()
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s*>\s*", " > ", text)
+    text = re.sub(r"\s*/\s*", "/", text)
+    return text.strip()
+
+
+def _type_match_key(value: str | None) -> str:
+    text = _clean_type_label(value).lower()
+    chars: list[str] = []
+    for ch in text:
+        if unicodedata.category(ch).startswith("M"):
+            continue
+        chars.append(ch)
+    return "".join(chars)
 
 def _is_deleted(p: Product) -> bool:
     return bool((p.notes or "").startswith(DELETED_PREFIX))
@@ -227,14 +247,19 @@ async def list_products(
         stmt = stmt.where(Product.category_id.is_(None))
     elif category_id:
         stmt = stmt.where(Product.category_id == category_id)
-    if product_type:
-        stmt = stmt.where(func.lower(Product.type) == product_type.strip().lower())
     if is_test is not None:
         stmt = stmt.where(Product.is_test.is_(is_test))
 
-    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
-    res = await db.execute(stmt.order_by(Product.updated_at.desc()).limit(limit).offset(offset))
-    items = res.scalars().all()
+    if product_type and product_type.strip():
+        res = await db.execute(stmt.order_by(Product.updated_at.desc()))
+        match_key = _type_match_key(product_type)
+        filtered_items = [p for p in res.scalars().all() if match_key in _type_match_key(p.type)]
+        total = len(filtered_items)
+        items = filtered_items[offset : offset + limit]
+    else:
+        total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+        res = await db.execute(stmt.order_by(Product.updated_at.desc()).limit(limit).offset(offset))
+        items = res.scalars().all()
 
     out = [_to_out(p) for p in items]
     return ProductListOut(items=out, total=int(total or 0))
@@ -337,11 +362,24 @@ async def force_full_sync_to_sheets():
 async def product_filter_options(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    include_deleted: bool = False,
 ):
     stmt = select(Product.type).where(Product.type.is_not(None), Product.type != "")
-    if user.role not in (Role.OWNER, Role.DEV):
+    if not (include_deleted and user.role in (Role.OWNER, Role.DEV)):
         stmt = stmt.where(~Product.notes.like(f"{DELETED_PREFIX}%"))
-    types = sorted({str(x[0]).strip() for x in (await db.execute(stmt)).all() if str(x[0]).strip()}, key=str.lower)
+    grouped: dict[str, dict[str, int]] = {}
+    for row in (await db.execute(stmt)).all():
+        cleaned = _clean_type_label(str(row[0]))
+        if not cleaned:
+            continue
+        key = _type_match_key(cleaned)
+        bucket = grouped.setdefault(key, {})
+        bucket[cleaned] = bucket.get(cleaned, 0) + 1
+    types = []
+    for bucket in grouped.values():
+        canonical = sorted(bucket.items(), key=lambda item: (-item[1], len(item[0]), item[0].lower()))[0][0]
+        types.append(canonical)
+    types.sort(key=str.lower)
     return {"types": types}
 
 

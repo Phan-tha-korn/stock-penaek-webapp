@@ -332,7 +332,7 @@ export function ProductsPage() {
 
   const [q, setQ] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [selectedType, setSelectedType] = useState('all')
+  const [selectedType, setSelectedType] = useState('')
 
   const [creating, setCreating] = useState(false)
   const [savingCreate, setSavingCreate] = useState(false)
@@ -355,7 +355,7 @@ export function ProductsPage() {
       limit: 100,
       offset: 0,
       include_deleted: canManage ? showDeleted : undefined,
-      product_type: selectedType !== 'all' ? selectedType : undefined,
+      product_type: selectedType.trim() || undefined,
     }
     if (selectedCategory === UNCATEGORIZED_VALUE) {
       base.uncategorized_only = true
@@ -369,7 +369,7 @@ export function ProductsPage() {
     const [productRes, categoryRes, filterRes, rulesRes] = await Promise.all([
       listProducts(params),
       listProductCategories(false),
-      getProductFilterOptions(),
+      getProductFilterOptions({ include_deleted: canManage ? showDeleted : undefined }),
       getInventoryRuleSettings(),
     ])
     setItems(Array.isArray(productRes?.items) ? productRes.items : [])
@@ -653,14 +653,17 @@ export function ProductsPage() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="ค้นหา SKU / ชื่อ / บาร์โค้ด / ซัพพลายเออร์ / ประเภท"
         />
-        <FilterSelect value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
-          <option value="all">ประเภทย่อยทั้งหมด</option>
+        <TextInput
+          value={selectedType}
+          onChange={(e) => setSelectedType(e.target.value)}
+          placeholder="ค้นหาประเภทย่อย"
+          list="product-type-options"
+        />
+        <datalist id="product-type-options">
           {typeOptions.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
+            <option key={type} value={type} />
           ))}
-        </FilterSelect>
+        </datalist>
         <div className="rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/70 px-3 py-2 text-sm text-white/70">
           กำลังดู: <span className="font-semibold text-white">{categoryFilterLabel}</span>
         </div>

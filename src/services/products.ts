@@ -180,8 +180,8 @@ export async function forceFullSyncToSheets() {
   return res.data
 }
 
-export async function getProductFilterOptions() {
-  const res = await api.get<{ types: string[] }>('/products/filter-options')
+export async function getProductFilterOptions(params: { include_deleted?: boolean } = {}) {
+  const res = await api.get<{ types: string[] }>('/products/filter-options', { params })
   return {
     types: Array.isArray(res.data?.types) ? res.data.types.filter((value) => typeof value === 'string' && value.trim()) : [],
   }
