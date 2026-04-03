@@ -219,9 +219,9 @@ export function ProductDetailModal(props: {
               <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                 <div className="text-white/60">SKU</div>
                 <div className="font-mono text-white/90">{product.sku}</div>
-                <div className="text-white/60">ประเภททั้งหมด</div>
-                <div className="text-white/90">{product.category || '-'}</div>
-                <div className="text-white/60">ประเภทย่อย</div>
+                <div className="text-white/60">หมวดหมู่</div>
+                <div className="text-white/90">{product.category || 'ไม่ระบุหมวด'}</div>
+                <div className="text-white/60">ประเภท</div>
                 <div className="text-white/90">{product.type || '-'}</div>
                 <div className="text-white/60">หน่วยนับ</div>
                 <div className="text-white/90">{product.unit || '-'}</div>

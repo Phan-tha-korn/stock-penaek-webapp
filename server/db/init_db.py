@@ -52,12 +52,28 @@ async def create_all() -> None:
                   AND trim(COALESCE(category, '')) <> ''
                 """
             )
+            await conn.exec_driver_sql(
+                """
+                UPDATE products
+                SET category = ''
+                WHERE category_id IS NULL
+                  AND trim(COALESCE(category, '')) <> ''
+                """
+            )
         else:
             await conn.exec_driver_sql(
                 """
                 UPDATE products
                 SET type = category
                 WHERE BTRIM(COALESCE(type, '')) = ''
+                  AND BTRIM(COALESCE(category, '')) <> ''
+                """
+            )
+            await conn.exec_driver_sql(
+                """
+                UPDATE products
+                SET category = ''
+                WHERE category_id IS NULL
                   AND BTRIM(COALESCE(category, '')) <> ''
                 """
             )

@@ -93,7 +93,7 @@ def _to_out(p: Product) -> ProductOut:
         sku=p.sku,
         category_id=p.category_id,
         name=ProductName(th=p.name_th, en=p.name_en),
-        category=p.category,
+        category=p.category if p.category_id else "",
         type=p.type,
         unit=p.unit,
         cost_price=_d(p.cost_price),

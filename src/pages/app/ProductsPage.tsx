@@ -132,7 +132,7 @@ function emptyDraft(defaultCategoryId = ''): ProductDraft {
 }
 
 function categoryLabel(product: Product) {
-  return product.category?.trim() || 'ไม่ระบุประเภท'
+  return product.category?.trim() || 'ไม่ระบุหมวด'
 }
 
 function FilterSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -223,7 +223,7 @@ function ProductFormFields(props: {
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <FilterSelect value={draft.category_id} onChange={(e) => patch({ category_id: e.target.value })}>
-          <option value="">ไม่ระบุประเภท</option>
+          <option value="">ไม่ระบุหมวด</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -581,8 +581,8 @@ export function ProductsPage() {
     selectedCategory === 'all'
       ? 'สินค้าทั้งหมด'
       : selectedCategory === UNCATEGORIZED_VALUE
-        ? 'ไม่ระบุประเภท'
-        : categories.find((c) => c.id === selectedCategory)?.name || 'ประเภททั้งหมด'
+        ? 'ไม่ระบุหมวด'
+        : categories.find((c) => c.id === selectedCategory)?.name || 'หมวดหมู่'
 
   return (
     <div className="space-y-3">
@@ -616,7 +616,7 @@ export function ProductsPage() {
         <div className="flex flex-wrap gap-2">
           <FilterSelect value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="min-w-[220px]">
             <option value="all">สินค้าทั้งหมด</option>
-            <option value={UNCATEGORIZED_VALUE}>ไม่ระบุประเภท</option>
+            <option value={UNCATEGORIZED_VALUE}>ไม่ระบุหมวด</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -921,8 +921,8 @@ export function ProductsPage() {
                 {canManage ? <th className="px-4 py-2">เลือก</th> : null}
                 <th className="px-4 py-2">SKU</th>
                 <th className="px-4 py-2">ชื่อสินค้า</th>
-                <th className="px-4 py-2">ประเภททั้งหมด</th>
-                <th className="px-4 py-2">ประเภทย่อย</th>
+                <th className="px-4 py-2">หมวดหมู่</th>
+                <th className="px-4 py-2">ประเภท</th>
                 <th className="px-4 py-2">สต็อก</th>
                 <th className="px-4 py-2">ราคา</th>
                 <th className="px-4 py-2">สถานะ</th>
