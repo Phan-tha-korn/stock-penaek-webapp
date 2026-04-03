@@ -42,3 +42,4 @@ config.json
 credentials/*.json
 **/google_oauth_token*.json
 
+.vercel

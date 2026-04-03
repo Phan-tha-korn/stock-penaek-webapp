@@ -287,12 +287,12 @@ function ProductFormFields(props: {
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <TextInput
-          placeholder="Supplier"
+          placeholder="????????????"
           value={draft.supplier}
           onChange={(e) => patch({ supplier: e.target.value })}
         />
         <TextInput
-          placeholder="Barcode"
+          placeholder="????????"
           value={draft.barcode}
           onChange={(e) => patch({ barcode: e.target.value })}
         />
@@ -920,12 +920,12 @@ export function ProductsPage() {
               <tr className="border-b border-[color:var(--color-border)]">
                 {canManage ? <th className="px-4 py-2">เลือก</th> : null}
                 <th className="px-4 py-2">SKU</th>
-                <th className="px-4 py-2">Name</th>
+                <th className="px-4 py-2">??????????</th>
                 <th className="px-4 py-2">หมวดหมู่</th>
                 <th className="px-4 py-2">ประเภท</th>
-                <th className="px-4 py-2">Stock</th>
-                <th className="px-4 py-2">Price</th>
-                <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">?????</th>
+                <th className="px-4 py-2">????</th>
+                <th className="px-4 py-2">?????</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--color-border)]">
@@ -967,7 +967,6 @@ export function ProductsPage() {
                   <td className="px-4 py-2 font-mono text-xs text-white/80">{p.sku}</td>
                   <td className="px-4 py-2">
                     <div className="text-white/90">{productDisplayName(p)}</div>
-                    <div className="text-xs text-white/50">{p?.name?.en || ''}</div>
                   </td>
                   <td className="px-4 py-2 text-white/80">{categoryLabel(p)}</td>
                   <td className="px-4 py-2 text-white/60">{p.type || '-'}</td>

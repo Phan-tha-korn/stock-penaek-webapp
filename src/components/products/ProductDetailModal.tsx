@@ -183,7 +183,6 @@ export function ProductDetailModal(props: {
 
             <div>
               <div className="text-xl font-bold">{productDisplayName(product)}</div>
-              <div className="text-sm text-white/50">{product.name?.en || ''}</div>
               <div className="mt-2 text-xs text-white/50">อัปเดตล่าสุด: {formatUpdatedAt(product.updated_at)}</div>
             </div>
 
