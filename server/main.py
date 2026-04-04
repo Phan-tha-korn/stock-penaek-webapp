@@ -8,7 +8,7 @@ import socketio
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from server.api import auth, config, dashboard, dev_backup, dev_notifications, dev_reset, dev_sheets, dev_tools, health, product_categories, products, suppliers, users, zones
+from server.api import auth, config, dashboard, dev_backup, dev_notifications, dev_reset, dev_sheets, dev_tools, health, price_records, product_categories, products, suppliers, users, zones
 from server.db.database import SessionLocal
 from server.db.init_db import create_all, seed_if_empty
 from server.services.attachments import ensure_attachment_type_classifications
@@ -59,6 +59,7 @@ fastapi_app.include_router(suppliers.router, prefix="/api")
 fastapi_app.include_router(product_categories.router, prefix="/api")
 fastapi_app.include_router(dashboard.router, prefix="/api")
 fastapi_app.include_router(zones.router, prefix="/api")
+fastapi_app.include_router(price_records.router, prefix="/api")
 fastapi_app.include_router(users.router, prefix="/api")
 fastapi_app.include_router(dev_tools.router, prefix="/api")
 fastapi_app.include_router(dev_backup.router, prefix="/api")

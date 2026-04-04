@@ -60,6 +60,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
   const queueItem = { to: '/zones/verification', label: isEn ? 'Auto review queue' : 'คิวตรวจสอบอัตโนมัติ' }
   const notificationItem = { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' }
   const productItem = { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' }
+  const priceRecordItem = { to: '/price-records', label: isEn ? 'Price Records' : 'บันทึกราคา' }
   const supplierManageItem = { to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }
   const supplierListItem = { to: '/suppliers', label: isEn ? 'Suppliers' : 'รายชื่อร้านค้า' }
   const transactionItem = { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' }
@@ -78,7 +79,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [productItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), transactionItem],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), priceRecordItem, transactionItem],
       },
       {
         title: isEn ? 'Settings' : 'การตั้งค่า',
@@ -102,7 +103,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), transactionItem, reportItem],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), priceRecordItem, transactionItem, reportItem],
       },
       {
         title: isEn ? 'Settings' : 'การตั้งค่า',
@@ -126,7 +127,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), transactionItem, reportItem],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), priceRecordItem, transactionItem, reportItem],
       },
       {
         title: isEn ? 'System' : 'ระบบ',
@@ -154,7 +155,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), transactionItem, reportItem],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), priceRecordItem, transactionItem, reportItem],
       },
       {
         title: isEn ? 'System' : 'ระบบ',
@@ -176,7 +177,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
     },
     {
       title: isEn ? 'Data' : 'ข้อมูลงาน',
-      items: [compareItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), transactionItem, reportItem],
+        items: [compareItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), priceRecordItem, transactionItem, reportItem],
     },
     {
       title: isEn ? 'Settings' : 'การตั้งค่า',

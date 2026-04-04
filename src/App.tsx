@@ -24,6 +24,7 @@ const UsersPage = lazyWithRetry(() => import('./pages/app/UsersPage').then((m) =
 const DevPage = lazyWithRetry(() => import('./pages/app/DevPage').then((m) => ({ default: m.DevPage })))
 const OwnerCheckPage = lazyWithRetry(() => import('./pages/app/OwnerCheckPage').then((m) => ({ default: m.OwnerCheckPage })))
 const SettingsPage = lazyWithRetry(() => import('./pages/app/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const PriceRecordsPage = lazyWithRetry(() => import('./pages/app/PriceRecordsPage').then((m) => ({ default: m.PriceRecordsPage })))
 const LoginPage = lazyWithRetry(() => import('./pages/public/LoginPage').then((m) => ({ default: m.LoginPage })))
 const ForbiddenPage = lazyWithRetry(() => import('./pages/public/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })))
 const NotFoundPage = lazyWithRetry(() => import('./pages/public/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
@@ -53,6 +54,7 @@ export function App() {
               <Route path="/zones/search" element={<SearchWorkspacePage />} />
               <Route path="/zones/notifications" element={<NotificationsPage />} />
               {featureFlags.supplierModule ? <Route path="/suppliers" element={<SuppliersPage />} /> : null}
+              <Route path="/price-records" element={<PriceRecordsPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route element={<ProtectedRoute allow={['OWNER']} />}>
