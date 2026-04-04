@@ -139,10 +139,10 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
       {!open ? (
         <button
           type="button"
-          className={`${fieldClass()} flex items-center justify-between gap-2 text-left`}
+          className={`${fieldClass()} flex items-center justify-between gap-2 text-left text-[color:var(--color-fg)]`}
           onClick={handleOpen}
         >
-          <span className={`truncate ${hasValue ? '' : 'text-[color:var(--color-muted)]'}`}>
+          <span className={`truncate ${hasValue ? 'text-[color:var(--color-fg)]' : 'text-[color:var(--color-muted)]'}`}>
             {hasValue ? (displayValue || value) : (placeholder || 'เลือก...')}
           </span>
           <span className="shrink-0 text-[color:var(--color-muted)] text-xs">
@@ -154,7 +154,7 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
           <input
             ref={inputRef}
             type="text"
-            className={`${fieldClass()} pr-8`}
+            className={`${fieldClass()} pr-8 text-[color:var(--color-fg)]`}
             placeholder="พิมพ์เพื่อค้นหา..."
             value={query}
             onChange={(e) => handleInputChange(e.target.value)}
@@ -174,7 +174,7 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
 
       {/* Dropdown list */}
       {open && (
-        <div className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-lg">
+        <div className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)] text-[color:var(--color-fg)] shadow-xl">
           {/* Currently selected shown at top if exists */}
           {hasValue && !query && (
             <div className="border-b border-[color:var(--color-border)] px-3 py-2 text-xs text-[color:var(--color-primary)] truncate">
@@ -191,9 +191,9 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
             <button
               key={getId(item)}
               type="button"
-              className={`block w-full px-3 py-2 text-left text-sm truncate transition-colors ${
+              className={`block w-full px-3 py-2 text-left text-sm text-[color:var(--color-fg)] truncate transition-colors ${
                 getId(item) === value
-                  ? 'bg-[color:var(--color-primary)]/15 text-[color:var(--color-primary)]'
+                  ? 'bg-[color:var(--color-primary)]/20 text-[color:var(--color-primary)]'
                   : 'hover:bg-[color:var(--color-primary)]/10'
               }`}
               onClick={() => { onSelect(item); setOpen(false); setQuery('') }}

@@ -17,7 +17,6 @@ from server.db.models import (
     Product,
     Role,
     Supplier,
-    SupplierStatus,
     User,
 )
 from server.services.audit import write_audit_log
@@ -477,7 +476,12 @@ async def dropdown_products(
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, str]]:
     """Return lightweight product list for dropdown selectors."""
-    stmt = select(Product).where(Product.deleted_at.is_(None))
+    DELETED_PREFIX = "__DELETED__:"
+    stmt = select(Product).where(
+        Product.deleted_at.is_(None),
+        Product.archived_at.is_(None),
+        ~Product.notes.like(f"{DELETED_PREFIX}%"),
+    )
     if q.strip():
         pattern = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -505,7 +509,7 @@ async def dropdown_suppliers(
     """Return lightweight supplier list for dropdown selectors."""
     stmt = select(Supplier).where(
         Supplier.deleted_at.is_(None),
-        Supplier.status == SupplierStatus.ACTIVE,
+        Supplier.archived_at.is_(None),
     )
     if q.strip():
         pattern = f"%{q.strip()}%"
