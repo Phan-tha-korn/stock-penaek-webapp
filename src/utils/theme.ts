@@ -19,11 +19,7 @@ const defaultPersonalSettings: PersonalBackgroundSettings = {
 
 export function resolveThemePreference(preference: ThemePreference): 'light' | 'dark' {
   if (preference === 'light' || preference === 'dark') return preference
-  try {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  } catch {
-    return 'dark'
-  }
+  return 'dark'
 }
 
 export function applyThemePreference(preference: ThemePreference) {

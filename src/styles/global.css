@@ -68,11 +68,27 @@ body {
   background-attachment: fixed;
 }
 
-:root[data-app-bg-mode='plain'] .bg-app {
+:root[data-theme-preference='light'] .bg-app {
+  background-color: #eff6ff;
+  background-image:
+    radial-gradient(900px 600px at 10% 0%, rgba(96, 165, 250, 0.22), transparent 60%),
+    radial-gradient(1100px 700px at 100% 10%, rgba(191, 219, 254, 0.7), transparent 60%),
+    linear-gradient(180deg, #f8fbff, #dbeafe);
+}
+
+:root[data-theme-preference='dark'] .bg-app {
+  background-color: #110d08;
+  background-image:
+    radial-gradient(900px 600px at 12% 0%, rgba(251, 146, 60, 0.18), transparent 60%),
+    radial-gradient(1100px 720px at 100% 100%, rgba(234, 88, 12, 0.28), transparent 58%),
+    linear-gradient(135deg, #15110d, #2a1709 60%, #3a1f08);
+}
+
+:root:not([data-theme-preference='light']):not([data-theme-preference='dark'])[data-app-bg-mode='plain'] .bg-app {
   background-image: none;
 }
 
-:root[data-app-bg-mode='image'] .bg-app {
+:root:not([data-theme-preference='light']):not([data-theme-preference='dark'])[data-app-bg-mode='image'] .bg-app {
   background-image: var(--app-bg-image);
   background-position: center;
   background-repeat: no-repeat;
@@ -91,6 +107,14 @@ body {
 .bg-app > * {
   position: relative;
   z-index: 1;
+}
+
+.auth-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
 }
 
 .text-app {

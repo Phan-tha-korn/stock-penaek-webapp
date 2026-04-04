@@ -29,7 +29,7 @@ export function LoginPage() {
   })
 
   return (
-    <div className="bg-app mx-auto flex min-h-screen max-w-none items-center justify-center px-4">
+    <div className="bg-app auth-shell">
       {busy ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md">
           <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[color:var(--color-card)]/90 p-6 text-center shadow-2xl">
@@ -40,7 +40,7 @@ export function LoginPage() {
         </div>
       ) : null}
 
-      <div className="card w-full rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-5 backdrop-blur animate-fade-in">
+      <div className="card w-full max-w-xl rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-card)]/88 p-5 backdrop-blur animate-fade-in md:p-6">
         <div className="mb-1 text-lg font-semibold">{t('auth.loginTitle')}</div>
         <div className="mb-4 text-sm text-[color:var(--color-muted)]">{t('auth.loginSubtitle')}</div>
 
