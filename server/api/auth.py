@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pyotp
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,7 +50,8 @@ async def _get_lock(db: AsyncSession, username: str, ip: str) -> LoginLock:
 
 @router.post("/login", response_model=TokenOut)
 @_limiter.limit(lambda: f"{settings.login_rate_limit_per_minute}/minute")
-async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, payload: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    payload = LoginIn.model_validate(payload)
     username = payload.username.strip()
     ip = request.client.host if request.client else "unknown"
     ua = request.headers.get("user-agent")
