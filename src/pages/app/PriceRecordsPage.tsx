@@ -76,9 +76,10 @@ interface SearchDropdownProps<T> {
   displayValue: string
   placeholder?: string
   autoLoad?: boolean
+  menuMode?: 'overlay' | 'push'
 }
 
-function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, displayValue, placeholder, autoLoad }: SearchDropdownProps<T>) {
+function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, displayValue, placeholder, autoLoad, menuMode = 'overlay' }: SearchDropdownProps<T>) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<T[]>([])
@@ -130,6 +131,9 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
   }
 
   const hasValue = Boolean(value)
+  const dropdownClassName = menuMode === 'push'
+    ? 'relative mt-2 max-h-56 w-full overflow-auto rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)] text-[color:var(--color-fg)] shadow-xl'
+    : 'absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)] text-[color:var(--color-fg)] shadow-xl'
 
   return (
     <div ref={ref} className="relative">
@@ -174,7 +178,7 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
 
       {/* Dropdown list */}
       {open && (
-        <div className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)] text-[color:var(--color-fg)] shadow-xl">
+        <div className={dropdownClassName}>
           {/* Currently selected shown at top if exists */}
           {hasValue && !query && (
             <div className="border-b border-[color:var(--color-border)] px-3 py-2 text-xs text-[color:var(--color-primary)] truncate">
@@ -441,6 +445,7 @@ export function PriceRecordsPage() {
             renderItem={(p) => `${p.sku} — ${p.name_th || p.name_en}`}
             getId={(p) => p.id}
             placeholder={isEn ? 'Search product...' : 'ค้นหาสินค้า...'}
+            menuMode="push"
           />
           <SearchDropdown<DropdownSupplier>
             label={isEn ? 'Filter by supplier' : 'กรองตามร้านค้า'}
@@ -451,6 +456,7 @@ export function PriceRecordsPage() {
             renderItem={(s) => s.code ? `${s.code} — ${s.name}` : s.name}
             getId={(s) => s.id}
             placeholder={isEn ? 'Search supplier...' : 'ค้นหาร้านค้า...'}
+            menuMode="push"
           />
           <div>
             <label className="mb-1 block text-xs text-[color:var(--color-muted)]">{isEn ? 'Filter by status' : 'กรองตามสถานะ'}</label>
