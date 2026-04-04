@@ -127,8 +127,8 @@
       "adminSuppliers": "จัดการร้านค้า",
       "adminVerification": "ติดตามคิวตรวจสอบ",
       "adminNotifications": "ติดตามการส่งแจ้งเตือน",
-      "stockQuickSearch": "ค้นหาแบบเร็ว",
-      "stockCompare": "หน้าเทียบราคา",
+      "stockQuickSearch": "Check Stock",
+      "stockCompare": "ค้นหาและเทียบราคา",
       "stockProducts": "ดูข้อมูลสินค้า"
     }
   },

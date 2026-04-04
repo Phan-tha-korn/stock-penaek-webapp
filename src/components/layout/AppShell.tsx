@@ -52,11 +52,11 @@ function homePathFor(role: AppRole | undefined) {
   if (role === 'OWNER') return '/zones/owner'
   if (role === 'DEV') return '/zones/dev'
   if (role === 'ADMIN') return '/zones/admin'
-  return '/zones/stock/search'
+  return '/dashboard'
 }
 
 function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
-  const compareItem = { to: '/zones/search?view=compare', label: isEn ? 'Quick compare' : 'เทียบสินค้าแบบไว' }
+  const compareItem = { to: '/zones/search?view=compare', label: isEn ? 'Search & compare' : 'ค้นหาและเทียบราคา' }
   const queueItem = { to: '/zones/verification', label: isEn ? 'Auto review queue' : 'คิวตรวจสอบอัตโนมัติ' }
   const notificationItem = { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' }
   const productItem = { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' }
@@ -72,7 +72,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
       {
         title: isEn ? 'Main' : 'เมนูหลัก',
         items: [
-          { to: '/zones/stock/search', label: isEn ? 'Find products' : 'ค้นหาสินค้าและเช็ก' },
+          { to: '/dashboard', label: 'Check Stock' },
           compareItem,
           notificationItem,
         ],

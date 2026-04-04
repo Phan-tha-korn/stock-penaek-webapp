@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { SessionGuard } from './components/auth/SessionGuard'
@@ -67,8 +67,8 @@ export function App() {
                 <Route path="/zones/admin" element={<ZoneDashboardPage zone="admin" />} />
                 <Route path="/zones/verification" element={<VerificationWorkspacePage />} />
               </Route>
-              <Route path="/zones/stock" element={<ZoneDashboardPage zone="stock" />} />
-              <Route path="/zones/stock/search" element={<SearchWorkspacePage />} />
+              <Route path="/zones/stock" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/zones/stock/search" element={<Navigate to="/dashboard" replace />} />
               <Route element={<ProtectedRoute allow={['OWNER']} />}>
                 <Route path="/owner-check" element={<OwnerCheckPage />} />
               </Route>

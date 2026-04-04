@@ -8,5 +8,5 @@ export function ZoneLandingPage() {
   if (role === 'OWNER') return <Navigate to="/zones/owner" replace />
   if (role === 'DEV') return <Navigate to="/zones/dev" replace />
   if (role === 'ADMIN') return <Navigate to="/zones/admin" replace />
-  return <Navigate to="/zones/stock/search" replace />
+  return <Navigate to="/dashboard" replace />
 }

@@ -60,7 +60,7 @@ export function ZoneDashboardPage(props: { zone: 'owner' | 'dev' | 'admin' | 'st
       ]
     }
     return [
-      { to: '/zones/stock/search', label: t('dashboard.quickLinks.stockQuickSearch') },
+      { to: '/dashboard', label: t('dashboard.quickLinks.stockQuickSearch') },
       { to: '/zones/search?view=compare', label: t('dashboard.quickLinks.stockCompare') },
       { to: '/products', label: t('dashboard.quickLinks.stockProducts') },
     ]

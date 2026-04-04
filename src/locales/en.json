@@ -127,8 +127,8 @@
       "adminSuppliers": "Supplier operations",
       "adminVerification": "Verification monitor",
       "adminNotifications": "Delivery monitor",
-      "stockQuickSearch": "Quick search",
-      "stockCompare": "Compare view",
+      "stockQuickSearch": "Check Stock",
+      "stockCompare": "Search & compare",
       "stockProducts": "Product view"
     }
   },
