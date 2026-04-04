@@ -3,7 +3,26 @@ import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 
 import { useAuthStore } from '../store/authStore'
 import type { AuthTokens } from '../types/models'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+function resolveApiBaseUrl(): string {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+  if (typeof window === 'undefined') return '/api'
+  const { hostname, protocol } = window.location
+  // Use relative URL for localhost, IPs, or when already on the api. subdomain
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    /^\d+\.\d+\.\d+\.\d+$/.test(hostname) ||
+    hostname.startsWith('api.')
+  ) {
+    return '/api'
+  }
+  // For custom domains (e.g. penaekapi.xyz or www.penaekapi.xyz),
+  // the API is hosted on the api. subdomain served by the cloudflared tunnel.
+  const cleanHost = hostname.replace(/^www\./, '')
+  return `${protocol}//api.${cleanHost}/api`
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 
 interface RequestConfigExtra extends InternalAxiosRequestConfig {
   __countedMutation?: boolean
