@@ -25,7 +25,7 @@ export function PublicProductPage() {
         <div className="card max-w-md w-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-8 text-center backdrop-blur shadow-2xl">
           <div className="text-6xl mb-4">🔍</div>
           <h2 className="text-xl font-bold mb-2">ไม่พบสินค้า</h2>
-          <p className="text-white/60 mb-6">SKU: {sku}</p>
+          <p className="text-white/60 mb-6">รหัสสินค้า: {sku}</p>
           <Link to="/" className="text-[color:var(--color-primary)] hover:underline">
             กลับหน้าหลัก
           </Link>
@@ -60,7 +60,7 @@ export function PublicProductPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-y-3 text-sm">
-            <div className="text-white/60">SKU</div>
+            <div className="text-white/60">รหัสสินค้า</div>
             <div className="min-w-0 font-mono text-right break-all">{product.sku}</div>
             
             <div className="text-white/60">หมวดหมู่</div>
@@ -90,7 +90,7 @@ export function PublicProductPage() {
 
           {config?.app_name && (
             <div className="pt-4 text-center text-xs text-white/40 border-t border-white/10">
-              Managed by {config.app_name}
+              ดูแลโดย {config.app_name}
             </div>
           )}
         </div>

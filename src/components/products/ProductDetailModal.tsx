@@ -217,7 +217,7 @@ export function ProductDetailModal(props: {
             <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3">
               <div className="text-sm font-semibold">รายละเอียดสินค้า</div>
               <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                <div className="text-white/60">SKU</div>
+                <div className="text-white/60">รหัสสินค้า</div>
                 <div className="font-mono text-white/90">{product.sku}</div>
                 <div className="text-white/60">หมวดหมู่</div>
                 <div className="text-white/90">{product.category || 'ไม่ระบุหมวด'}</div>
@@ -344,7 +344,7 @@ export function ProductDetailModal(props: {
                   }
                 }}
               >
-                คัดลอก SKU
+                คัดลอกรหัสสินค้า
               </button>
             </div>
           </div>

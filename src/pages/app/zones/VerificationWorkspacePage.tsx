@@ -7,7 +7,7 @@ import { fetchZoneVerificationQueue, type VerificationQueueItem } from '../../..
 import { useAuthStore } from '../../../store/authStore'
 
 function fieldClass() {
-  return 'w-full rounded border border-[color:var(--color-border)] bg-black/20 px-3 py-2 text-sm text-[color:var(--color-fg)]'
+  return 'input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-[color:var(--color-fg)]'
 }
 
 export function VerificationWorkspacePage() {

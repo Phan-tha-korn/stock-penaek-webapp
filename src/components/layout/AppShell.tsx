@@ -51,7 +51,7 @@ export function AppShell() {
   ].filter((x) => (role ? x.roles.includes(role as never) : false))
 
   return (
-    <div className="min-h-screen">
+    <div className="bg-app min-h-screen text-app">
       <header className="card border-b border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link to="/" className="text-sm font-semibold tracking-wide">

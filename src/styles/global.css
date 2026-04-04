@@ -12,6 +12,8 @@
   --color-muted: rgba(255, 255, 255, 0.72);
   --color-muted-strong: rgba(255, 255, 255, 0.58);
   --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --color-input-bg: rgba(0, 0, 0, 0.22);
+  --color-surface-soft: rgba(255, 255, 255, 0.04);
   --app-bg-mode: gradient;
   --app-bg-color: #0d0d0d;
   --app-bg-image: none;
@@ -30,6 +32,8 @@
   --color-muted: rgba(16, 35, 63, 0.74);
   --color-muted-strong: rgba(16, 35, 63, 0.56);
   --shadow-soft: 0 12px 35px rgba(80, 122, 186, 0.14);
+  --color-input-bg: rgba(255, 255, 255, 0.72);
+  --color-surface-soft: rgba(255, 255, 255, 0.48);
 }
 
 :root[data-theme='dark'] {
@@ -39,6 +43,8 @@
   --color-border: rgba(255, 247, 237, 0.08);
   --color-muted: rgba(255, 247, 237, 0.72);
   --color-muted-strong: rgba(255, 247, 237, 0.58);
+  --color-input-bg: rgba(0, 0, 0, 0.28);
+  --color-surface-soft: rgba(255, 255, 255, 0.04);
 }
 
 html,
@@ -46,10 +52,12 @@ body {
   height: 100%;
   background: var(--color-bg);
   color: var(--color-fg);
+  margin: 0;
 }
 
 .bg-app {
   position: relative;
+  min-height: 100vh;
   background-color: var(--app-bg-color);
   background-image:
     radial-gradient(800px 500px at 10% 0%, color-mix(in srgb, var(--app-bg-gradient-accent) 35%, transparent), transparent 60%),
@@ -80,6 +88,11 @@ body {
   backdrop-filter: blur(var(--app-bg-blur));
 }
 
+.bg-app > * {
+  position: relative;
+  z-index: 1;
+}
+
 .text-app {
   color: var(--color-fg);
 }
@@ -94,6 +107,14 @@ button {
 
 .card {
   box-shadow: var(--shadow-soft);
+}
+
+.surface-soft {
+  background: var(--color-surface-soft);
+}
+
+.input-surface {
+  background: var(--color-input-bg);
 }
 
 @keyframes fade-in {

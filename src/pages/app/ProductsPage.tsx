@@ -139,7 +139,7 @@ function FilterSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] ${props.className || ''}`}
+      className={`input-surface rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] ${props.className || ''}`}
     />
   )
 }
@@ -148,7 +148,7 @@ function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] ${props.className || ''}`}
+      className={`input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] ${props.className || ''}`}
     />
   )
 }
@@ -157,7 +157,7 @@ function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
       {...props}
-      className={`w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] ${props.className || ''}`}
+      className={`input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] ${props.className || ''}`}
     />
   )
 }
@@ -204,7 +204,7 @@ function ProductFormFields(props: {
     <div className="space-y-3">
       {showSku ? (
         <TextInput
-          placeholder="SKU"
+          placeholder="รหัสสินค้า"
           value={draft.sku}
           onChange={(e) => patch({ sku: e.target.value })}
         />
@@ -287,7 +287,7 @@ function ProductFormFields(props: {
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <TextInput
-          placeholder="ซัพพลายเออร์"
+          placeholder="ชื่อร้านค้าหรือซัพพลายเออร์"
           value={draft.supplier}
           onChange={(e) => patch({ supplier: e.target.value })}
         />
@@ -306,7 +306,7 @@ function ProductFormFields(props: {
       <input
         type="file"
         accept="image/*"
-        className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm text-white/80 file:mr-3 file:rounded file:border file:border-[color:var(--color-border)] file:bg-black/40 file:px-3 file:py-1.5"
+        className="input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 file:mr-3 file:rounded file:border file:border-[color:var(--color-border)] file:bg-[color:var(--color-input-bg)] file:px-3 file:py-1.5"
         onChange={(e) => patch({ imageFile: e.target.files?.[0] || null })}
       />
     </div>
@@ -475,7 +475,7 @@ export function ProductsPage() {
     const sku = createDraft.sku.trim()
     const name_th = createDraft.name_th.trim()
     if (!sku || !name_th) {
-      window.alert('กรุณากรอก SKU และชื่อสินค้า')
+      window.alert('กรุณากรอกรหัสสินค้าและชื่อสินค้า')
       return
     }
     setSavingCreate(true)
@@ -516,7 +516,7 @@ export function ProductsPage() {
     }
     const invalid = bulkRows.find((row) => !row.sku.trim() || !row.name_th.trim())
     if (invalid) {
-      window.alert('กรอก SKU และชื่อสินค้าให้ครบทุกแถว')
+      window.alert('กรอกรหัสสินค้าและชื่อสินค้าให้ครบทุกแถว')
       return
     }
     setBulkSaving(true)
@@ -651,7 +651,7 @@ export function ProductsPage() {
         <TextInput
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="ค้นหา SKU / ชื่อ / บาร์โค้ด / ซัพพลายเออร์ / ประเภท"
+          placeholder="ค้นหารหัสสินค้า / ชื่อ / บาร์โค้ด / ร้านค้า / ประเภท"
         />
         <TextInput
           value={selectedType}
@@ -922,7 +922,7 @@ export function ProductsPage() {
             <thead className="text-xs text-white/60">
               <tr className="border-b border-[color:var(--color-border)]">
                 {canManage ? <th className="px-4 py-2">เลือก</th> : null}
-                <th className="px-4 py-2">SKU</th>
+                <th className="px-4 py-2">รหัสสินค้า</th>
                 <th className="px-4 py-2">ชื่อสินค้า</th>
                 <th className="px-4 py-2">หมวดหมู่</th>
                 <th className="px-4 py-2">ประเภท</th>

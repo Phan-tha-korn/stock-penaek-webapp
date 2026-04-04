@@ -133,7 +133,7 @@ export function TransactionsPage() {
             className="w-full max-w-sm flex-1 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
             value={sku}
             onChange={(e) => setSku(e.target.value)}
-            placeholder="ค้นหาด้วย SKU"
+            placeholder="ค้นหาด้วยรหัสสินค้า"
           />
           <select
             className="w-full max-w-xs rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)] sm:w-auto"
@@ -167,7 +167,7 @@ export function TransactionsPage() {
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={formSku}
                 onChange={(e) => setFormSku(e.target.value)}
-                placeholder="SKU / ชื่อสินค้า / บาร์โค้ด (พิมพ์บางส่วนได้)"
+                placeholder="รหัสสินค้า / ชื่อสินค้า / บาร์โค้ด (พิมพ์บางส่วนได้)"
               />
               {skuSuggestions.length > 0 ? (
                 <div className="absolute z-20 mt-1 w-full overflow-hidden rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)] shadow-xl">
@@ -230,7 +230,7 @@ export function TransactionsPage() {
                   setItems(res.items)
                   setTotal(res.total)
                 } catch {
-                  alert('บันทึกรายการไม่สำเร็จ (ตรวจสอบ SKU/จำนวน)')
+                  alert('บันทึกรายการไม่สำเร็จ (ตรวจสอบรหัสสินค้าและจำนวน)')
                 }
               }}
             >
@@ -253,7 +253,7 @@ export function TransactionsPage() {
               <tr className="border-b border-[color:var(--color-border)]">
                 <th className="px-4 py-2">เวลา</th>
                 <th className="px-4 py-2">ประเภท</th>
-                <th className="px-4 py-2">SKU</th>
+                <th className="px-4 py-2">รหัสสินค้า</th>
                 <th className="px-4 py-2">สินค้า</th>
                 <th className="px-4 py-2">จำนวน</th>
                 <th className="px-4 py-2">หมายเหตุ</th>

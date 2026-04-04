@@ -223,9 +223,9 @@ export function DevPage() {
       try {
         const res = await createDevBackup(password)
         await downloadProtectedFile(res.download_url, res.file_name)
-        setSheetMsg(`สร้าง Backup Now และดาวน์โหลดแล้ว: ${res.file_name}`)
+        setSheetMsg(`สร้างไฟล์สำรองและดาวน์โหลดแล้ว: ${res.file_name}`)
       } catch (e: any) {
-        setSheetMsg(e?.response?.data?.detail || e?.message || 'สร้าง backup ไม่สำเร็จ')
+        setSheetMsg(e?.response?.data?.detail || e?.message || 'สร้างไฟล์สำรองไม่สำเร็จ')
       } finally {
         setBackupBusy(false)
       }
@@ -233,19 +233,19 @@ export function DevPage() {
     }
     if (secureAction === 'restore') {
       if (!restoreFile) {
-        setSheetMsg('กรุณาเลือกไฟล์ backup ก่อน')
+        setSheetMsg('กรุณาเลือกไฟล์สำรองก่อน')
         return
       }
       setSheetMsg(null)
       setRestoreBusy(true)
       try {
         const res = await restoreDevBackup(password, restoreFile)
-        setSheetMsg(`กู้คืน backup แล้ว: users ${res.restored.users || 0}, products ${res.restored.products || 0}, transactions ${res.restored.transactions || 0}`)
+        setSheetMsg(`กู้คืนไฟล์สำรองแล้ว: ผู้ใช้ ${res.restored.users || 0}, สินค้า ${res.restored.products || 0}, ธุรกรรม ${res.restored.transactions || 0}`)
         setRestoreFile(null)
         await reload()
         setSheetsCfg(await getDevSheetsConfig())
       } catch (e: any) {
-        setSheetMsg(e?.response?.data?.detail || e?.message || 'กู้คืน backup ไม่สำเร็จ')
+        setSheetMsg(e?.response?.data?.detail || e?.message || 'กู้คืนไฟล์สำรองไม่สำเร็จ')
       } finally {
         setRestoreBusy(false)
       }
@@ -256,7 +256,7 @@ export function DevPage() {
     try {
       const res = await resetStock(password)
       await downloadProtectedFile(res.backup_download_url, res.backup_file_name)
-      setSheetMsg(`ล้างสต็อกแล้วและดาวน์โหลด backup ให้แล้ว: สินค้า ${res.deleted_products}, ธุรกรรม ${res.deleted_transactions}`)
+      setSheetMsg(`ล้างสต็อกแล้วและดาวน์โหลดไฟล์สำรองให้แล้ว: สินค้า ${res.deleted_products}, ธุรกรรม ${res.deleted_transactions}`)
       await reload()
     } catch (e: any) {
       setSheetMsg(e?.response?.data?.detail || e?.message || 'ล้างสต็อกไม่สำเร็จ')
@@ -326,8 +326,8 @@ export function DevPage() {
   return (
     <div className="space-y-4">
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
-        <div className="text-sm font-semibold">Dev tools</div>
-        <div className="mt-1 text-xs text-white/60">Health / Config / Activity / Google Sheets</div>
+        <div className="text-sm font-semibold">เครื่องมือสำหรับทีมพัฒนา</div>
+        <div className="mt-1 text-xs text-white/60">สถานะระบบ / การตั้งค่า / ความเคลื่อนไหว / Google Sheets</div>
       </div>
 
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
@@ -335,13 +335,13 @@ export function DevPage() {
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-md">
             <div className="mx-4 max-w-lg rounded-2xl border border-white/10 bg-[color:var(--color-card)]/90 p-6 text-center shadow-2xl">
               <div className="text-lg font-semibold">ยังไม่ได้ตั้งค่า Google Sheets</div>
-              <div className="mt-2 text-sm text-white/65">ไปที่หน้า Config เพื่อกำหนด Gmail, path credentials และให้ระบบสร้าง/เชื่อม Google Sheets อัตโนมัติก่อนใช้งานโซนนี้</div>
+              <div className="mt-2 text-sm text-white/65">ไปที่หน้าตั้งค่าเพื่อกำหนด Gmail, path credentials และให้ระบบสร้างหรือเชื่อม Google Sheets ก่อนใช้งานโซนนี้</div>
               <button
                 className="mt-4 rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
                 type="button"
                 onClick={() => navigate('/settings#google-setup')}
               >
-                ไปตั้งค่า Google ใน Config
+                ไปตั้งค่า Google
               </button>
               <button
                 className="rounded border border-amber-400/30 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/10"
@@ -350,25 +350,25 @@ export function DevPage() {
                 onClick={async () => {
                   setSheetMsg(null)
                   setSheetAction('force-sync')
-                  setSheetMsg('กำลัง Force Full Sync ทั้ง workbook...')
+                  setSheetMsg('กำลังซิงก์ข้อมูลทั้งสมุดงานใหม่ทั้งหมด...')
                   try {
                     const res = await forceFullSyncToSheets()
-                    setSheetMsg(res.ok ? 'Force Full Sync เสร็จแล้ว' : `Force Full Sync ไม่สำเร็จ: ${res.error || ''}`)
+                    setSheetMsg(res.ok ? 'ซิงก์ข้อมูลทั้งสมุดงานเสร็จแล้ว' : `ซิงก์ข้อมูลทั้งสมุดงานไม่สำเร็จ: ${res.error || ''}`)
                     setSheetsCfg(await getDevSheetsConfig())
                   } finally {
                     setSheetAction(null)
                   }
                 }}
               >
-                {sheetAction === 'force-sync' ? 'กำลัง Force Sync...' : 'Force Full Sync'}
+                {sheetAction === 'force-sync' ? 'กำลังซิงก์ทั้งหมด...' : 'ซิงก์ทั้งสมุดงาน'}
               </button>
             </div>
           </div>
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Garbage File Management</div>
-            <div className="text-xs text-white/60">สแกน temp/cache/log/build เก่า/backup หมดอายุ/duplicate node_modules</div>
+            <div className="text-sm font-semibold">จัดการไฟล์ขยะ</div>
+            <div className="text-xs text-white/60">สแกนไฟล์ชั่วคราว แคช ล็อก ไฟล์ build เก่า ไฟล์สำรองหมดอายุ และโฟลเดอร์ที่ซ้ำซ้อน</div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -428,13 +428,13 @@ export function DevPage() {
           <span className="mx-2 text-white/25">•</span>
           เลือกไว้ <span className="font-semibold text-white">{selectedPaths.length}</span> รายการ
           <span className="mx-2 text-white/25">•</span>
-          Whitelist <span className="font-semibold text-white">{whitelist.length}</span> รายการ
+          รายการยกเว้น <span className="font-semibold text-white">{whitelist.length}</span> รายการ
         </div>
 
         {garbageExpanded ? (
           <>
             <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-              <div className="mb-2 text-xs text-white/60">Whitelist (รองรับ wildcard เช่น dist/**, **/*.log)</div>
+              <div className="mb-2 text-xs text-white/60">รายการยกเว้นไฟล์ (รองรับ wildcard เช่น dist/**, **/*.log)</div>
               <div className="flex flex-wrap gap-2">
                 <input
                   className="min-w-[240px] flex-1 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
@@ -547,7 +547,7 @@ export function DevPage() {
           </>
         ) : (
           <div className="mt-3 rounded border border-dashed border-[color:var(--color-border)] bg-white/5 px-4 py-5 text-sm text-white/55">
-            ซ่อนรายละเอียดรายการไว้แล้ว กด “ดูรายการ” เพื่อเปิดตารางไฟล์ขยะและ whitelist
+            ซ่อนรายละเอียดรายการไว้แล้ว กด “ดูรายการ” เพื่อเปิดตารางไฟล์ขยะและรายการยกเว้น
           </div>
         )}
       </div>
@@ -555,7 +555,7 @@ export function DevPage() {
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold">Inventory Categories + Rules</div>
+            <div className="text-sm font-semibold">หมวดหมู่สินค้าและกฎคำนวณ</div>
             <div className="text-xs text-white/60">สร้าง/แก้ชื่อ/ลบ/กู้คืนหมวดหมู่สินค้า และตั้งสูตร Min/Max สำหรับหน้าเพิ่มสินค้า</div>
           </div>
           <button
@@ -771,7 +771,7 @@ export function DevPage() {
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Notification Percentage</div>
+            <div className="text-sm font-semibold">ตั้งค่าการแจ้งเตือนตามเปอร์เซ็นต์</div>
             <div className="text-xs text-white/60">
               ตั้งค่าเปอร์เซ็นต์หลายระดับสำหรับแจ้งเตือนเมื่อสต็อก “ขึ้นถึง/ลงถึง” เกณฑ์ที่กำหนด (อิงจาก stock/max_stock)
             </div>
@@ -986,7 +986,7 @@ export function DevPage() {
         </div>
 
         <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-          <div className="text-xs text-white/60">Role ที่จะรับการแจ้งเตือน</div>
+          <div className="text-xs text-white/60">บทบาทที่จะรับการแจ้งเตือน</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {(['OWNER', 'ADMIN', 'STOCK', 'ACCOUNTANT', 'DEV'] as const).map((r) => (
               <button
@@ -1006,18 +1006,18 @@ export function DevPage() {
             ))}
           </div>
           <div className="mt-2 text-xs text-white/50">
-            หมายเหตุ: การแจ้งเตือนจะส่งผ่าน LINE Notify ตาม token ของ role ที่ตั้งไว้ใน config.json
+            หมายเหตุ: การแจ้งเตือนจะส่งผ่าน LINE Notify ตามโทเคนของบทบาทที่ตั้งไว้ในไฟล์ตั้งค่าระบบ
           </div>
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-            <div className="text-xs font-semibold text-white/80">รายละเอียดที่ให้แจ้งใน LINE</div>
-            <div className="mt-1 text-xs text-white/50">เลือกได้หลายหัวข้อ และ token สามารถเป็น token ของ LINE ส่วนตัวหรือ group ที่สร้างไว้ได้</div>
+            <div className="text-xs font-semibold text-white/80">รายละเอียดที่ให้แจ้งในไลน์</div>
+            <div className="mt-1 text-xs text-white/50">เลือกได้หลายหัวข้อ และโทเคนสามารถเป็นของไลน์ส่วนตัวหรือไลน์กลุ่มที่สร้างไว้ได้</div>
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
               {[
                 { label: 'ชื่อสินค้า', checked: notifIncludeName, setter: setNotifIncludeName },
-                { label: 'SKU', checked: notifIncludeSku, setter: setNotifIncludeSku },
+                { label: 'รหัสสินค้า', checked: notifIncludeSku, setter: setNotifIncludeSku },
                 { label: 'สถานะ', checked: notifIncludeStatus, setter: setNotifIncludeStatus },
                 { label: 'จำนวนคงเหลือ', checked: notifIncludeCurrentQty, setter: setNotifIncludeCurrentQty },
                 { label: 'จำนวนที่ควรมี', checked: notifIncludeTargetQty, setter: setNotifIncludeTargetQty },
@@ -1035,14 +1035,14 @@ export function DevPage() {
           </div>
 
           <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-            <div className="text-xs font-semibold text-white/80">จัดการ LINE Token แยกตาม Role</div>
-            <div className="mt-1 text-xs text-white/50">กดเลือก role แล้วระบบจะให้กรอก token แบบ popup ก่อนบันทึก</div>
+            <div className="text-xs font-semibold text-white/80">จัดการโทเคนไลน์แยกตามบทบาท</div>
+            <div className="mt-1 text-xs text-white/50">กดเลือกบทบาท แล้วระบบจะให้กรอกโทเคนผ่านหน้าต่างยืนยันก่อนบันทึก</div>
             <div className="mt-3 space-y-2">
               {(['OWNER', 'ADMIN', 'STOCK', 'ACCOUNTANT', 'DEV'] as const).map((roleName) => (
                 <div key={roleName} className="flex items-center justify-between gap-2 rounded border border-[color:var(--color-border)] px-3 py-2">
                   <div>
                     <div className="text-sm font-semibold">{roleName}</div>
-                    <div className="text-xs text-white/50">{notifTokenStatus[roleName] ? `ตั้งค่าแล้ว: ${notifTokenStatus[roleName]}` : 'ยังไม่มี token'}</div>
+                    <div className="text-xs text-white/50">{notifTokenStatus[roleName] ? `ตั้งค่าแล้ว: ${notifTokenStatus[roleName]}` : 'ยังไม่มีโทเคน'}</div>
                   </div>
                   <button
                     className="rounded border border-[color:var(--color-border)] px-3 py-2 text-xs text-white/80 hover:bg-white/10"
@@ -1052,7 +1052,7 @@ export function DevPage() {
                       setNotifTokenInput('')
                     }}
                   >
-                    ตั้งค่า Token
+                    ตั้งค่าโทเคน
                   </button>
                 </div>
               ))}
@@ -1065,14 +1065,14 @@ export function DevPage() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
           <div className="flex min-h-full items-center justify-center">
             <div className="w-full max-w-md rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)] shadow-2xl">
-              <div className="border-b border-[color:var(--color-border)] px-5 py-4 text-sm font-semibold">ตั้งค่า LINE Token สำหรับ {notifTokenRole}</div>
+              <div className="border-b border-[color:var(--color-border)] px-5 py-4 text-sm font-semibold">ตั้งค่าโทเคนไลน์สำหรับ {notifTokenRole}</div>
               <div className="space-y-3 px-5 py-4">
-                <div className="text-sm text-white/70">รองรับ token ที่ใช้แจ้งเข้า LINE ส่วนตัวหรือ LINE Group ที่สร้าง token ไว้แล้ว</div>
+                <div className="text-sm text-white/70">รองรับโทเคนที่ใช้แจ้งเข้าไลน์ส่วนตัวหรือไลน์กลุ่มที่สร้างโทเคนไว้แล้ว</div>
                 <input
                   className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                   value={notifTokenInput}
                   onChange={(e) => setNotifTokenInput(e.target.value)}
-                  placeholder="วาง LINE token ที่นี่"
+                  placeholder="วางโทเคนไลน์ที่นี่"
                 />
               </div>
               <div className="flex justify-end gap-2 border-t border-[color:var(--color-border)] px-5 py-4">
@@ -1094,10 +1094,10 @@ export function DevPage() {
                     setNotifTokenStatus((prev) => ({ ...prev, [notifTokenRole]: notifTokenInput.trim() ? `${notifTokenInput.trim().slice(0, 4)}...${notifTokenInput.trim().slice(-4)}` : '' }))
                     setNotifTokenRole(null)
                     setNotifTokenInput('')
-                    setNotifMsg(`เตรียม token สำหรับ ${notifTokenRole} แล้ว กดบันทึกเพื่อใช้งานจริง`)
+                    setNotifMsg(`เตรียมโทเคนสำหรับ ${notifTokenRole} แล้ว กดบันทึกเพื่อใช้งานจริง`)
                   }}
                 >
-                  ใช้ Token นี้
+                  ใช้โทเคนนี้
                 </button>
               </div>
             </div>
@@ -1109,11 +1109,11 @@ export function DevPage() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 backdrop-blur-md">
           <div className="flex min-h-full items-center justify-center">
             <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[color:var(--color-card)]/95 p-6 text-center shadow-2xl">
-              <div className="text-xl font-semibold">ยังไม่ได้ sync Google Sheets</div>
+              <div className="text-xl font-semibold">ยังไม่ได้ซิงก์ Google Sheets</div>
               <div className="mt-2 text-sm text-white/65">
                 {sheetGuardMode === 'missing'
-                  ? 'โซนนี้ใช้ข้อมูลที่เก็บกับ Google Sheets กรุณาเชื่อม Google หรือ Sync ให้พร้อมก่อนใช้งาน'
-                  : 'กรุณา Sync Google Sheets ก่อน เพื่อให้ข้อมูลล่าสุดพร้อมสำหรับการเปิดดูหรือดาวน์โหลด'}
+                  ? 'โซนนี้ใช้ข้อมูลที่เก็บกับ Google Sheets กรุณาเชื่อม Google หรือซิงก์ให้พร้อมก่อนใช้งาน'
+                  : 'กรุณาซิงก์ Google Sheets ก่อน เพื่อให้ข้อมูลล่าสุดพร้อมสำหรับการเปิดดูหรือดาวน์โหลด'}
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <button
@@ -1131,18 +1131,18 @@ export function DevPage() {
                   type="button"
                   onClick={async () => {
                     setSheetGuardOpen(false)
-                    setSheetMsg('กำลัง Sync ไปชีต...')
+                    setSheetMsg('กำลังซิงก์ไปยังชีต...')
                     setSheetAction('sync')
                     try {
                       const res = await syncToSheets()
-                      setSheetMsg(res.ok ? 'Sync ไปชีตเสร็จแล้ว' : `Sync ไม่สำเร็จ: ${res.error || ''}`)
+                      setSheetMsg(res.ok ? 'ซิงก์ไปยังชีตเสร็จแล้ว' : `ซิงก์ไม่สำเร็จ: ${res.error || ''}`)
                       setSheetsCfg(await getDevSheetsConfig())
                     } finally {
                       setSheetAction(null)
                     }
                   }}
                 >
-                  ไป Sync Google Sheets
+                  ไปซิงก์ Google Sheets
                 </button>
               </div>
             </div>
@@ -1155,15 +1155,15 @@ export function DevPage() {
           <div className="flex min-h-full items-center justify-center">
             <div className="w-full max-w-md rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)] shadow-2xl">
               <div className="border-b border-[color:var(--color-border)] px-5 py-4 text-sm font-semibold">
-                {secureAction === 'backup' ? 'ยืนยันสร้าง Backup Now' : secureAction === 'restore' ? 'ยืนยันกู้คืน Backup' : 'ยืนยันล้าง Stock'}
+                {secureAction === 'backup' ? 'ยืนยันสร้างไฟล์สำรอง' : secureAction === 'restore' ? 'ยืนยันกู้คืนไฟล์สำรอง' : 'ยืนยันล้างสต็อก'}
               </div>
               <div className="space-y-3 px-5 py-4">
                 <div className="text-sm text-white/70">
                   {secureAction === 'backup'
-                    ? 'กรอกรหัสเพื่อสร้างไฟล์ backup แบบ realtime แล้วดาวน์โหลดทันที'
+                    ? 'กรอกรหัสเพื่อสร้างไฟล์สำรองแบบทันที แล้วดาวน์โหลดได้เลย'
                     : secureAction === 'restore'
                       ? `กรอกรหัสเพื่อกู้คืนจากไฟล์ ${restoreFile?.name || '-'} และแทนที่ข้อมูลทั้งหมดในระบบ`
-                      : 'กรอกรหัสเพื่อสำรองข้อมูลก่อน แล้วล้างสินค้า/ธุรกรรม/alert ทั้งหมดโดยคงผู้ใช้ไว้'}
+                      : 'กรอกรหัสเพื่อสำรองข้อมูลก่อน แล้วล้างสินค้า ธุรกรรม และสถานะแจ้งเตือนทั้งหมดโดยคงผู้ใช้ไว้'}
                 </div>
                 <input
                   type="password"
@@ -1216,7 +1216,7 @@ export function DevPage() {
                   )}
                 </div>
                 <div className="rounded border border-[color:var(--color-border)] bg-black/20 p-3 text-xs text-white/60">
-                  แนะนำโหมด Backup ก่อน เพื่อย้ายไฟล์ไปโฟลเดอร์สำรองและสามารถนำกลับได้
+                  แนะนำโหมดสำรองข้อมูลก่อนลบ เพื่อย้ายไฟล์ไปโฟลเดอร์สำรองและสามารถนำกลับได้
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -1224,7 +1224,7 @@ export function DevPage() {
                     type="button"
                     onClick={() => setDeleteMode('backup')}
                   >
-                    Backup ก่อนลบ
+                    สำรองก่อนลบ
                   </button>
                   <button
                     className={`rounded px-3 py-2 text-sm ${deleteMode === 'permanent' ? 'bg-red-500/25 text-red-100' : 'border border-[color:var(--color-border)] text-white/80'}`}
@@ -1272,7 +1272,7 @@ export function DevPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
-          <div className="text-sm font-semibold">Health</div>
+          <div className="text-sm font-semibold">สถานะระบบ</div>
           <div className="mt-2 text-xs text-white/60">{busy ? 'กำลังโหลด...' : JSON.stringify(health)}</div>
           <button
             className="mt-3 rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-white/80 hover:bg-white/10"
@@ -1284,7 +1284,7 @@ export function DevPage() {
         </div>
 
         <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
-          <div className="text-sm font-semibold">Config (public)</div>
+          <div className="text-sm font-semibold">ค่าตั้งค่าที่เปิดให้ดูได้</div>
           <div className="mt-2 text-xs text-white/60 break-words">{busy ? 'กำลังโหลด...' : JSON.stringify(config)}</div>
         </div>
       </div>
@@ -1292,8 +1292,8 @@ export function DevPage() {
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Sheets Center + Backup Control</div>
-            <div className="text-xs text-white/60">ใช้งานหลักผ่านเว็บ แต่จัดเก็บ/เรียงข้อมูลสำคัญไว้ใน Google Sheets และ Backup แบบไฟล์ ZIP</div>
+            <div className="text-sm font-semibold">ศูนย์จัดการ Google Sheets และไฟล์สำรอง</div>
+            <div className="text-xs text-white/60">ใช้งานหลักผ่านเว็บ แต่จัดเก็บและเรียงข้อมูลสำคัญไว้ใน Google Sheets พร้อมสำรองเป็นไฟล์บีบอัด ZIP</div>
           </div>
           {sheetsCfg?.usable ? (
             <div className="flex flex-wrap gap-2">
@@ -1304,17 +1304,17 @@ export function DevPage() {
                 onClick={async () => {
                   setSheetMsg(null)
                   setSheetAction('sync')
-                  setSheetMsg('กำลัง Sync ไปชีต...')
+                  setSheetMsg('กำลังซิงก์ข้อมูลไปยังชีต...')
                   try {
                     const res = await syncToSheets()
-                    setSheetMsg(res.ok ? 'Sync ไปชีตเสร็จแล้ว' : `Sync ไม่สำเร็จ: ${res.error || ''}`)
+                    setSheetMsg(res.ok ? 'ซิงก์ข้อมูลไปยังชีตเสร็จแล้ว' : `ซิงก์ข้อมูลไม่สำเร็จ: ${res.error || ''}`)
                     setSheetsCfg(await getDevSheetsConfig())
                   } finally {
                     setSheetAction(null)
                   }
                 }}
               >
-                {sheetAction === 'sync' ? 'กำลัง Sync...' : 'Sync ไปชีตตอนนี้'}
+                {sheetAction === 'sync' ? 'กำลังซิงก์...' : 'ซิงก์ไปยังชีตตอนนี้'}
               </button>
               <button
                 className="rounded border border-amber-400/30 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/10 disabled:opacity-60"
@@ -1323,17 +1323,17 @@ export function DevPage() {
                 onClick={async () => {
                   setSheetMsg(null)
                   setSheetAction('force-sync')
-                  setSheetMsg('กำลัง Force Full Sync ทั้ง workbook...')
+                  setSheetMsg('กำลังซิงก์ข้อมูลทั้งสมุดงานใหม่ทั้งหมด...')
                   try {
                     const res = await forceFullSyncToSheets()
-                    setSheetMsg(res.ok ? 'Force Full Sync เสร็จแล้ว' : `Force Full Sync ไม่สำเร็จ: ${res.error || ''}`)
+                    setSheetMsg(res.ok ? 'ซิงก์ข้อมูลทั้งสมุดงานเสร็จแล้ว' : `ซิงก์ข้อมูลทั้งสมุดงานไม่สำเร็จ: ${res.error || ''}`)
                     setSheetsCfg(await getDevSheetsConfig())
                   } finally {
                     setSheetAction(null)
                   }
                 }}
               >
-                {sheetAction === 'force-sync' ? 'กำลัง Force Sync...' : 'Force Full Sync'}
+                {sheetAction === 'force-sync' ? 'กำลังซิงก์ทั้งหมด...' : 'ซิงก์ทั้งสมุดงาน'}
               </button>
               <button
                 className="rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
@@ -1342,7 +1342,7 @@ export function DevPage() {
                 onClick={async () => {
                   setSheetMsg(null)
                   setSheetAction('import')
-                  setSheetMsg('กำลัง Import Stock → DB...')
+                  setSheetMsg('กำลังนำเข้าสต็อกจากชีตเข้าสู่ฐานข้อมูล...')
                   try {
                     const res = await importFromSheets({ overwrite_stock_qty: false, overwrite_prices: false })
                     setSheetMsg(res.ok ? `นำเข้าเสร็จ: สร้าง ${res.created || 0}, อัปเดต ${res.updated || 0}, ข้าม ${res.skipped || 0}` : `นำเข้าไม่สำเร็จ: ${res.error || ''}`)
@@ -1352,7 +1352,7 @@ export function DevPage() {
                   }
                 }}
               >
-                {sheetAction === 'import' ? 'กำลัง Import...' : 'Import Stock → DB'}
+                {sheetAction === 'import' ? 'กำลังนำเข้า...' : 'นำเข้าสินค้าจากชีต'}
               </button>
             </div>
           ) : sheetsLoading || googleSheetsPending ? (
@@ -1369,7 +1369,7 @@ export function DevPage() {
               type="button"
               onClick={() => navigate('/settings#google-setup')}
             >
-              ไปเชื่อม Google ใน Config
+              ไปเชื่อม Google
             </button>
           )}
         </div>
@@ -1380,11 +1380,11 @@ export function DevPage() {
             <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
               <div className="text-xs text-white/60">Google Sheets หลักของระบบ</div>
               <div className="mt-2 text-xs text-white/50 break-words">
-                sheet_id: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | key: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
+                รหัสชีต: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | ไฟล์กุญแจ: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
               </div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
-                  <div className="text-sm font-semibold text-green-100">โซน Stock</div>
+                  <div className="text-sm font-semibold text-green-100">โซนสต็อก</div>
                   <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.stock_tab_url, 'sync')}>
@@ -1414,11 +1414,11 @@ export function DevPage() {
                   </div>
                 </div>
                 <div className="rounded border border-red-500/30 bg-red-500/10 p-3">
-                  <div className="text-sm font-semibold text-red-100">โซน Log</div>
-                  <div className="mt-1 text-xs text-red-100/80">เก็บการแก้ไขสำคัญ Add/Edit/Sell/Audit แยกหัวข้อให้อ่านง่าย</div>
+                  <div className="text-sm font-semibold text-red-100">โซนบันทึกเหตุการณ์</div>
+                  <div className="mt-1 text-xs text-red-100/80">เก็บการแก้ไขสำคัญ เช่น เพิ่ม แก้ไข ขาย และบันทึกตรวจสอบ แยกหัวข้อให้อ่านง่าย</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.logs_tab_url, 'sync')}>
-                      เปิดแท็บ Log
+                      เปิดแท็บบันทึกเหตุการณ์
                     </button>
                     <button className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.download_xlsx_url, 'sync')}>
                       โหลดทั้งชีต .xlsx
@@ -1430,7 +1430,7 @@ export function DevPage() {
                 </div>
                 <div className="rounded border border-sky-500/30 bg-sky-500/10 p-3">
                   <div className="text-sm font-semibold text-sky-100">โซนบัญชีผู้ใช้</div>
-                  <div className="mt-1 text-xs text-sky-100/80">รวมข้อมูลบัญชีของผู้ใช้ในระบบเพื่อใช้ดูสรุปและ export เป็นไฟล์</div>
+                  <div className="mt-1 text-xs text-sky-100/80">รวมข้อมูลบัญชีของผู้ใช้ในระบบเพื่อใช้ดูสรุปและส่งออกเป็นไฟล์</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="rounded border border-sky-400/30 px-3 py-2 text-xs text-sky-50 hover:bg-sky-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.users_tab_url, 'sync')}>
                       เปิดแท็บผู้ใช้
@@ -1447,7 +1447,7 @@ export function DevPage() {
             </div>
 
             <div className="mt-3 rounded border border-[color:var(--color-border)] bg-black/20 p-3">
-              <div className="text-xs text-white/60">สร้าง Google Sheet ใหม่และตั้งค่าให้ระบบ</div>
+              <div className="text-xs text-white/60">สร้างชีต Google ใหม่และตั้งค่าให้ระบบ</div>
               <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-5">
                 <input
                   className="md:col-span-2 rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
@@ -1475,12 +1475,12 @@ export function DevPage() {
                         .filter(Boolean)
                       const res = await createDevSheet({ title: sheetCreateTitle.trim(), share_emails: emails, set_as_default: true })
                       setLastCreatedSheet(res)
-                      setSheetMsg('กำลัง Sync ไปชีตใหม่...')
+                      setSheetMsg('กำลังซิงก์ไปยังชีตใหม่...')
                       try {
                         const s = await syncToSheets()
-                        setSheetMsg(s.ok ? `สร้างชีตใหม่และ Sync แล้ว: ${res.sheet_id}` : `สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ: ${s.error || ''}`)
+                        setSheetMsg(s.ok ? `สร้างชีตใหม่และซิงก์แล้ว: ${res.sheet_id}` : `สร้างชีตใหม่แล้ว แต่ซิงก์ไม่สำเร็จ: ${s.error || ''}`)
                       } catch {
-                        setSheetMsg(`สร้างชีตใหม่แล้ว แต่ Sync ไม่สำเร็จ`)
+                        setSheetMsg(`สร้างชีตใหม่แล้ว แต่ซิงก์ไม่สำเร็จ`)
                       }
                       setSheetsCfg(await getDevSheetsConfig())
                     } catch (e: any) {
@@ -1490,7 +1490,7 @@ export function DevPage() {
                     }
                   }}
                 >
-                  {sheetCreateBusy ? 'กำลังสร้าง/Sync...' : 'สร้างชีตใหม่ + Sync'}
+                  {sheetCreateBusy ? 'กำลังสร้างและซิงก์...' : 'สร้างชีตใหม่และซิงก์'}
                 </button>
               </div>
               {lastCreatedSheet ? (
@@ -1527,14 +1527,14 @@ export function DevPage() {
             <div className="absolute inset-0 bg-black/55 backdrop-blur-md" />
             <div className="relative text-center">
               <div className="text-base font-semibold">ปิดโซน Google Sheets ชั่วคราว</div>
-              <div className="mt-2 text-sm text-white/65">ยังไม่สามารถเชื่อม/Sync Google Sheets ได้ ระบบจึงซ่อนโซนนี้ไว้ก่อน</div>
+              <div className="mt-2 text-sm text-white/65">ยังไม่สามารถเชื่อมหรือซิงก์ Google Sheets ได้ ระบบจึงซ่อนโซนนี้ไว้ก่อน</div>
               <div className="mt-1 text-xs text-white/45">สถานะ: {sheetsCfg?.error || 'not_configured'}</div>
               <button
                 className="mt-4 rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
                 type="button"
                 onClick={() => navigate('/settings#google-setup')}
               >
-                ไปเชื่อม Google ใน Config
+                ไปเชื่อม Google ในหน้าตั้งค่า
               </button>
             </div>
           </div>
@@ -1542,7 +1542,7 @@ export function DevPage() {
 
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3">
-            <div className="text-sm font-semibold text-blue-100">Backup Now</div>
+            <div className="text-sm font-semibold text-blue-100">สำรองข้อมูลทันที</div>
             <div className="mt-1 text-xs text-blue-100/80">สร้างไฟล์ ZIP ของข้อมูลทั้งระบบ ณ ตอนนั้น แล้วดาวน์โหลดทันที</div>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
@@ -1554,14 +1554,14 @@ export function DevPage() {
                   setSecureAction('backup')
                 }}
               >
-                {backupBusy ? 'กำลังสร้าง...' : 'โหลด Backup Now'}
+                {backupBusy ? 'กำลังสร้าง...' : 'ดาวน์โหลดไฟล์สำรอง'}
               </button>
             </div>
           </div>
 
           <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3">
-            <div className="text-sm font-semibold text-amber-100">Restore Backup</div>
-            <div className="mt-1 text-xs text-amber-100/80">เลือกไฟล์ backup ZIP แล้วแทนที่ข้อมูลทั้งหมดในระบบให้ตรงกับ backup</div>
+            <div className="text-sm font-semibold text-amber-100">กู้คืนจากไฟล์สำรอง</div>
+            <div className="mt-1 text-xs text-amber-100/80">เลือกไฟล์สำรอง ZIP แล้วแทนที่ข้อมูลทั้งหมดในระบบให้ตรงกับไฟล์สำรอง</div>
             <div className="mt-3 flex flex-wrap gap-2">
               <input
                 type="file"
@@ -1576,7 +1576,7 @@ export function DevPage() {
                     const preview = await previewDevBackup(file)
                     setRestorePreview(preview)
                   } catch (error: any) {
-                    setSheetMsg(error?.response?.data?.detail || error?.message || 'อ่าน preview backup ไม่สำเร็จ')
+                    setSheetMsg(error?.response?.data?.detail || error?.message || 'อ่านตัวอย่างไฟล์สำรองไม่สำเร็จ')
                   }
                 }}
               />
@@ -1589,22 +1589,22 @@ export function DevPage() {
                   setSecureAction('restore')
                 }}
               >
-                {restoreBusy ? 'กำลังกู้คืน...' : 'กู้คืนจาก Backup'}
+                {restoreBusy ? 'กำลังกู้คืน...' : 'กู้คืนจากไฟล์สำรอง'}
               </button>
             </div>
             {restorePreview ? (
               <div className="mt-3 rounded border border-amber-400/30 bg-black/20 p-3 text-xs text-amber-50">
-                <div className="font-semibold">Preview Backup</div>
+                <div className="font-semibold">ตัวอย่างข้อมูลในไฟล์สำรอง</div>
                 <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
-                  <div>App: <span className="text-white">{restorePreview.app_name || '-'}</span></div>
+                  <div>ชื่อระบบ: <span className="text-white">{restorePreview.app_name || '-'}</span></div>
                   <div>สร้างเมื่อ: <span className="text-white">{restorePreview.created_at || '-'}</span></div>
-                  <div>Sheet: <span className="text-white">{restorePreview.sheet_id || '-'}</span></div>
-                  <div>Users: <span className="text-white">{restorePreview.counts.users || 0}</span></div>
-                  <div>Products: <span className="text-white">{restorePreview.counts.products || 0}</span></div>
-                  <div>Transactions: <span className="text-white">{restorePreview.counts.transactions || 0}</span></div>
-                  <div>Alert states: <span className="text-white">{restorePreview.counts.alert_states || 0}</span></div>
-                  <div>Audit logs: <span className="text-white">{restorePreview.counts.audit_logs || 0}</span></div>
-                  <div>Media files: <span className="text-white">{restorePreview.counts.media_files || 0}</span></div>
+                  <div>ชีตหลัก: <span className="text-white">{restorePreview.sheet_id || '-'}</span></div>
+                  <div>ผู้ใช้: <span className="text-white">{restorePreview.counts.users || 0}</span></div>
+                  <div>สินค้า: <span className="text-white">{restorePreview.counts.products || 0}</span></div>
+                  <div>ธุรกรรม: <span className="text-white">{restorePreview.counts.transactions || 0}</span></div>
+                  <div>สถานะแจ้งเตือน: <span className="text-white">{restorePreview.counts.alert_states || 0}</span></div>
+                  <div>บันทึกตรวจสอบ: <span className="text-white">{restorePreview.counts.audit_logs || 0}</span></div>
+                  <div>ไฟล์สื่อ: <span className="text-white">{restorePreview.counts.media_files || 0}</span></div>
                 </div>
               </div>
             ) : null}
@@ -1612,7 +1612,7 @@ export function DevPage() {
         </div>
 
         <div className="mt-3 rounded border border-red-500/30 bg-red-500/5 p-3">
-          <div className="text-xs text-white/60">ล้างสินค้า/สต็อกทั้งหมด (DB) แต่คงผู้ใช้ไว้ พร้อมดาวน์โหลด backup ก่อนล้าง</div>
+          <div className="text-xs text-white/60">ล้างสินค้าและสต็อกทั้งหมดในฐานข้อมูล แต่คงผู้ใช้ไว้ พร้อมดาวน์โหลดไฟล์สำรองก่อนล้าง</div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               className="rounded bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
@@ -1623,14 +1623,14 @@ export function DevPage() {
                 setSecureAction('reset')
               }}
             >
-              {resetStockBusy ? 'กำลังล้าง...' : 'ล้าง Stock ให้โล่ง'}
+              {resetStockBusy ? 'กำลังล้าง...' : 'ล้างสต็อกให้โล่ง'}
             </button>
           </div>
         </div>
       </div>
 
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 backdrop-blur">
-        <div className="border-b border-[color:var(--color-border)] px-4 py-2 text-sm font-semibold">Activity ล่าสุด</div>
+        <div className="border-b border-[color:var(--color-border)] px-4 py-2 text-sm font-semibold">ความเคลื่อนไหวล่าสุด</div>
         <div className="max-h-[360px] overflow-y-auto">
           {activity.map((x) => (
             <div key={x.id} className="flex items-start justify-between gap-3 border-b border-[color:var(--color-border)] px-4 py-3 text-sm">

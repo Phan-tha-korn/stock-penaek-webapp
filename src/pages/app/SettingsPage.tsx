@@ -181,20 +181,20 @@ export function SettingsPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field label="โหมดพื้นหลัง">
             <select
-              className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              className="input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               value={personal.mode}
               onChange={(e) =>
                 setPersonal((prev) => ({ ...prev, mode: e.target.value as 'gradient' | 'plain' | 'image' }))
               }
             >
-              <option value="gradient">ใช้ธีมระบบ</option>
+              <option value="gradient">ใช้ตามธีมของระบบ</option>
               <option value="plain">สีพื้นเรียบ</option>
               <option value="image">รูปภาพพื้นหลัง</option>
             </select>
           </Field>
           <Field label="สีพื้นหลังส่วนตัว">
             <input
-              className="h-10 w-full rounded border border-[color:var(--color-border)] bg-black/30"
+              className="input-surface h-10 w-full rounded border border-[color:var(--color-border)]"
               type="color"
               value={personal.color}
               onChange={(e) => setPersonal((prev) => ({ ...prev, color: e.target.value }))}
@@ -202,13 +202,13 @@ export function SettingsPage() {
           </Field>
           <Field label="URL รูปภาพพื้นหลังส่วนตัว">
             <input
-              className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              className="input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               value={personal.imageUrl}
               onChange={(e) => setPersonal((prev) => ({ ...prev, imageUrl: e.target.value }))}
               placeholder="https://..."
             />
             <input
-              className="mt-2 block w-full text-xs text-white/70 file:mr-3 file:rounded file:border file:border-[color:var(--color-border)] file:bg-black/30 file:px-3 file:py-2 file:text-xs file:text-white/80"
+              className="mt-2 block w-full text-xs text-white/70 file:mr-3 file:rounded file:border file:border-[color:var(--color-border)] file:bg-[color:var(--color-input-bg)] file:px-3 file:py-2 file:text-xs file:text-white/80"
               type="file"
               accept="image/*"
               onChange={(e) => {
@@ -494,7 +494,7 @@ export function SettingsPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">{t('settings.googleTitle')}</div>
-              <div className="mt-1 text-xs text-white/60">เชื่อม Google เพื่อให้ระบบสร้างชีตอัตโนมัติ และ sync ข้อมูลขึ้น Google Sheets</div>
+              <div className="mt-1 text-xs text-white/60">เชื่อม Google เพื่อให้ระบบสร้างชีตอัตโนมัติ และซิงก์ข้อมูลขึ้น Google Sheets</div>
             </div>
             {googleCfg?.usable ? (
               <button
@@ -509,7 +509,7 @@ export function SettingsPage() {
 
           <div className={`mt-3 rounded border ${googleCfg?.usable ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100' : 'border-amber-500/30 bg-amber-500/10 text-amber-100'} px-3 py-2 text-xs`}>
             {googleCfg?.usable
-              ? `เชื่อมแล้วและข้อมูลใช้ได้ • Sheet: ${googleCfg.current_sheet_id || '-'}`
+              ? `เชื่อมแล้วและข้อมูลใช้ได้ • ชีตหลัก: ${googleCfg.current_sheet_id || '-'}`
               : `ยังใช้ Google Sheets ไม่ได้ • สาเหตุ: ${googleCfg?.error || 'not_configured'}`}
           </div>
           {!googleCfg?.usable ? (
@@ -518,8 +518,8 @@ export function SettingsPage() {
               <div className="mt-2 space-y-1">
                 <div>- ใส่ OAuth Client ID/Secret ให้ครบ แล้วกด Sign in with Google</div>
                 <div>- ตรวจว่า Redirect URI ใน Google Cloud Console ตรงกับที่ใส่ในช่อง OAuth Redirect URI</div>
-                <div>- ถ้า Sheet หาย/ลิงก์เสีย ให้กด “เชื่อม Google และสร้าง Sheets อัตโนมัติ” เพื่อสร้างใหม่ แล้วระบบจะ sync ข้อมูลจากฐานข้อมูลขึ้นชีตใหม่ให้</div>
-                <div>- ถ้าข้อมูลเก่าอยู่ในชีตเดิมอย่างเดียว ให้ไปหน้า Dev แล้วกด Import Stock → DB จากชีตเดิมก่อน จากนั้นค่อย sync ไปชีตใหม่</div>
+                <div>- ถ้าชีตหายหรือลิงก์เสีย ให้กด “เชื่อม Google และสร้าง Sheets อัตโนมัติ” เพื่อสร้างใหม่ แล้วระบบจะซิงก์ข้อมูลจากฐานข้อมูลขึ้นชีตใหม่ให้</div>
+                <div>- ถ้าข้อมูลเก่าอยู่ในชีตเดิมอย่างเดียว ให้ไปหน้าเครื่องมือพัฒนา แล้วกดนำเข้าสต็อกจากชีตเดิมเข้า DB ก่อน จากนั้นค่อยซิงก์ไปชีตใหม่</div>
               </div>
             </div>
           ) : null}
@@ -550,7 +550,7 @@ export function SettingsPage() {
                 placeholder="Stock Penaek Master"
               />
             </Field>
-            <Field label="Path ไฟล์ Google credentials">
+            <Field label="ตำแหน่งไฟล์ Google credentials">
               <input
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={googleCfg?.service_account_key_path || ''}
@@ -583,7 +583,7 @@ export function SettingsPage() {
                 placeholder="https://api.example.com/api/config/google-oauth/callback"
               />
             </Field>
-            <Field label="OAuth Token Path">
+            <Field label="ตำแหน่งไฟล์โทเคน OAuth">
               <input
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={googleCfg?.oauth_token_path || ''}
@@ -653,7 +653,7 @@ export function SettingsPage() {
                   })
                   setGoogleCfg(next)
                   setGoogleOauthSecretDraft('')
-                  setOk('สร้าง/สลับ Google Sheets ใหม่และ sync ข้อมูลแล้ว')
+                  setOk('สร้างหรือสลับ Google Sheets ใหม่ และซิงก์ข้อมูลแล้ว')
                 } catch (e: any) {
                   setError(e?.response?.data?.detail || t('settings.googleSaveFailed'))
                 } finally {

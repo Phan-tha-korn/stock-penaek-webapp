@@ -29,7 +29,7 @@ export function LoginPage() {
   })
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg items-center px-4">
+    <div className="bg-app mx-auto flex min-h-screen max-w-none items-center justify-center px-4">
       {busy ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md">
           <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[color:var(--color-card)]/90 p-6 text-center shadow-2xl">
@@ -78,11 +78,10 @@ export function LoginPage() {
           <FieldLabel
             label={t('auth.username')}
             helper={t('auth.usernameHelper')}
-            example={t('auth.usernamePlaceholder')}
             helpKey="login.username"
           >
             <input
-              className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              className="input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               autoComplete="username"
               placeholder={t('auth.usernamePlaceholder')}
               required
@@ -93,11 +92,10 @@ export function LoginPage() {
           <FieldLabel
             label={t('auth.password')}
             helper={t('auth.passwordHelper')}
-            example={t('auth.passwordPlaceholder')}
             helpKey="login.password"
           >
             <input
-              className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              className="input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               autoComplete="current-password"
               type="password"
               placeholder={t('auth.passwordPlaceholder')}
@@ -109,11 +107,10 @@ export function LoginPage() {
           <FieldLabel
             label={t('auth.totp')}
             helper={t('auth.totpHelper')}
-            example={t('auth.totpPlaceholder')}
             helpKey="login.totp"
           >
             <input
-              className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
+              className="input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               inputMode="numeric"
               placeholder={t('auth.totpPlaceholder')}
               {...register('totp')}
