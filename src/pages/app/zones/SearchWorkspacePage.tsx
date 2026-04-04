@@ -296,6 +296,29 @@ export function SearchWorkspacePage() {
   const quickCompareHint = isEn
     ? 'Type part of the product name, SKU, alias, or supplier. Suggestions appear automatically.'
     : 'พิมพ์ชื่อสินค้า รหัสสินค้า alias หรือชื่อร้านค้าได้เลย ระบบจะเด้งรายการให้เลือกอัตโนมัติ'
+  const compareAddTitle = isEn ? '1. Find and add products' : '1. ค้นหาและเพิ่มสินค้าเข้าเทียบ'
+  const compareAddHelper = isEn
+    ? 'This box is for searching products to add into the compare list.'
+    : 'กล่องนี้ใช้สำหรับค้นหาสินค้าที่จะเอาเข้าเทียบ พิมพ์ชื่อสินค้า รหัสสินค้า alias หรือชื่อร้านค้า แล้วกดจากรายการที่เด้งขึ้นมาได้เลย'
+  const selectedTitle = isEn ? '2. Selected products' : '2. สินค้าที่เลือกไว้แล้ว'
+  const selectedHelper = isEn
+    ? 'These are the products already selected for comparison.'
+    : 'กล่องนี้คือรายการสินค้าที่เลือกไว้แล้ว กดดูรายละเอียดหรือเอาออกได้'
+  const summaryTitle = isEn ? '3. Compare summary' : '3. สรุปผลเทียบ'
+  const summaryHelper = isEn
+    ? 'This section tells you which product is cheaper and why.'
+    : 'กล่องนี้ใช้สรุปว่าตัวไหนถูกกว่า และถ้ายังเทียบไม่ได้จะบอกเหตุผลที่พบบ่อย'
+  const noPriceChecklist = isEn
+    ? [
+        'This item still has no active price record in the system.',
+        'The quantity you entered may not match the configured price tier.',
+        'The selected compare mode may not match the stored pricing data.',
+      ]
+    : [
+        'สินค้านี้ยังไม่มีราคาที่ใช้งานอยู่ในระบบ',
+        'จำนวนที่กรอกอาจไม่ตรงกับช่วงราคาที่ตั้งไว้',
+        'โหมดที่เลือกอาจไม่ตรงกับข้อมูลราคาที่บันทึกไว้',
+      ]
 
   return (
     <section className="space-y-4">
@@ -391,6 +414,10 @@ export function SearchWorkspacePage() {
 
       {view === 'compare' ? (
         <div className="surface-panel space-y-4 rounded p-4">
+          <div className="rounded border border-[color:var(--color-border)] surface-soft px-4 py-3">
+            <div className="text-base font-semibold">{compareAddTitle}</div>
+            <div className="mt-1 text-sm text-[color:var(--color-muted)]">{compareAddHelper}</div>
+          </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(180px,220px)_minmax(180px,220px)]">
             <FieldLabel label={quickCompareTitle} helper={quickCompareHint} helpKey="search.compare">
               <input
@@ -420,6 +447,11 @@ export function SearchWorkspacePage() {
             {isEn
               ? `Selected ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} items. Pick at least ${MIN_COMPARE_ITEMS} items to compare automatically.`
               : `เลือกแล้ว ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} รายการ เลือกอย่างน้อย ${MIN_COMPARE_ITEMS} รายการเพื่อให้ระบบเทียบให้อัตโนมัติ`}
+          </div>
+
+          <div className="rounded border border-[color:var(--color-border)] surface-soft px-4 py-3">
+            <div className="text-base font-semibold">{selectedTitle}</div>
+            <div className="mt-1 text-sm text-[color:var(--color-muted)]">{selectedHelper}</div>
           </div>
 
           {compareSuggestions.length > 0 ? (
@@ -495,6 +527,11 @@ export function SearchWorkspacePage() {
 
           {compareNotice ? <div className="text-sm text-[color:var(--color-muted)]">{compareNotice}</div> : null}
 
+          <div className="rounded border border-[color:var(--color-border)] surface-soft px-4 py-3">
+            <div className="text-base font-semibold">{summaryTitle}</div>
+            <div className="mt-1 text-sm text-[color:var(--color-muted)]">{summaryHelper}</div>
+          </div>
+
           {selectedCompareItems.length >= MIN_COMPARE_ITEMS ? (
             <div className="space-y-3">
               <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-3 text-sm">
@@ -552,10 +589,23 @@ export function SearchWorkspacePage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-3 text-sm text-[color:var(--color-muted)]">
-                        {isEn
-                          ? 'No active price found for this item under the current quantity and mode.'
-                          : 'ยังไม่พบราคาที่พร้อมเทียบสำหรับสินค้านี้ตามจำนวนและโหมดที่เลือก'}
+                      <div className="mt-3 rounded border border-dashed border-[color:var(--color-border)] px-3 py-3 text-sm text-[color:var(--color-muted)]">
+                        <div className="font-medium text-[color:var(--color-fg)]">
+                          {isEn ? 'No comparable price is available yet.' : 'ยังไม่พบราคาที่พร้อมเทียบสำหรับสินค้านี้'}
+                        </div>
+                        <div className="mt-2">
+                          {isEn ? 'Please check these common reasons:' : 'ให้ลองเช็กสาเหตุที่พบบ่อยต่อไปนี้:'}
+                        </div>
+                        <ul className="mt-2 list-disc space-y-1 pl-5">
+                          {noPriceChecklist.map((item) => (
+                            <li key={`${row.compareKey}-${item}`}>{item}</li>
+                          ))}
+                        </ul>
+                        <div className="mt-2 text-xs">
+                          {isEn
+                            ? 'Tip: try quantity 1, 10, or 50, or switch the compare mode.'
+                            : 'คำแนะนำ: ลองเปลี่ยนจำนวนเป็น 1, 10 หรือ 50 และลองสลับโหมดที่ใช้เทียบ'}
+                        </div>
                       </div>
                     )}
                   </div>
