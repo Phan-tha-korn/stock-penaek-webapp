@@ -249,6 +249,7 @@ async def delete_garbage(
         message="garbage_delete",
         before=None,
         after={"deleted": deleted, "failed": failed, "mode": payload.mode},
+        commit=True,
     )
 
     return GarbageDeleteOut(

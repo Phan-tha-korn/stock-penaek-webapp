@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
+from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import inspect
 
-from server.config.config_loader import load_master_config
-from server.db.database import Base, engine
-from server.db.models import Product, Role, StockStatus, User
+from server.config.settings import settings
+from server.db.models import Role, StockStatus, User
 from server.services.security import hash_password
 
 
@@ -26,57 +28,24 @@ def calc_status(qty: float, min_stock: float, max_stock: float, is_test: bool) -
     return StockStatus.NORMAL
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _build_alembic_config() -> Config:
+    root = _repo_root()
+    config = Config(str(root / "alembic.ini"))
+    config.set_main_option("script_location", str(root / "alembic"))
+    config.set_main_option("sqlalchemy.url", settings.resolved_database_url())
+    return config
+
+
+def _upgrade_schema_sync() -> None:
+    command.upgrade(_build_alembic_config(), "head")
+
+
 async def create_all() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        driver = conn.engine.url.get_backend_name()
-        if driver == "sqlite":
-            def _product_columns(sync_conn) -> set[str]:
-                return {str(col["name"]) for col in inspect(sync_conn).get_columns("products")}
-
-            cols = await conn.run_sync(_product_columns)
-            if "category_id" not in cols:
-                await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN category_id VARCHAR(36)")
-            if "last_category_id" not in cols:
-                await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN last_category_id VARCHAR(36)")
-        else:
-            await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id VARCHAR(36)")
-            await conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS last_category_id VARCHAR(36)")
-
-        if driver == "sqlite":
-            await conn.exec_driver_sql(
-                """
-                UPDATE products
-                SET type = category
-                WHERE trim(COALESCE(type, '')) = ''
-                  AND trim(COALESCE(category, '')) <> ''
-                """
-            )
-            await conn.exec_driver_sql(
-                """
-                UPDATE products
-                SET category = ''
-                WHERE category_id IS NULL
-                  AND trim(COALESCE(category, '')) <> ''
-                """
-            )
-        else:
-            await conn.exec_driver_sql(
-                """
-                UPDATE products
-                SET type = category
-                WHERE BTRIM(COALESCE(type, '')) = ''
-                  AND BTRIM(COALESCE(category, '')) <> ''
-                """
-            )
-            await conn.exec_driver_sql(
-                """
-                UPDATE products
-                SET category = ''
-                WHERE category_id IS NULL
-                  AND BTRIM(COALESCE(category, '')) <> ''
-                """
-            )
+    await asyncio.to_thread(_upgrade_schema_sync)
 
 
 async def seed_if_empty(db: AsyncSession) -> None:
@@ -131,59 +100,6 @@ async def seed_if_empty(db: AsyncSession) -> None:
             totp_secret=None,
         ),
     ]
-    for u in users:
-        db.add(u)
+    for user in users:
+        db.add(user)
     await db.commit()
-
-    res = await db.execute(select(User).where(User.username == "owner"))
-    owner = res.scalar_one()
-
-    cfg = load_master_config()
-    default_min = float(cfg.get("min_stock_threshold") or 10)
-
-    demo_products = [
-        
-    ]
-
-    for (
-        sku,
-        name_th,
-        name_en,
-        category,
-        ptype,
-        unit,
-        cost,
-        sell,
-        qty,
-        min_s,
-        max_s,
-        is_test,
-        supplier,
-        barcode,
-    ) in demo_products:
-        p = Product(
-            sku=sku,
-            name_th=name_th,
-            name_en=name_en,
-            category=category,
-            type=ptype,
-            unit=unit,
-            cost_price=cost,
-            selling_price=sell,
-            stock_qty=qty,
-            min_stock=min_s,
-            max_stock=max_s,
-            status=calc_status(float(qty), float(min_s), float(max_s), bool(is_test)),
-            is_test=bool(is_test),
-            supplier=supplier,
-            barcode=barcode,
-            image_url=None,
-            notes="",
-            created_by=owner.id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-        db.add(p)
-
-    await db.commit()
-

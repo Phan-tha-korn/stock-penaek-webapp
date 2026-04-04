@@ -32,7 +32,9 @@ from server.db.database import get_db
 from server.db.models import Product, ProductCategory, Role, StockAlertState, StockTransaction, TxnType, User
 from server.db.init_db import calc_status
 from server.services.audit import write_audit_log
+from server.services.branches import ensure_default_branch
 from server.services.media_store import choose_image_for_row, parse_products_csv, read_zip_payload, save_product_image_bytes
+from server.services.suppliers import sync_product_supplier_links
 from server.realtime.socket_manager import broadcast
 from server.config.config_loader import load_master_config
 from server.config.settings import settings
@@ -70,7 +72,22 @@ def _type_match_key(value: str | None) -> str:
     return "".join(chars)
 
 def _is_deleted(p: Product) -> bool:
-    return bool((p.notes or "").startswith(DELETED_PREFIX))
+    return bool(p.deleted_at) or bool((p.notes or "").startswith(DELETED_PREFIX))
+
+
+def _mark_product_deleted(p: Product, *, actor_id: str, reason: str) -> None:
+    ts = datetime.utcnow().isoformat(timespec="seconds")
+    p.notes = f"{DELETED_PREFIX}{ts}:{actor_id}:{reason}"
+    p.deleted_at = datetime.utcnow()
+    p.delete_reason = reason or None
+    p.updated_at = datetime.utcnow()
+
+
+def _restore_product_state(p: Product) -> None:
+    p.notes = ""
+    p.deleted_at = None
+    p.delete_reason = None
+    p.updated_at = datetime.utcnow()
 
 
 def _trigger_sheet_sync() -> None:
@@ -111,6 +128,7 @@ def _to_out(p: Product) -> ProductOut:
     return ProductOut(
         id=p.id,
         sku=p.sku,
+        branch_id=p.branch_id,
         category_id=p.category_id,
         name=ProductName(th=p.name_th, en=p.name_en),
         category=p.category if p.category_id else "",
@@ -127,6 +145,9 @@ def _to_out(p: Product) -> ProductOut:
         barcode=p.barcode,
         image_url=p.image_url,
         notes=p.notes,
+        archived_at=p.archived_at,
+        deleted_at=p.deleted_at,
+        delete_reason=p.delete_reason,
         created_at=p.created_at,
         updated_at=p.updated_at,
         created_by=p.created_by,
@@ -308,6 +329,7 @@ async def import_from_sheets(
         message="import_stock",
         before=None,
         after=res,
+        commit=True,
     )
 
     _trigger_sheet_sync()
@@ -398,9 +420,11 @@ async def create_product(
     if existing:
         raise HTTPException(status_code=409, detail="sku_exists")
     category = await _resolve_category(db, payload.category_id)
+    branch = await ensure_default_branch(db)
 
     p = Product(
         sku=sku,
+        branch_id=branch.id,
         category_id=None,
         last_category_id=None,
         name_th="",
@@ -428,8 +452,8 @@ async def create_product(
     p.last_category_id = category.id if category else p.last_category_id
     p.category = category.name if category else (p.category or "")
     db.add(p)
-    await db.commit()
-    await db.refresh(p)
+    await db.flush()
+    await sync_product_supplier_links(db, product=p, actor_id=user.id)
 
     await write_audit_log(
         db,
@@ -441,8 +465,12 @@ async def create_product(
         success=True,
         message="created",
         before=None,
-        after={"sku": p.sku, "name_th": p.name_th},
+        after={"sku": p.sku, "name_th": p.name_th, "branch_id": p.branch_id},
+        branch_id=p.branch_id,
     )
+
+    await db.commit()
+    await db.refresh(p)
 
     _trigger_sheet_sync()
 
@@ -509,6 +537,7 @@ async def bulk_create_products(
     if len(payload.items) < 2:
         raise HTTPException(status_code=400, detail="bulk_items_too_few")
 
+    branch = await ensure_default_branch(db)
     normalized: list[Product] = []
     seen: set[str] = set()
     for item in payload.items:
@@ -524,6 +553,7 @@ async def bulk_create_products(
         category = await _resolve_category(db, item.category_id)
         product = Product(
             sku=sku,
+            branch_id=branch.id,
             category_id=category.id if category else None,
             last_category_id=category.id if category else None,
             name_th="",
@@ -571,9 +601,9 @@ async def bulk_create_products(
 
     for product in normalized:
         db.add(product)
-    await db.commit()
+    await db.flush()
     for product in normalized:
-        await db.refresh(product)
+        await sync_product_supplier_links(db, product=product, actor_id=user.id)
 
     await write_audit_log(
         db,
@@ -585,8 +615,12 @@ async def bulk_create_products(
         success=True,
         message="bulk_created",
         before=None,
-        after={"count": len(normalized)},
+        after={"count": len(normalized), "branch_id": branch.id},
+        branch_id=branch.id,
     )
+    await db.commit()
+    for product in normalized:
+        await db.refresh(product)
     _trigger_sheet_sync()
     return ProductListOut(items=[_to_out(product) for product in normalized], total=len(normalized))
 
@@ -635,6 +669,7 @@ async def bulk_import_zip(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    branch = await ensure_default_branch(db)
     created = 0
     updated = 0
     failed = 0
@@ -673,11 +708,13 @@ async def bulk_import_zip(
                     image_url=image_url if image_url else existing.image_url,
                 )
                 _apply_product_payload(existing, payload)
+                await sync_product_supplier_links(db, product=existing, actor_id=user.id)
                 updated += 1
                 items.append(ProductBulkRowResult(row=row.index, sku=row.sku, ok=True, action="updated"))
             else:
                 p = Product(
                     sku=row.sku,
+                    branch_id=branch.id,
                     name_th="",
                     name_en="",
                     category="",
@@ -714,13 +751,13 @@ async def bulk_import_zip(
                     ),
                 )
                 db.add(p)
+                await db.flush()
+                await sync_product_supplier_links(db, product=p, actor_id=user.id)
                 created += 1
                 items.append(ProductBulkRowResult(row=row.index, sku=row.sku, ok=True, action="created"))
         except Exception as e:
             failed += 1
             items.append(ProductBulkRowResult(row=row.index, sku=row.sku, ok=False, action="error", error=str(e)))
-
-    await db.commit()
 
     await write_audit_log(
         db,
@@ -732,8 +769,10 @@ async def bulk_import_zip(
         success=True,
         message="bulk_import_zip",
         before=None,
-        after={"created": created, "updated": updated, "failed": failed},
+        after={"created": created, "updated": updated, "failed": failed, "branch_id": branch.id},
+        branch_id=branch.id,
     )
+    await db.commit()
     _trigger_sheet_sync()
     return ProductBulkImportOut(ok=True, created=created, updated=updated, failed=failed, items=items)
 
@@ -749,6 +788,8 @@ async def update_product(
     p = await db.scalar(select(Product).where(Product.sku == sku))
     if not p or _is_deleted(p):
         raise HTTPException(status_code=404, detail="Product not found")
+    if not p.branch_id:
+        p.branch_id = (await ensure_default_branch(db)).id
 
     before = {"sku": p.sku, "name_th": p.name_th}
     fields_set = getattr(payload, "model_fields_set", set())
@@ -762,9 +803,7 @@ async def update_product(
             p.category = ""
 
     _apply_product_payload(p, payload)
-
-    await db.commit()
-    await db.refresh(p)
+    await sync_product_supplier_links(db, product=p, actor_id=user.id)
 
     await write_audit_log(
         db,
@@ -776,8 +815,12 @@ async def update_product(
         success=True,
         message="updated",
         before=before,
-        after={"sku": p.sku, "name_th": p.name_th},
+        after={"sku": p.sku, "name_th": p.name_th, "branch_id": p.branch_id},
+        branch_id=p.branch_id,
     )
+
+    await db.commit()
+    await db.refresh(p)
 
     _trigger_sheet_sync()
 
@@ -844,7 +887,6 @@ async def bulk_delete(
     if not isinstance(skus, list) or not skus:
         raise HTTPException(status_code=400, detail="invalid_skus")
 
-    ts = datetime.utcnow().isoformat(timespec="seconds")
     done = 0
     for raw in skus:
         sku = (str(raw) or "").strip()
@@ -853,11 +895,8 @@ async def bulk_delete(
         p = await db.scalar(select(Product).where(Product.sku == sku))
         if not p or _is_deleted(p):
             continue
-        p.notes = f"{DELETED_PREFIX}{ts}:{user.id}:{reason}"
-        p.updated_at = datetime.utcnow()
+        _mark_product_deleted(p, actor_id=user.id, reason=reason)
         done += 1
-
-    await db.commit()
 
     await write_audit_log(
         db,
@@ -871,6 +910,7 @@ async def bulk_delete(
         before=None,
         after={"count": done},
     )
+    await db.commit()
 
     _trigger_sheet_sync()
 
@@ -885,18 +925,14 @@ async def delete_all_test(
 ):
     res = await db.execute(select(Product))
     products = res.scalars().all()
-    ts = datetime.utcnow().isoformat(timespec="seconds")
     done = 0
     for p in products:
         if _is_deleted(p):
             continue
         if not p.is_test:
             continue
-        p.notes = f"{DELETED_PREFIX}{ts}:{user.id}:purge_test"
-        p.updated_at = datetime.utcnow()
+        _mark_product_deleted(p, actor_id=user.id, reason="purge_test")
         done += 1
-
-    await db.commit()
 
     await write_audit_log(
         db,
@@ -910,6 +946,7 @@ async def delete_all_test(
         before=None,
         after={"count": done},
     )
+    await db.commit()
 
     _trigger_sheet_sync()
 
@@ -929,16 +966,12 @@ async def delete_all(
 
     res = await db.execute(select(Product))
     products = res.scalars().all()
-    ts = datetime.utcnow().isoformat(timespec="seconds")
     done = 0
     for p in products:
         if _is_deleted(p):
             continue
-        p.notes = f"{DELETED_PREFIX}{ts}:{user.id}:purge_all"
-        p.updated_at = datetime.utcnow()
+        _mark_product_deleted(p, actor_id=user.id, reason="purge_all")
         done += 1
-
-    await db.commit()
 
     await write_audit_log(
         db,
@@ -952,6 +985,7 @@ async def delete_all(
         before=None,
         after={"count": done},
     )
+    await db.commit()
 
     _trigger_sheet_sync()
 
@@ -970,13 +1004,8 @@ async def delete_product(
     if not p or _is_deleted(p):
         raise HTTPException(status_code=404, detail="Product not found")
 
-    ts = datetime.utcnow().isoformat(timespec="seconds")
     reason = (payload.reason or "").strip()
-    p.notes = f"{DELETED_PREFIX}{ts}:{user.id}:{reason}"
-    p.updated_at = datetime.utcnow()
-
-    await db.commit()
-    await db.refresh(p)
+    _mark_product_deleted(p, actor_id=user.id, reason=reason)
 
     await write_audit_log(
         db,
@@ -988,8 +1017,12 @@ async def delete_product(
         success=True,
         message=reason or "deleted",
         before={"sku": p.sku},
-        after={"sku": p.sku},
+        after={"sku": p.sku, "deleted_at": p.deleted_at.isoformat() if p.deleted_at else None},
+        branch_id=p.branch_id,
     )
+
+    await db.commit()
+    await db.refresh(p)
 
     _trigger_sheet_sync()
 
@@ -1007,11 +1040,7 @@ async def restore_product(
     if not p or not _is_deleted(p):
         raise HTTPException(status_code=404, detail="Product not found")
 
-    p.notes = ""
-    p.updated_at = datetime.utcnow()
-
-    await db.commit()
-    await db.refresh(p)
+    _restore_product_state(p)
 
     await write_audit_log(
         db,
@@ -1023,8 +1052,12 @@ async def restore_product(
         success=True,
         message="restored",
         before={"sku": p.sku},
-        after={"sku": p.sku},
+        after={"sku": p.sku, "deleted_at": None},
+        branch_id=p.branch_id,
     )
+
+    await db.commit()
+    await db.refresh(p)
 
     _trigger_sheet_sync()
 
@@ -1043,6 +1076,8 @@ async def adjust_stock(
     product = await db.scalar(select(Product).where(Product.sku == sku))
     if not product or _is_deleted(product):
         raise HTTPException(status_code=404, detail="Product not found")
+    if not product.branch_id:
+        product.branch_id = (await ensure_default_branch(db)).id
 
     old_status = product.status.value
     old_qty = float(product.stock_qty)
@@ -1064,6 +1099,7 @@ async def adjust_stock(
     txn = StockTransaction(
         type=payload.type,
         product_id=product.id,
+        branch_id=product.branch_id,
         sku=product.sku,
         qty=(new_qty - old_qty) if payload.type == TxnType.ADJUST else adjust_amount,
         unit_cost=product.cost_price,
@@ -1083,7 +1119,8 @@ async def adjust_stock(
         success=True,
         message=payload.reason,
         before={"qty": old_qty, "status": old_status},
-        after={"qty": new_qty, "status": product.status.value}
+        after={"qty": new_qty, "status": product.status.value, "branch_id": product.branch_id},
+        branch_id=product.branch_id,
     )
 
     await db.commit()
@@ -1176,7 +1213,9 @@ async def adjust_stock(
     return ProductOut(
         id=product.id,
         sku=product.sku,
+        branch_id=product.branch_id,
         name=ProductName(th=product.name_th, en=product.name_en),
+        category_id=product.category_id,
         category=product.category,
         type=product.type,
         unit=product.unit,
@@ -1191,6 +1230,9 @@ async def adjust_stock(
         barcode=product.barcode,
         image_url=product.image_url,
         notes=product.notes,
+        archived_at=product.archived_at,
+        deleted_at=product.deleted_at,
+        delete_reason=product.delete_reason,
         created_at=product.created_at,
         updated_at=product.updated_at,
         created_by=product.created_by,

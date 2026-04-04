@@ -99,8 +99,6 @@ async def create_user(
         updated_at=datetime.utcnow(),
     )
     db.add(u)
-    await db.commit()
-    await db.refresh(u)
 
     await write_audit_log(
         db,
@@ -114,6 +112,9 @@ async def create_user(
         before=None,
         after={"username": u.username, "role": u.role.value},
     )
+
+    await db.commit()
+    await db.refresh(u)
 
     return _to_out(u)
 
@@ -156,9 +157,6 @@ async def update_user(
     if revoke_sessions:
         await _revoke_user_sessions(db, u.id)
 
-    await db.commit()
-    await db.refresh(u)
-
     await write_audit_log(
         db,
         request=request,
@@ -171,6 +169,9 @@ async def update_user(
         before=before,
         after={"username": u.username, "role": u.role.value, "is_active": u.is_active, "language": u.language, "display_name": u.display_name},
     )
+
+    await db.commit()
+    await db.refresh(u)
 
     return _to_out(u)
 
@@ -193,8 +194,6 @@ async def reset_password(
     u.password_hash = hash_password(payload.password)
     u.updated_at = datetime.utcnow()
     await _revoke_user_sessions(db, u.id)
-    await db.commit()
-    await db.refresh(u)
 
     await write_audit_log(
         db,
@@ -208,6 +207,9 @@ async def reset_password(
         before=None,
         after={"username": u.username},
     )
+
+    await db.commit()
+    await db.refresh(u)
 
     return _to_out(u)
 
@@ -228,7 +230,6 @@ async def delete_user(
     username = u.username
     await _revoke_user_sessions(db, u.id)
     await db.delete(u)
-    await db.commit()
 
     await write_audit_log(
         db,
@@ -242,6 +243,8 @@ async def delete_user(
         before={"username": username},
         after=None,
     )
+
+    await db.commit()
 
     return {"ok": True}
 

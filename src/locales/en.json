@@ -20,10 +20,15 @@
     "managedBy": "Managed by"
   },
   "nav": {
+    "zoneHome": "Zone Home",
+    "searchWorkspace": "Search",
+    "notificationsCenter": "Notifications",
     "dashboard": "Dashboard",
     "products": "Products",
+    "suppliers": "Suppliers",
     "transactions": "Transactions",
     "reports": "Summary",
+    "verificationQueue": "Verification",
     "ownerInsights": "Owner Insights",
     "adminUsers": "Users",
     "settings": "Settings",

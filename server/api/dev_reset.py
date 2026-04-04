@@ -63,6 +63,7 @@ async def reset_stock(
         message=f"deleted products={deleted_products}, txns={deleted_txns}, alerts={deleted_alerts}",
         before={"products": before_products, "transactions": before_txns, "alert_states": before_alerts},
         after={"products": 0, "transactions": 0, "alert_states": 0},
+        commit=True,
     )
     try:
         schedule_sheet_sync()

@@ -41,11 +41,34 @@ class Settings(BaseSettings):
     line_token_accountant: str = ""
     line_token_owner: str = ""
     line_token_dev: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_use_tls: bool = True
+    notification_email_stock: str = ""
+    notification_email_admin: str = ""
+    notification_email_accountant: str = ""
+    notification_email_owner: str = ""
+    notification_email_dev: str = ""
+    notification_lock_seconds: int = 120
+    notification_worker_batch_size: int = 25
+    notification_max_retry_attempts: int = 4
+    notification_max_batch_size: int = 100
+    notification_processing_timeout_seconds: int = 30
+    notification_delivery_timeout_seconds: int = 20
 
     notification_enabled: bool = False
     notification_low_levels_pct: list[int] = [50, 20, 10, 0]
     notification_high_levels_pct: list[int] = [80, 90, 100]
     notification_roles: list[str] = ["OWNER"]
+
+    search_result_limit_max: int = 200
+    search_query_timeout_seconds: int = 5
+    report_query_timeout_seconds: int = 10
+    historical_query_max_days: int = 366
+    snapshot_max_payload_bytes: int = 65536
 
     enforce_https: bool = False
 
@@ -90,6 +113,27 @@ class Settings(BaseSettings):
         s.line_token_accountant = str(cfg.get("line_token_accountant") or s.line_token_accountant)
         s.line_token_owner = str(cfg.get("line_token_owner") or s.line_token_owner)
         s.line_token_dev = str(cfg.get("line_token_dev") or s.line_token_dev)
+        s.smtp_host = str(cfg.get("smtp_host") or s.smtp_host)
+        s.smtp_port = int(cfg.get("smtp_port") or s.smtp_port)
+        s.smtp_username = str(cfg.get("smtp_username") or s.smtp_username)
+        s.smtp_password = str(cfg.get("smtp_password") or s.smtp_password)
+        s.smtp_from_email = str(cfg.get("smtp_from_email") or s.smtp_from_email)
+        s.smtp_use_tls = bool(cfg.get("smtp_use_tls", s.smtp_use_tls))
+        s.notification_email_stock = str(cfg.get("notification_email_stock") or s.notification_email_stock)
+        s.notification_email_admin = str(cfg.get("notification_email_admin") or s.notification_email_admin)
+        s.notification_email_accountant = str(cfg.get("notification_email_accountant") or s.notification_email_accountant)
+        s.notification_email_owner = str(cfg.get("notification_email_owner") or s.notification_email_owner)
+        s.notification_email_dev = str(cfg.get("notification_email_dev") or s.notification_email_dev)
+        s.notification_lock_seconds = int(cfg.get("notification_lock_seconds") or s.notification_lock_seconds)
+        s.notification_worker_batch_size = int(cfg.get("notification_worker_batch_size") or s.notification_worker_batch_size)
+        s.notification_max_retry_attempts = int(cfg.get("notification_max_retry_attempts") or s.notification_max_retry_attempts)
+        s.notification_max_batch_size = int(cfg.get("notification_max_batch_size") or s.notification_max_batch_size)
+        s.notification_processing_timeout_seconds = int(
+            cfg.get("notification_processing_timeout_seconds") or s.notification_processing_timeout_seconds
+        )
+        s.notification_delivery_timeout_seconds = int(
+            cfg.get("notification_delivery_timeout_seconds") or s.notification_delivery_timeout_seconds
+        )
 
         s.notification_enabled = bool(cfg.get("notification_enabled") or False)
         low_levels = cfg.get("notification_low_levels_pct", None)
@@ -101,6 +145,12 @@ class Settings(BaseSettings):
         roles = cfg.get("notification_roles", None)
         if isinstance(roles, list):
             s.notification_roles = [str(x) for x in roles if str(x).strip()]
+
+        s.search_result_limit_max = int(cfg.get("search_result_limit_max") or s.search_result_limit_max)
+        s.search_query_timeout_seconds = int(cfg.get("search_query_timeout_seconds") or s.search_query_timeout_seconds)
+        s.report_query_timeout_seconds = int(cfg.get("report_query_timeout_seconds") or s.report_query_timeout_seconds)
+        s.historical_query_max_days = int(cfg.get("historical_query_max_days") or s.historical_query_max_days)
+        s.snapshot_max_payload_bytes = int(cfg.get("snapshot_max_payload_bytes") or s.snapshot_max_payload_bytes)
 
         return s
 

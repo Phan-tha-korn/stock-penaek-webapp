@@ -14,6 +14,7 @@ from server.api import dev_sheets as dev_sheets_api
 from server.api import products as products_api
 from server.db.database import Base, get_db
 from server.db.models import AuditLog, Product, Role, StockStatus, User
+import server.main as main_module
 from server.main import fastapi_app
 from server.services.security import hash_password
 
@@ -38,6 +39,20 @@ class ApiSmokeTests(unittest.TestCase):
         dev_sheets_api.get_client = lambda: None
         self._orig_config_get_client = config_api.get_client
         config_api.get_client = lambda: None
+        self._orig_create_all = main_module.create_all
+        self._orig_seed_if_empty = main_module.seed_if_empty
+        self._orig_bootstrap_branch_foundations = main_module.bootstrap_branch_foundations
+        self._orig_ensure_attachment_type_classifications = main_module.ensure_attachment_type_classifications
+        self._orig_bootstrap_supplier_foundations = main_module.bootstrap_supplier_foundations
+
+        async def _noop(*_args, **_kwargs):
+            return None
+
+        main_module.create_all = _noop
+        main_module.seed_if_empty = _noop
+        main_module.bootstrap_branch_foundations = _noop
+        main_module.ensure_attachment_type_classifications = _noop
+        main_module.bootstrap_supplier_foundations = _noop
 
         self.client = TestClient(fastapi_app)
 
@@ -46,6 +61,11 @@ class ApiSmokeTests(unittest.TestCase):
         products_api._trigger_sheet_sync = self._orig_trigger_sheet_sync
         dev_sheets_api.get_client = self._orig_dev_sheets_get_client
         config_api.get_client = self._orig_config_get_client
+        main_module.create_all = self._orig_create_all
+        main_module.seed_if_empty = self._orig_seed_if_empty
+        main_module.bootstrap_branch_foundations = self._orig_bootstrap_branch_foundations
+        main_module.ensure_attachment_type_classifications = self._orig_ensure_attachment_type_classifications
+        main_module.bootstrap_supplier_foundations = self._orig_bootstrap_supplier_foundations
         fastapi_app.dependency_overrides.clear()
         asyncio.run(self.engine.dispose())
         if os.path.exists(self.db_path):

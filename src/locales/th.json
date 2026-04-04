@@ -20,10 +20,14 @@
     "managedBy": "จัดการโดย"
   },
   "nav": {
+    "zoneHome": "โซนหลัก",
+    "searchWorkspace": "ค้นหา",
+    "notificationsCenter": "การแจ้งเตือน",
     "dashboard": "แดชบอร์ด",
     "products": "สินค้า",
     "transactions": "ธุรกรรม",
     "reports": "สรุป",
+    "verificationQueue": "คิวตรวจสอบ",
     "ownerInsights": "สำหรับเจ้าของ",
     "adminUsers": "ผู้ใช้",
     "settings": "ตั้งค่า",

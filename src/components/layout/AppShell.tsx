@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
+import { featureFlags } from '../../config/features'
 import { useAuthStore } from '../../store/authStore'
 import i18n from '../../services/i18n'
 
@@ -20,11 +21,22 @@ export function AppShell() {
 
   const role = user?.role
 
+  const homePath =
+    role === 'OWNER' ? '/zones/owner' :
+    role === 'DEV' ? '/zones/dev' :
+    role === 'ADMIN' ? '/zones/admin' :
+    '/zones/stock/search'
+
   const navItems = [
-    { to: '/', label: t('nav.dashboard'), roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
+    { to: homePath, label: t('nav.zoneHome', { defaultValue: 'Zone Home' }), roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
+    { to: '/zones/search', label: t('nav.searchWorkspace', { defaultValue: 'Search' }), roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
+    { to: '/zones/notifications', label: t('nav.notificationsCenter', { defaultValue: 'Notifications' }), roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
+    { to: '/dashboard', label: t('nav.dashboard'), roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
     { to: '/products', label: t('nav.products'), roles: ['STOCK', 'ADMIN', 'OWNER', 'DEV'] as const },
+    ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: t('nav.suppliers', { defaultValue: 'Suppliers' }), roles: ['STOCK', 'ADMIN', 'OWNER', 'DEV', 'ACCOUNTANT'] as const }] : []),
     { to: '/transactions', label: t('nav.transactions'), roles: ['STOCK', 'ADMIN', 'OWNER', 'DEV', 'ACCOUNTANT'] as const },
     { to: '/reports', label: t('nav.reports'), roles: ['ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
+    { to: '/zones/verification', label: t('nav.verificationQueue', { defaultValue: 'Verification' }), roles: ['ADMIN', 'OWNER', 'DEV'] as const },
     { to: '/owner-check', label: t('nav.ownerInsights'), roles: ['OWNER'] as const },
     { to: '/admin/users', label: t('nav.adminUsers'), roles: ['OWNER', 'DEV'] as const },
     { to: '/settings', label: t('nav.settings'), roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },

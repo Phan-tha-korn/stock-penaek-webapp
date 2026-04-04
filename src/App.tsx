@@ -5,10 +5,17 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { SessionGuard } from './components/auth/SessionGuard'
 import { AppShell } from './components/layout/AppShell'
 import { AppErrorBoundary } from './components/system/AppErrorBoundary'
+import { featureFlags } from './config/features'
 import { lazyWithRetry } from './utils/lazyWithRetry'
 
 const DashboardPage = lazyWithRetry(() => import('./pages/app/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const ZoneLandingPage = lazyWithRetry(() => import('./pages/app/zones/ZoneLandingPage').then((m) => ({ default: m.ZoneLandingPage })))
+const ZoneDashboardPage = lazyWithRetry(() => import('./pages/app/zones/ZoneDashboardPage').then((m) => ({ default: m.ZoneDashboardPage })))
+const SearchWorkspacePage = lazyWithRetry(() => import('./pages/app/zones/SearchWorkspacePage').then((m) => ({ default: m.SearchWorkspacePage })))
+const VerificationWorkspacePage = lazyWithRetry(() => import('./pages/app/zones/VerificationWorkspacePage').then((m) => ({ default: m.VerificationWorkspacePage })))
+const NotificationsPage = lazyWithRetry(() => import('./pages/app/zones/NotificationsPage').then((m) => ({ default: m.NotificationsPage })))
 const ProductsPage = lazyWithRetry(() => import('./pages/app/ProductsPage').then((m) => ({ default: m.ProductsPage })))
+const SuppliersPage = lazyWithRetry(() => import('./pages/app/SuppliersPage').then((m) => ({ default: m.SuppliersPage })))
 const TransactionsPage = lazyWithRetry(() => import('./pages/app/TransactionsPage').then((m) => ({ default: m.TransactionsPage })))
 const ReportsPage = lazyWithRetry(() => import('./pages/app/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 const UsersPage = lazyWithRetry(() => import('./pages/app/UsersPage').then((m) => ({ default: m.UsersPage })))
@@ -36,10 +43,26 @@ export function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/" element={<ZoneLandingPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/products" element={<ProductsPage />} />
+              <Route path="/zones/search" element={<SearchWorkspacePage />} />
+              <Route path="/zones/notifications" element={<NotificationsPage />} />
+              {featureFlags.supplierModule ? <Route path="/suppliers" element={<SuppliersPage />} /> : null}
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route element={<ProtectedRoute allow={['OWNER']} />}>
+                <Route path="/zones/owner" element={<ZoneDashboardPage zone="owner" />} />
+              </Route>
+              <Route element={<ProtectedRoute allow={['OWNER', 'DEV']} />}>
+                <Route path="/zones/dev" element={<ZoneDashboardPage zone="dev" />} />
+              </Route>
+              <Route element={<ProtectedRoute allow={['OWNER', 'DEV', 'ADMIN']} />}>
+                <Route path="/zones/admin" element={<ZoneDashboardPage zone="admin" />} />
+                <Route path="/zones/verification" element={<VerificationWorkspacePage />} />
+              </Route>
+              <Route path="/zones/stock" element={<ZoneDashboardPage zone="stock" />} />
+              <Route path="/zones/stock/search" element={<SearchWorkspacePage />} />
               <Route element={<ProtectedRoute allow={['OWNER']} />}>
                 <Route path="/owner-check" element={<OwnerCheckPage />} />
               </Route>

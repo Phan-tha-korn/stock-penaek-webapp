@@ -251,6 +251,7 @@ async def update_config(
         message="updated",
         before=before,
         after=cfg,
+        commit=True,
     )
 
     return await get_public_config()
@@ -376,6 +377,7 @@ async def update_google_setup(
         message="updated_google_setup",
         before=before,
         after=cfg,
+        commit=True,
     )
     return await get_google_setup(user)
 

@@ -27,6 +27,7 @@ export function normalizeProduct(product: PartialProduct): Product {
   return {
     id: asText(product?.id),
     sku: asText(product?.sku),
+    branch_id: product?.branch_id == null ? null : asText(product.branch_id),
     category_id: product?.category_id ?? null,
     name: {
       th: asText(rawNameTh),

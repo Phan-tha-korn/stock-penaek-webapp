@@ -63,6 +63,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
             message="locked",
             before={"username": username, "ip": ip, "failed_count": lock.failed_count},
             after=None,
+            commit=True,
         )
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="locked")
 
@@ -82,6 +83,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
             message="bad_secret_phrase",
             before={"username": username, "ip": ip},
             after=None,
+            commit=True,
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
 
@@ -103,6 +105,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
             message="invalid_credentials",
             before={"username": username, "ip": ip},
             after={"failed_count": lock.failed_count, "locked_until": lock.locked_until.isoformat() if lock.locked_until else None},
+            commit=True,
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
 
@@ -123,6 +126,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
                 message="totp_required_or_invalid",
                 before={"username": username, "ip": ip},
                 after={"failed_count": lock.failed_count},
+                commit=True,
             )
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_totp")
 
@@ -168,6 +172,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
         message="success",
         before=None,
         after={"ip": ip, "user_agent": ua},
+        commit=True,
     )
 
     return TokenOut(access_token=access_token, refresh_token=refresh_token, expires_in=expires_in)
@@ -234,6 +239,7 @@ async def refresh(payload: RefreshIn, request: Request, db: AsyncSession = Depen
         message="rotated",
         before={"ip": ip},
         after={"ip": ip, "user_agent": ua},
+        commit=True,
     )
 
     return TokenOut(access_token=access_token, refresh_token=refresh_token, expires_in=expires_in)

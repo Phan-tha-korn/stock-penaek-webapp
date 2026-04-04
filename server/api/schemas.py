@@ -116,6 +116,7 @@ class ProductName(BaseModel):
 class ProductOut(BaseModel):
     id: str
     sku: str
+    branch_id: str | None = None
     category_id: str | None = None
     name: ProductName
     category: str
@@ -132,9 +133,189 @@ class ProductOut(BaseModel):
     barcode: str
     image_url: str | None
     notes: str
+    archived_at: datetime | None = None
+    deleted_at: datetime | None = None
+    delete_reason: str | None = None
     created_at: datetime
     updated_at: datetime
     created_by: str
+
+
+class BranchOut(BaseModel):
+    id: str
+    code: str
+    name: str
+    description: str = ""
+    is_default: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class AttachmentOut(BaseModel):
+    id: str
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    classification: str
+    storage_driver: str
+    storage_bucket: str
+    storage_key: str
+    status: str
+    malware_status: str
+    owner_user_id: str | None = None
+    created_at: datetime
+    archived_at: datetime | None = None
+    deleted_at: datetime | None = None
+
+
+class SupplierContactIn(BaseModel):
+    contact_type: str = "other"
+    label: str = ""
+    value: str = ""
+    is_primary: bool = False
+
+
+class SupplierContactOut(SupplierContactIn):
+    id: str
+    sort_order: int = 0
+    created_at: datetime
+    archived_at: datetime | None = None
+
+
+class SupplierLinkIn(BaseModel):
+    link_type: str = "other"
+    label: str = ""
+    url: str = ""
+    is_primary: bool = False
+
+
+class SupplierLinkOut(SupplierLinkIn):
+    id: str
+    sort_order: int = 0
+    created_at: datetime
+    archived_at: datetime | None = None
+
+
+class SupplierPickupPointIn(BaseModel):
+    label: str = ""
+    address: str = ""
+    details: str = ""
+    is_primary: bool = False
+
+
+class SupplierPickupPointOut(SupplierPickupPointIn):
+    id: str
+    created_at: datetime
+    archived_at: datetime | None = None
+
+
+class SupplierReliabilityBreakdownOut(BaseModel):
+    metric_key: str
+    score_value: float
+    weight: float
+    detail_text: str = ""
+
+
+class SupplierReliabilityOut(BaseModel):
+    overall_score: float
+    auto_score: float
+    effective_score: float
+    breakdown: list[SupplierReliabilityBreakdownOut] = []
+
+
+class SupplierOut(BaseModel):
+    id: str
+    branch_id: str | None = None
+    code: str
+    name: str
+    normalized_name: str
+    phone: str = ""
+    line_id: str = ""
+    facebook_url: str = ""
+    website_url: str = ""
+    address: str = ""
+    pickup_notes: str = ""
+    source_details: str = ""
+    purchase_history_notes: str = ""
+    reliability_note: str = ""
+    status: str
+    is_verified: bool = False
+    archived_at: datetime | None = None
+    deleted_at: datetime | None = None
+    delete_reason: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    product_count: int = 0
+    contacts: list[SupplierContactOut] = []
+    links: list[SupplierLinkOut] = []
+    pickup_points: list[SupplierPickupPointOut] = []
+    reliability: SupplierReliabilityOut | None = None
+    attachments: list[AttachmentOut] = []
+
+
+class SupplierListOut(BaseModel):
+    items: list[SupplierOut]
+    total: int
+
+
+class SupplierCreateIn(BaseModel):
+    branch_id: str | None = None
+    name: str
+    phone: str = ""
+    line_id: str = ""
+    facebook_url: str = ""
+    website_url: str = ""
+    address: str = ""
+    pickup_notes: str = ""
+    source_details: str = ""
+    purchase_history_notes: str = ""
+    reliability_note: str = ""
+    status: str = "ACTIVE"
+    is_verified: bool = False
+    contacts: list[SupplierContactIn] = []
+    links: list[SupplierLinkIn] = []
+    pickup_points: list[SupplierPickupPointIn] = []
+
+
+class SupplierUpdateIn(BaseModel):
+    branch_id: str | None = None
+    name: str | None = None
+    phone: str | None = None
+    line_id: str | None = None
+    facebook_url: str | None = None
+    website_url: str | None = None
+    address: str | None = None
+    pickup_notes: str | None = None
+    source_details: str | None = None
+    purchase_history_notes: str | None = None
+    reliability_note: str | None = None
+    status: str | None = None
+    is_verified: bool | None = None
+    contacts: list[SupplierContactIn] | None = None
+    links: list[SupplierLinkIn] | None = None
+    pickup_points: list[SupplierPickupPointIn] | None = None
+
+
+class SupplierProposalOut(BaseModel):
+    id: str
+    supplier_id: str | None = None
+    action: str
+    status: str
+    proposed_by_user_id: str | None = None
+    reviewed_by_user_id: str | None = None
+    approved_supplier_id: str | None = None
+    requires_dev_review: bool = True
+    proposed_payload: dict | None = None
+    current_payload: dict | None = None
+    review_note: str = ""
+    created_at: datetime
+    updated_at: datetime
+    reviewed_at: datetime | None = None
+
+
+class SupplierProposalActionIn(BaseModel):
+    review_note: str = ""
 
 
 class ProductListOut(BaseModel):

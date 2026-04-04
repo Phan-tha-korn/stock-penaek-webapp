@@ -17,6 +17,8 @@ from server.config.settings import settings
 from server.db.database import SessionLocal
 from server.db.models import AuditLog, Product, Role, User
 from server.db.init_db import calc_status
+from server.services.branches import ensure_default_branch
+from server.services.suppliers import sync_product_supplier_links
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"]
 
 DELETED_PREFIX = "__DELETED__:"
@@ -890,6 +892,7 @@ async def import_stock_from_sheet(
 
     async with SessionLocal() as db:
         actor = None
+        default_branch = await ensure_default_branch(db)
         if actor_id:
             actor = await db.scalar(select(User).where(User.id == actor_id))
         if not actor:
@@ -922,6 +925,7 @@ async def import_stock_from_sheet(
             if not p:
                 p = Product(
                     sku=sku,
+                    branch_id=default_branch.id,
                     name_th=name_th,
                     name_en="",
                     category=category,
@@ -945,6 +949,8 @@ async def import_stock_from_sheet(
                 db.add(p)
                 created += 1
             else:
+                if not p.branch_id:
+                    p.branch_id = default_branch.id
                 p.name_th = name_th
                 if category:
                     p.category = category
@@ -960,6 +966,8 @@ async def import_stock_from_sheet(
                 p.status = calc_status(float(p.stock_qty), float(p.min_stock), float(p.max_stock), bool(p.is_test))
                 p.updated_at = datetime.utcnow()
                 updated += 1
+            await db.flush()
+            await sync_product_supplier_links(db, product=p, actor_id=actor_id_resolved)
 
         await db.commit()
 

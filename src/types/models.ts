@@ -52,6 +52,7 @@ export interface ProductName {
 export interface Product {
   id: string
   sku: string
+  branch_id: string | null
   category_id: string | null
   name: ProductName
   category: string
@@ -68,9 +69,133 @@ export interface Product {
   barcode: string
   image_url: string | null
   notes: string
+  archived_at?: string | null
+  deleted_at?: string | null
+  delete_reason?: string | null
   created_at: string
   updated_at: string
   created_by: string
+}
+
+export interface Branch {
+  id: string
+  code: string
+  name: string
+  description: string
+  is_default: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AttachmentItem {
+  id: string
+  original_filename: string
+  content_type: string
+  size_bytes: number
+  classification: string
+  storage_driver: string
+  storage_bucket: string
+  storage_key: string
+  status: string
+  malware_status: string
+  owner_user_id?: string | null
+  created_at: string
+  archived_at?: string | null
+  deleted_at?: string | null
+}
+
+export interface SupplierContact {
+  id?: string
+  contact_type: string
+  label: string
+  value: string
+  is_primary: boolean
+  sort_order?: number
+  created_at?: string
+  archived_at?: string | null
+}
+
+export interface SupplierLink {
+  id?: string
+  link_type: string
+  label: string
+  url: string
+  is_primary: boolean
+  sort_order?: number
+  created_at?: string
+  archived_at?: string | null
+}
+
+export interface SupplierPickupPoint {
+  id?: string
+  label: string
+  address: string
+  details: string
+  is_primary: boolean
+  created_at?: string
+  archived_at?: string | null
+}
+
+export interface SupplierReliabilityBreakdown {
+  metric_key: string
+  score_value: number
+  weight: number
+  detail_text: string
+}
+
+export interface SupplierReliability {
+  overall_score: number
+  auto_score: number
+  effective_score: number
+  breakdown: SupplierReliabilityBreakdown[]
+}
+
+export interface Supplier {
+  id: string
+  branch_id: string | null
+  code: string
+  name: string
+  normalized_name: string
+  phone: string
+  line_id: string
+  facebook_url: string
+  website_url: string
+  address: string
+  pickup_notes: string
+  source_details: string
+  purchase_history_notes: string
+  reliability_note: string
+  status: string
+  is_verified: boolean
+  archived_at?: string | null
+  deleted_at?: string | null
+  delete_reason?: string | null
+  created_at: string
+  updated_at: string
+  product_count: number
+  contacts: SupplierContact[]
+  links: SupplierLink[]
+  pickup_points: SupplierPickupPoint[]
+  reliability?: SupplierReliability | null
+  attachments: AttachmentItem[]
+}
+
+export interface SupplierProposal {
+  id: string
+  supplier_id?: string | null
+  action: string
+  status: string
+  proposed_by_user_id?: string | null
+  reviewed_by_user_id?: string | null
+  approved_supplier_id?: string | null
+  requires_dev_review: boolean
+  proposed_payload?: Record<string, unknown> | null
+  current_payload?: Record<string, unknown> | null
+  review_note: string
+  created_at: string
+  updated_at: string
+  reviewed_at?: string | null
 }
 
 export interface ProductCategory {

@@ -107,6 +107,7 @@ async def update_rule_settings(
         before=None,
         after=cfg["inventory_rules"],
     )
+    await db.commit()
     return _load_rule_settings()
 
 
@@ -142,8 +143,6 @@ async def create_category(
             updated_at=datetime.utcnow(),
         )
         db.add(category)
-    await db.commit()
-    await db.refresh(category)
     await write_audit_log(
         db,
         request=request,
@@ -156,6 +155,8 @@ async def create_category(
         before=None,
         after={"name": category.name},
     )
+    await db.commit()
+    await db.refresh(category)
     await _broadcast_patch("completed", category.id)
     return _to_out(category)
 
@@ -199,8 +200,6 @@ async def update_category(
         for product in res.scalars().all():
             product.category = category.name
             product.updated_at = datetime.utcnow()
-    await db.commit()
-    await db.refresh(category)
     await write_audit_log(
         db,
         request=request,
@@ -213,6 +212,8 @@ async def update_category(
         before=before,
         after={"name": category.name, "description": category.description, "sort_order": category.sort_order},
     )
+    await db.commit()
+    await db.refresh(category)
     await _broadcast_patch("completed", category.id)
     return _to_out(category)
 
@@ -230,6 +231,9 @@ async def delete_category(
 
     await _broadcast_patch("started", category.id)
     category.is_deleted = True
+    category.deleted_at = datetime.utcnow()
+    category.delete_reason = "deleted"
+    category.archived_at = category.deleted_at
     category.updated_at = datetime.utcnow()
     products = (await db.execute(select(Product).where(Product.category_id == category.id))).scalars().all()
     for product in products:
@@ -237,7 +241,6 @@ async def delete_category(
         product.category_id = None
         product.category = ""
         product.updated_at = datetime.utcnow()
-    await db.commit()
     await write_audit_log(
         db,
         request=request,
@@ -250,6 +253,7 @@ async def delete_category(
         before={"name": category.name},
         after={"detached_products": len(products)},
     )
+    await db.commit()
     await _broadcast_patch("completed", category.id)
     return {"ok": True}
 
@@ -267,6 +271,9 @@ async def restore_category(
 
     await _broadcast_patch("started", category.id)
     category.is_deleted = False
+    category.deleted_at = None
+    category.delete_reason = None
+    category.archived_at = None
     category.updated_at = datetime.utcnow()
     products = (
         await db.execute(
@@ -283,8 +290,6 @@ async def restore_category(
         product.category_id = category.id
         product.category = category.name
         product.updated_at = datetime.utcnow()
-    await db.commit()
-    await db.refresh(category)
     await write_audit_log(
         db,
         request=request,
@@ -297,5 +302,7 @@ async def restore_category(
         before=None,
         after={"restored_products": len(products)},
     )
+    await db.commit()
+    await db.refresh(category)
     await _broadcast_patch("completed", category.id)
     return _to_out(category)
