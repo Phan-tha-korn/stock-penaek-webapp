@@ -10,7 +10,7 @@ import { forceFullSyncToSheets, importFromSheets, syncToSheets } from '../../ser
 import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist, type GarbageFileItem } from '../../services/devGarbage'
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
 import { createDevSheet, getDevSheetsConfig, resolveDevSheetUrl, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
-import { resetStock } from '../../services/devReset'
+import { permanentDelete, resetStock, type DevPermanentDeletePayload, type DevPermanentDeleteResult, type DevPermanentDeleteScope } from '../../services/devReset'
 import {
   createProductCategory,
   deleteProductCategory,
@@ -25,6 +25,127 @@ import type { ActivityItem } from '../../services/dashboard'
 import type { AppConfig, InventoryRuleSettings, ProductCategory } from '../../types/models'
 
 const GOOGLE_OAUTH_PENDING_KEY = 'google_oauth_pending_until'
+
+interface PurgeTargetInputs {
+  product_refs: string
+  supplier_refs: string
+  category_refs: string
+  price_record_refs: string
+  verification_refs: string
+  attachment_refs: string
+}
+
+const EMPTY_PURGE_TARGETS: PurgeTargetInputs = {
+  product_refs: '',
+  supplier_refs: '',
+  category_refs: '',
+  price_record_refs: '',
+  verification_refs: '',
+  attachment_refs: '',
+}
+
+const PURGE_SCOPE_OPTIONS: Array<{ value: DevPermanentDeleteScope; label: string; description: string }> = [
+  { value: 'products', label: 'สินค้า / สต็อก / หมวด / แท็ก', description: 'สินค้า ธุรกรรม สถานะแจ้งเตือน หมวดหมู่ แท็ก และดัชนีค้นหา' },
+  { value: 'suppliers', label: 'ซัพพลายเออร์', description: 'ผู้ขาย รายชื่อช่องทางติดต่อ ลิงก์ จุดรับของ และคะแนนความน่าเชื่อถือ' },
+  { value: 'pricing', label: 'ราคา / สูตรคำนวณ', description: 'Price record, projection, สูตรต้นทุน และ exchange rate snapshot' },
+  { value: 'matching', label: 'Matching / Canonical Group', description: 'กลุ่ม canonical และประวัติ matching ทั้งหมด' },
+  { value: 'verification', label: 'คิวตรวจสอบ', description: 'Verification request, assignment, action, warning และ queue projection' },
+  { value: 'notifications', label: 'แจ้งเตือน', description: 'Event, outbox, delivery, failure, preference และ template' },
+  { value: 'attachments', label: 'ไฟล์แนบ', description: 'Attachment record, binding, scan job และไฟล์แนบจริงใน storage' },
+  { value: 'reports', label: 'Snapshot / Report', description: 'Report snapshot, item และ link' },
+  { value: 'logs', label: 'Audit / Archive / Logs', description: 'Audit log, audit event, archive และไฟล์ใน storage/logs' },
+  { value: 'system_access', label: 'Session / Lock / Scope', description: 'Refresh session, login lock และ user branch scope' },
+  { value: 'backups', label: 'ไฟล์สำรอง', description: 'ล้างไฟล์ backup ทั้งหมดใน storage/backups' },
+]
+
+const PURGE_COUNT_LABELS: Record<string, string> = {
+  products: 'สินค้า',
+  stock_transactions: 'ธุรกรรมสต็อก',
+  stock_alert_states: 'สถานะแจ้งเตือน',
+  product_categories: 'หมวดสินค้า',
+  product_aliases: 'ชื่อเรียกสินค้า',
+  product_specs: 'สเปกสินค้า',
+  product_tag_links: 'ลิงก์แท็กสินค้า',
+  tags: 'แท็ก',
+  suppliers: 'ซัพพลายเออร์',
+  supplier_contacts: 'ผู้ติดต่อ',
+  supplier_links: 'ลิงก์ซัพพลายเออร์',
+  supplier_pickup_points: 'จุดรับของ',
+  supplier_product_links: 'ลิงก์สินค้า-ซัพพลายเออร์',
+  supplier_reliability_profiles: 'โปรไฟล์ความน่าเชื่อถือ',
+  supplier_reliability_scores: 'คะแนนความน่าเชื่อถือ',
+  supplier_reliability_breakdowns: 'รายละเอียดคะแนน',
+  supplier_change_proposals: 'ข้อเสนอเปลี่ยนแปลงซัพพลายเออร์',
+  price_records: 'ราคา',
+  price_search_projections: 'ดัชนีค้นหาราคา',
+  cost_formulas: 'สูตรต้นทุน',
+  cost_formula_versions: 'เวอร์ชันสูตรต้นทุน',
+  exchange_rate_snapshots: 'exchange rate snapshot',
+  canonical_product_groups: 'canonical group',
+  canonical_group_members: 'สมาชิก canonical group',
+  matching_operations: 'matching operation',
+  matching_operation_group_states: 'matching group state',
+  matching_operation_membership_states: 'matching membership state',
+  matching_dependency_checks: 'matching dependency check',
+  verification_requests: 'verification request',
+  verification_request_items: 'verification item',
+  verification_actions: 'verification action',
+  verification_assignments: 'verification assignment',
+  verification_dependency_warnings: 'verification warning',
+  verification_escalations: 'verification escalation',
+  verification_queue_projections: 'verification queue projection',
+  notification_events: 'notification event',
+  notification_outbox: 'notification outbox',
+  notification_deliveries: 'notification delivery',
+  notification_failures: 'notification failure',
+  notification_preferences: 'notification preference',
+  notification_templates: 'notification template',
+  attachments: 'attachment',
+  attachment_bindings: 'attachment binding',
+  attachment_scan_jobs: 'attachment scan job',
+  attachment_type_classifications: 'attachment type rule',
+  report_snapshots: 'report snapshot',
+  report_snapshot_items: 'snapshot item',
+  report_snapshot_links: 'snapshot link',
+  audit_logs: 'audit log',
+  audit_events: 'audit event',
+  entity_archives: 'entity archive',
+  refresh_sessions: 'refresh session',
+  login_locks: 'login lock',
+  user_branch_scopes: 'user branch scope',
+  users: 'ผู้ใช้',
+  branches: 'สาขา',
+}
+
+const PURGE_FILE_LABELS: Record<string, string> = {
+  product_media_files: 'ไฟล์รูปสินค้า',
+  attachment_files: 'ไฟล์แนบ',
+  log_files: 'ไฟล์ log',
+  backup_files: 'ไฟล์สำรอง',
+}
+
+function splitRefInput(value: string) {
+  return value
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function summarizeNumberMap(values: Record<string, number>, labels: Record<string, string>) {
+  return Object.entries(values)
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([key, value]) => `${labels[key] || key} ${value}`)
+    .join(', ')
+}
+
+function summarizeUnmatchedRefs(unmatched: Record<string, string[]>) {
+  const items = Object.values(unmatched).flat().filter(Boolean)
+  if (items.length === 0) return ''
+  if (items.length <= 6) return items.join(', ')
+  return `${items.slice(0, 6).join(', ')} และอีก ${items.length - 6}`
+}
 
 function hasPendingGoogleOauth() {
   const raw = window.localStorage.getItem(GOOGLE_OAUTH_PENDING_KEY)
@@ -69,6 +190,12 @@ export function DevPage() {
   const [restoreBusy, setRestoreBusy] = useState(false)
   const [restoreFile, setRestoreFile] = useState<File | null>(null)
   const [resetStockBusy, setResetStockBusy] = useState(false)
+  const [purgeBusy, setPurgeBusy] = useState(false)
+  const [purgeMsg, setPurgeMsg] = useState<string | null>(null)
+  const [purgeDeleteAll, setPurgeDeleteAll] = useState(false)
+  const [purgeScopes, setPurgeScopes] = useState<DevPermanentDeleteScope[]>([])
+  const [purgeTargets, setPurgeTargets] = useState<PurgeTargetInputs>(EMPTY_PURGE_TARGETS)
+  const [purgeResult, setPurgeResult] = useState<DevPermanentDeleteResult | null>(null)
   const [garbageBusy, setGarbageBusy] = useState(false)
   const [garbageItems, setGarbageItems] = useState<GarbageFileItem[]>([])
   const [selectedPaths, setSelectedPaths] = useState<string[]>([])
@@ -100,7 +227,7 @@ export function DevPage() {
   const [notifIncludeActor, setNotifIncludeActor] = useState(true)
   const [notifIncludeReason, setNotifIncludeReason] = useState(true)
   const [notifIncludeImageUrl, setNotifIncludeImageUrl] = useState(false)
-  const [secureAction, setSecureAction] = useState<'backup' | 'restore' | 'reset' | null>(null)
+  const [secureAction, setSecureAction] = useState<'backup' | 'restore' | 'reset' | 'purge' | null>(null)
   const [securePassword, setSecurePassword] = useState('')
   const [sheetGuardOpen, setSheetGuardOpen] = useState(false)
   const [sheetGuardMode, setSheetGuardMode] = useState<'missing' | 'sync'>('missing')
@@ -217,6 +344,40 @@ export function DevPage() {
     }, mode)
   }
 
+  function togglePurgeScope(scope: DevPermanentDeleteScope) {
+    setPurgeScopes((prev) => (prev.includes(scope) ? prev.filter((item) => item !== scope) : [...prev, scope]))
+  }
+
+  function updatePurgeTarget(field: keyof PurgeTargetInputs, value: string) {
+    setPurgeTargets((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function buildPermanentDeletePayload(): DevPermanentDeletePayload {
+    return {
+      delete_all: purgeDeleteAll,
+      scopes: purgeDeleteAll ? [] : purgeScopes,
+      product_refs: splitRefInput(purgeTargets.product_refs),
+      supplier_refs: splitRefInput(purgeTargets.supplier_refs),
+      category_refs: splitRefInput(purgeTargets.category_refs),
+      price_record_refs: splitRefInput(purgeTargets.price_record_refs),
+      verification_refs: splitRefInput(purgeTargets.verification_refs),
+      attachment_refs: splitRefInput(purgeTargets.attachment_refs),
+    }
+  }
+
+  function canRunPermanentDelete(payload = buildPermanentDeletePayload()) {
+    return (
+      payload.delete_all ||
+      payload.scopes.length > 0 ||
+      payload.product_refs.length > 0 ||
+      payload.supplier_refs.length > 0 ||
+      payload.category_refs.length > 0 ||
+      payload.price_record_refs.length > 0 ||
+      payload.verification_refs.length > 0 ||
+      payload.attachment_refs.length > 0
+    )
+  }
+
   async function runSecureAction() {
     const password = securePassword.trim()
     if (!password || !secureAction) return
@@ -251,6 +412,44 @@ export function DevPage() {
         setSheetMsg(e?.response?.data?.detail || e?.message || 'กู้คืนไฟล์สำรองไม่สำเร็จ')
       } finally {
         setRestoreBusy(false)
+      }
+      return
+    }
+    if (secureAction === 'purge') {
+      const purgePayload = buildPermanentDeletePayload()
+      if (!canRunPermanentDelete(purgePayload)) {
+        setPurgeMsg('เลือกอย่างน้อย 1 scope หรือกรอกรายการที่จะลบก่อน')
+        return
+      }
+      setPurgeMsg(null)
+      setPurgeBusy(true)
+      try {
+        const res = await permanentDelete(purgePayload, password)
+        setPurgeResult(res)
+        const dbSummary = summarizeNumberMap(res.deleted_counts, PURGE_COUNT_LABELS)
+        const fileSummary = summarizeNumberMap(res.filesystem_deleted, PURGE_FILE_LABELS)
+        const unmatchedSummary = summarizeUnmatchedRefs(res.unmatched_refs)
+        setPurgeMsg(
+          [
+            dbSummary ? `ลบข้อมูลแล้ว: ${dbSummary}` : 'ลบข้อมูลตามที่เลือกแล้ว',
+            fileSummary ? `ลบไฟล์แล้ว: ${fileSummary}` : null,
+            unmatchedSummary ? `ไม่พบบางรายการ: ${unmatchedSummary}` : null,
+          ]
+            .filter(Boolean)
+            .join(' | ')
+        )
+        if (res.session_invalidated) {
+          useAuthStore.getState().clearSession()
+          navigate('/login')
+          return
+        }
+        await reload()
+        await reloadCategoryTools().catch(() => {})
+        await scanNow()
+      } catch (e: any) {
+        setPurgeMsg(e?.response?.data?.detail || e?.message || 'ลบถาวรไม่สำเร็จ')
+      } finally {
+        setPurgeBusy(false)
       }
       return
     }
@@ -1158,7 +1357,13 @@ export function DevPage() {
           <div className="flex min-h-full items-center justify-center">
             <div className="w-full max-w-md rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)] shadow-2xl">
               <div className="border-b border-[color:var(--color-border)] px-5 py-4 text-sm font-semibold">
-                {secureAction === 'backup' ? 'ยืนยันสร้างไฟล์สำรอง' : secureAction === 'restore' ? 'ยืนยันกู้คืนไฟล์สำรอง' : 'ยืนยันล้างสต็อก'}
+                {secureAction === 'backup'
+                  ? 'ยืนยันสร้างไฟล์สำรอง'
+                  : secureAction === 'restore'
+                    ? 'ยืนยันกู้คืนไฟล์สำรอง'
+                    : secureAction === 'purge'
+                      ? 'ยืนยันลบถาวร 100%'
+                      : 'ยืนยันล้างสต็อก'}
               </div>
               <div className="space-y-3 px-5 py-4">
                 <div className="text-sm text-white/70">
@@ -1166,7 +1371,9 @@ export function DevPage() {
                     ? 'กรอกรหัสเพื่อสร้างไฟล์สำรองแบบทันที แล้วดาวน์โหลดได้เลย'
                     : secureAction === 'restore'
                       ? `กรอกรหัสเพื่อกู้คืนจากไฟล์ ${restoreFile?.name || '-'} และแทนที่ข้อมูลทั้งหมดในระบบ`
-                      : 'กรอกรหัสเพื่อสำรองข้อมูลก่อน แล้วล้างสินค้า ธุรกรรม และสถานะแจ้งเตือนทั้งหมดโดยคงผู้ใช้ไว้'}
+                      : secureAction === 'purge'
+                        ? 'กรอกรหัสเพื่อทำ Permanent Delete ตาม scope หรือรายการที่เลือก การลบนี้ย้อนกลับไม่ได้'
+                        : 'กรอกรหัสเพื่อสำรองข้อมูลก่อน แล้วล้างสินค้า ธุรกรรม และสถานะแจ้งเตือนทั้งหมดโดยคงผู้ใช้ไว้'}
                 </div>
                 <input
                   type="password"
@@ -1191,7 +1398,7 @@ export function DevPage() {
                 <button
                   className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
                   type="button"
-                  disabled={!securePassword.trim() || backupBusy || restoreBusy || resetStockBusy}
+                  disabled={!securePassword.trim() || backupBusy || restoreBusy || resetStockBusy || purgeBusy}
                   onClick={async () => {
                     await runSecureAction()
                     setSecureAction(null)
@@ -1629,6 +1836,137 @@ export function DevPage() {
               {resetStockBusy ? 'กำลังล้าง...' : 'ล้างสต็อกให้โล่ง'}
             </button>
           </div>
+        </div>
+
+        <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-red-100">ลบถาวร 100%</div>
+              <div className="mt-1 text-xs text-red-100/80">DEV only สำหรับลบหลายส่วนพร้อมกัน หรือลบเฉพาะรายการด้วย ref หลายตัวในครั้งเดียว</div>
+            </div>
+            <div className="rounded border border-red-400/30 bg-black/20 px-3 py-2 text-xs text-red-50">
+              ใส่รหัสยืนยันผ่าน modal เดิม: phanthakorn
+            </div>
+          </div>
+
+          {purgeMsg ? <div className="mt-3 text-xs text-red-50/90">{purgeMsg}</div> : null}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 rounded border border-red-400/30 bg-black/20 px-3 py-2 text-sm text-red-50">
+              <input
+                type="checkbox"
+                checked={purgeDeleteAll}
+                onChange={(e) => setPurgeDeleteAll(e.target.checked)}
+              />
+              ลบทุกสิ่งทั้งระบบ รวมผู้ใช้และสาขา
+            </label>
+            <button
+              className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10 disabled:opacity-50"
+              type="button"
+              disabled={purgeDeleteAll}
+              onClick={() => setPurgeScopes(PURGE_SCOPE_OPTIONS.map((item) => item.value))}
+            >
+              เลือก safe scope ทั้งหมด
+            </button>
+            <button
+              className="rounded border border-red-400/30 px-3 py-2 text-xs text-red-50 hover:bg-red-500/10"
+              type="button"
+              onClick={() => {
+                setPurgeDeleteAll(false)
+                setPurgeScopes([])
+                setPurgeTargets(EMPTY_PURGE_TARGETS)
+                setPurgeResult(null)
+                setPurgeMsg(null)
+              }}
+            >
+              ล้างตัวเลือก
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+            <div className="rounded border border-red-400/20 bg-black/20 p-3">
+              <div className="text-xs font-semibold text-red-50">เลือกส่วนที่จะลบ</div>
+              <div className="mt-1 text-xs text-red-50/65">กดได้หลายส่วนพร้อมกัน ถ้าเปิด “ลบทุกสิ่ง” ระบบจะลบครบทุก scope รวมบัญชีผู้ใช้และสาขา</div>
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                {PURGE_SCOPE_OPTIONS.map((item) => {
+                  const active = purgeScopes.includes(item.value)
+                  return (
+                    <button
+                      key={item.value}
+                      className={`rounded border px-3 py-3 text-left transition ${
+                        active
+                          ? 'border-red-300/60 bg-red-500/20 text-red-50'
+                          : 'border-red-400/20 bg-black/10 text-red-50/80 hover:bg-red-500/10'
+                      }`}
+                      type="button"
+                      disabled={purgeDeleteAll}
+                      onClick={() => togglePurgeScope(item.value)}
+                    >
+                      <div className="text-sm font-semibold">{item.label}</div>
+                      <div className="mt-1 text-xs text-current/70">{item.description}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="rounded border border-red-400/20 bg-black/20 p-3">
+              <div className="text-xs font-semibold text-red-50">ลบเฉพาะรายการ</div>
+              <div className="mt-1 text-xs text-red-50/65">คั่นหลายรายการด้วย comma หรือขึ้นบรรทัดใหม่ ใช้เดี่ยว ๆ หรือใช้ร่วมกับ scope ก็ได้</div>
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {[
+                  { key: 'product_refs', label: 'สินค้า', placeholder: 'SKU หรือ Product ID' },
+                  { key: 'supplier_refs', label: 'ซัพพลายเออร์', placeholder: 'Supplier code, ID หรือชื่อ' },
+                  { key: 'category_refs', label: 'หมวดสินค้า', placeholder: 'Category name หรือ ID' },
+                  { key: 'price_record_refs', label: 'ราคา', placeholder: 'Price record ID' },
+                  { key: 'verification_refs', label: 'คิวตรวจสอบ', placeholder: 'Request code หรือ ID' },
+                  { key: 'attachment_refs', label: 'ไฟล์แนบ', placeholder: 'Attachment ID หรือ storage key' },
+                ].map((item) => (
+                  <div key={item.key}>
+                    <div className="mb-1 text-xs text-red-50/75">{item.label}</div>
+                    <textarea
+                      className="min-h-[92px] w-full rounded border border-red-400/20 bg-black/25 px-3 py-2 text-sm outline-none focus:border-red-300/60 disabled:opacity-50"
+                      value={purgeTargets[item.key as keyof PurgeTargetInputs]}
+                      onChange={(e) => updatePurgeTarget(item.key as keyof PurgeTargetInputs, e.target.value)}
+                      placeholder={item.placeholder}
+                      disabled={purgeDeleteAll}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded border border-red-400/20 bg-black/20 px-3 py-3">
+            <div className="text-xs text-red-50/70">
+              คำเตือน: การลบนี้เป็นแบบถาวร ไม่มี backup อัตโนมัติ และอาจทำให้ต้อง login ใหม่ถ้าล้างทั้งระบบ
+            </div>
+            <button
+              className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              type="button"
+              disabled={purgeBusy || !canRunPermanentDelete()}
+              onClick={() => {
+                if (!canRunPermanentDelete()) {
+                  setPurgeMsg('เลือกอย่างน้อย 1 scope หรือกรอกรายการที่จะลบก่อน')
+                  return
+                }
+                setSecurePassword('')
+                setSecureAction('purge')
+              }}
+            >
+              {purgeBusy ? 'กำลังลบถาวร...' : 'เริ่มลบถาวร 100%'}
+            </button>
+          </div>
+
+          {purgeResult ? (
+            <div className="mt-3 rounded border border-red-400/20 bg-black/20 p-3 text-xs text-red-50/80">
+              <div className="font-semibold text-red-50">ผลลัพธ์ล่าสุด</div>
+              <div className="mt-2">scope ที่รัน: {purgeResult.executed_scopes.join(', ') || '-'}</div>
+              <div className="mt-1">ลบจากฐานข้อมูล: {summarizeNumberMap(purgeResult.deleted_counts, PURGE_COUNT_LABELS) || 'ไม่มีรายการที่ถูกลบ'}</div>
+              <div className="mt-1">ลบไฟล์: {summarizeNumberMap(purgeResult.filesystem_deleted, PURGE_FILE_LABELS) || 'ไม่มีไฟล์ที่ถูกลบ'}</div>
+              <div className="mt-1">รายการที่ไม่พบ: {summarizeUnmatchedRefs(purgeResult.unmatched_refs) || 'ไม่มี'}</div>
+            </div>
+          ) : null}
         </div>
       </div>
 
