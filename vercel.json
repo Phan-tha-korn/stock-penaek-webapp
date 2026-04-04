@@ -1,1 +1,21 @@
-{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
+{
+	"redirects": [
+		{
+			"source": "/(.*)",
+			"has": [
+				{
+					"type": "host",
+					"value": "www.penaekapi.xyz"
+				}
+			],
+			"destination": "https://penaekapi.xyz/$1",
+			"permanent": true
+		}
+	],
+	"rewrites": [
+		{
+			"source": "/(.*)",
+			"destination": "/index.html"
+		}
+	]
+}

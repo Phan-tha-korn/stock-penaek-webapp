@@ -38,9 +38,15 @@ def _cors_origins() -> list[str]:
     web_url = str(load_master_config().get("web_url") or "").strip().rstrip("/")
     if web_url:
         origins.append(web_url)
+        if "://" in web_url:
+            scheme, host = web_url.split("://", 1)
+            if host.startswith("www."):
+                origins.append(f"{scheme}://{host[4:]}")
+            else:
+                origins.append(f"{scheme}://www.{host}")
     if settings.env != "production":
         origins.extend(["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"])
-    return origins or ["http://localhost:5173"]
+    return list(dict.fromkeys(origins)) or ["http://localhost:5173"]
 
 
 fastapi_app.add_middleware(
