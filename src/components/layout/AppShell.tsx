@@ -11,10 +11,20 @@ import { applyThemePreference } from '../../utils/theme'
 
 type AppRole = 'STOCK' | 'ADMIN' | 'ACCOUNTANT' | 'OWNER' | 'DEV'
 
+type NavItem = {
+  to: string
+  label: string
+}
+
+type NavSection = {
+  title: string
+  items: NavItem[]
+}
+
 function navClass(isActive: boolean) {
   return [
     'block rounded-lg px-3 py-2 text-sm transition',
-    isActive ? 'bg-[color:var(--color-primary)] text-black shadow-sm' : 'text-[color:var(--color-muted-strong)] hover:bg-white/8'
+    isActive ? 'bg-[color:var(--color-primary)] text-black shadow-sm' : 'text-[color:var(--color-muted-strong)] hover:bg-white/8',
   ].join(' ')
 }
 
@@ -45,28 +55,34 @@ function homePathFor(role: AppRole | undefined) {
   return '/zones/stock/search'
 }
 
-function sectionsFor(role: AppRole | undefined, isEn: boolean) {
+function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
+  const compareItem = { to: '/zones/search?view=compare', label: isEn ? 'Quick compare' : 'เทียบสินค้าแบบไว' }
+  const queueItem = { to: '/zones/verification', label: isEn ? 'Auto review queue' : 'คิวตรวจสอบอัตโนมัติ' }
+  const notificationItem = { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' }
+  const productItem = { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' }
+  const supplierManageItem = { to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }
+  const supplierListItem = { to: '/suppliers', label: isEn ? 'Suppliers' : 'รายชื่อร้านค้า' }
+  const transactionItem = { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' }
+  const reportItem = { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' }
+  const settingsItem = { to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' }
+
   if (role === 'STOCK') {
     return [
       {
         title: isEn ? 'Main' : 'เมนูหลัก',
         items: [
           { to: '/zones/stock/search', label: isEn ? 'Find products' : 'ค้นหาสินค้าและเช็ก' },
-          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
-          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+          compareItem,
+          notificationItem,
         ],
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [
-          { to: '/products', label: isEn ? 'Products' : 'รายการสินค้า' },
-          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'รายชื่อร้านค้า' }] : []),
-          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
-        ],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), transactionItem],
       },
       {
         title: isEn ? 'Settings' : 'การตั้งค่า',
-        items: [{ to: '/settings', label: isEn ? 'Display settings' : 'ตั้งค่าหน้าตา' }],
+        items: [{ ...settingsItem, label: isEn ? 'Display settings' : 'ตั้งค่าหน้าตา' }],
       },
     ]
   }
@@ -77,28 +93,20 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean) {
         title: isEn ? 'Main' : 'เมนูหลัก',
         items: [
           { to: '/zones/admin', label: isEn ? 'Operations home' : 'หน้าดูแลงานหลัก' },
-          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+          notificationItem,
         ],
       },
       {
         title: isEn ? 'Review' : 'ตรวจสอบงาน',
-        items: [
-          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
-          { to: '/zones/verification', label: isEn ? 'Review monitor' : 'ติดตามคิวตรวจสอบ' },
-        ],
+        items: [compareItem, queueItem],
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [
-          { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' },
-          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }] : []),
-          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
-          { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
-        ],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), transactionItem, reportItem],
       },
       {
         title: isEn ? 'Settings' : 'การตั้งค่า',
-        items: [{ to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' }],
+        items: [settingsItem],
       },
     ]
   }
@@ -109,30 +117,22 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean) {
         title: isEn ? 'Main' : 'เมนูหลัก',
         items: [
           { to: '/zones/dev', label: isEn ? 'My review home' : 'งานตรวจสอบของฉัน' },
-          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+          notificationItem,
         ],
       },
       {
         title: isEn ? 'Review' : 'ตรวจสอบงาน',
-        items: [
-          { to: '/zones/verification', label: isEn ? 'Verification queue' : 'คิวงานรอตรวจสอบ' },
-          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
-        ],
+        items: [queueItem, compareItem],
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [
-          { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' },
-          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }] : []),
-          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
-          { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
-        ],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), transactionItem, reportItem],
       },
       {
         title: isEn ? 'System' : 'ระบบ',
         items: [
           { to: '/admin/users', label: isEn ? 'Users' : 'จัดการผู้ใช้' },
-          { to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' },
+          settingsItem,
           { to: '/dev', label: isEn ? 'Developer tools' : 'เครื่องมือพัฒนา' },
         ],
       },
@@ -145,31 +145,22 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean) {
         title: isEn ? 'Main' : 'เมนูหลัก',
         items: [
           { to: '/zones/owner', label: isEn ? 'Executive home' : 'ภาพรวมผู้บริหาร' },
-          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+          notificationItem,
         ],
       },
       {
         title: isEn ? 'Review' : 'ตรวจสอบงาน',
-        items: [
-          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
-          { to: '/zones/verification', label: isEn ? 'Verification queue' : 'คิวงานรอตรวจสอบ' },
-          { to: '/owner-check', label: isEn ? 'Deep insights' : 'มุมมองเชิงลึก' },
-        ],
+        items: [compareItem, queueItem, { to: '/owner-check', label: isEn ? 'Deep insights' : 'มุมมองเชิงลึก' }],
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [
-          { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' },
-          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }] : []),
-          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
-          { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
-        ],
+        items: [productItem, ...(featureFlags.supplierModule ? [supplierManageItem] : []), transactionItem, reportItem],
       },
       {
         title: isEn ? 'System' : 'ระบบ',
         items: [
           { to: '/admin/users', label: isEn ? 'Users' : 'จัดการผู้ใช้' },
-          { to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' },
+          settingsItem,
         ],
       },
     ]
@@ -180,21 +171,16 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean) {
       title: isEn ? 'Main' : 'เมนูหลัก',
       items: [
         { to: homePathFor(role), label: isEn ? 'Work home' : 'หน้าทำงานหลัก' },
-        { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+        notificationItem,
       ],
     },
     {
       title: isEn ? 'Data' : 'ข้อมูลงาน',
-      items: [
-        { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
-        ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'รายชื่อร้านค้า' }] : []),
-        { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
-        { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
-      ],
+      items: [compareItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), transactionItem, reportItem],
     },
     {
       title: isEn ? 'Settings' : 'การตั้งค่า',
-      items: [{ to: '/settings', label: isEn ? 'Display settings' : 'ตั้งค่าหน้าตา' }],
+      items: [{ ...settingsItem, label: isEn ? 'Display settings' : 'ตั้งค่าหน้าตา' }],
     },
   ]
 }
@@ -304,9 +290,7 @@ export function AppShell() {
                     onClick={() => toggleSection(index)}
                     className="surface-item flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left shadow-sm transition"
                   >
-                    <span className="text-sm font-bold text-[color:var(--color-fg)]">
-                      {section.title}
-                    </span>
+                    <span className="text-sm font-bold text-[color:var(--color-fg)]">{section.title}</span>
                     <span
                       className={`text-sm font-semibold text-[color:var(--color-muted)] transition-transform ${collapsedSections[index] ? '' : 'rotate-90'}`}
                     >

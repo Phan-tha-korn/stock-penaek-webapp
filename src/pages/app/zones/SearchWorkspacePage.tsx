@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -8,9 +8,32 @@ import {
   fetchZoneHistory,
   fetchZoneQuickSearch,
   type CompareResult,
+  type CompareResultRow,
   type HistoricalPriceItem,
   type QuickSearchItem,
 } from '../../../services/zones'
+
+const MAX_COMPARE_ITEMS = 20
+const MIN_COMPARE_ITEMS = 2
+
+type CompareSelection = {
+  compareKey: string
+  productId: string
+  canonicalGroupId: string | null
+  canonicalGroupName: string
+  sku: string
+  name: string
+}
+
+type QuickCompareSummaryRow = {
+  compareKey: string
+  productId: string
+  sku: string
+  name: string
+  canonicalGroupName: string
+  bestRow: CompareResultRow | null
+  matchedRowCount: number
+}
 
 function inputClass() {
   return 'input-surface w-full rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-[color:var(--color-fg)]'
@@ -24,14 +47,37 @@ function viewButtonClass(active: boolean) {
   }`
 }
 
+function compareKeyFor(item: Pick<QuickSearchItem, 'product_id' | 'canonical_group_id'>) {
+  return item.canonical_group_id ? `group:${item.canonical_group_id}` : `product:${item.product_id}`
+}
+
+function toSelection(item: QuickSearchItem): CompareSelection {
+  return {
+    compareKey: compareKeyFor(item),
+    productId: item.product_id,
+    canonicalGroupId: item.canonical_group_id,
+    canonicalGroupName: item.canonical_group_name || '',
+    sku: item.sku,
+    name: item.name_th || item.name_en || item.sku,
+  }
+}
+
 export function SearchWorkspacePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [params, setParams] = useSearchParams()
   const [searchItems, setSearchItems] = useState<QuickSearchItem[]>([])
-  const [compareResult, setCompareResult] = useState<CompareResult | null>(null)
+  const [quickBusy, setQuickBusy] = useState(false)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [historyBusy, setHistoryBusy] = useState(false)
+  const [compareSuggestions, setCompareSuggestions] = useState<QuickSearchItem[]>([])
+  const [selectedCompareItems, setSelectedCompareItems] = useState<CompareSelection[]>([])
+  const [quickCompareRows, setQuickCompareRows] = useState<QuickCompareSummaryRow[]>([])
+  const [legacyCompareResult, setLegacyCompareResult] = useState<CompareResult | null>(null)
   const [historyItems, setHistoryItems] = useState<HistoricalPriceItem[]>([])
-  const [busy, setBusy] = useState(false)
+  const [compareInput, setCompareInput] = useState('')
+  const [compareNotice, setCompareNotice] = useState('')
 
+  const isEn = i18n.language === 'en'
   const view = params.get('view') || 'quick'
   const query = params.get('q') || ''
   const productId = params.get('product_id') || params.get('productId') || ''
@@ -41,49 +87,18 @@ export function SearchWorkspacePage() {
   const fromAt = params.get('fromAt') || ''
   const toAt = params.get('toAt') || ''
 
-  const compareQuery = useMemo(
-    () => ({
-      product_id: productId || undefined,
-      canonical_group_id: canonicalGroupId || undefined,
-      quantity: Number(quantity || 1),
-      mode,
-    }),
-    [canonicalGroupId, mode, productId, quantity]
-  )
-
-  async function runQuickSearch() {
-    setBusy(true)
-    try {
-      setSearchItems(await fetchZoneQuickSearch({ q: query || undefined, limit: 20 }))
-    } finally {
-      setBusy(false)
+  const quickCompareSummary = useMemo(() => {
+    const pricedRows = quickCompareRows.filter((row) => row.bestRow)
+    const cheapest = pricedRows
+      .slice()
+      .sort((left, right) => (left.bestRow?.final_total_cost_thb || Number.MAX_SAFE_INTEGER) - (right.bestRow?.final_total_cost_thb || Number.MAX_SAFE_INTEGER))[0]
+    return {
+      selectedCount: selectedCompareItems.length,
+      comparableCount: pricedRows.length,
+      cheapestName: cheapest?.name || '',
+      cheapestCost: cheapest?.bestRow?.final_total_cost_thb ?? null,
     }
-  }
-
-  async function runCompare() {
-    setBusy(true)
-    try {
-      setCompareResult(await fetchZoneCompare(compareQuery))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function runHistory() {
-    setBusy(true)
-    try {
-      setHistoryItems(
-        await fetchZoneHistory({
-          product_id: productId || undefined,
-          canonical_group_id: canonicalGroupId || undefined,
-          from_at: fromAt || undefined,
-          to_at: toAt || undefined,
-        })
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
+  }, [quickCompareRows, selectedCompareItems.length])
 
   function patchSearch(next: Record<string, string>) {
     const draft = new URLSearchParams(params)
@@ -94,6 +109,194 @@ export function SearchWorkspacePage() {
     setParams(draft)
   }
 
+  async function runQuickSearch(searchTerm: string) {
+    setQuickBusy(true)
+    try {
+      setSearchItems(await fetchZoneQuickSearch({ q: searchTerm || undefined, limit: 12 }))
+    } finally {
+      setQuickBusy(false)
+    }
+  }
+
+  async function runHistory() {
+    setHistoryBusy(true)
+    try {
+      setHistoryItems(
+        await fetchZoneHistory({
+          product_id: productId || undefined,
+          canonical_group_id: canonicalGroupId || undefined,
+          from_at: fromAt || undefined,
+          to_at: toAt || undefined,
+        })
+      )
+    } finally {
+      setHistoryBusy(false)
+    }
+  }
+
+  function addCompareItem(item: QuickSearchItem) {
+    const nextItem = toSelection(item)
+    if (selectedCompareItems.some((entry) => entry.compareKey === nextItem.compareKey)) {
+      setCompareNotice(isEn ? 'This item is already selected.' : 'สินค้านี้ถูกเลือกไว้แล้ว')
+      return
+    }
+    if (selectedCompareItems.length >= MAX_COMPARE_ITEMS) {
+      setCompareNotice(isEn ? 'You can compare up to 20 items at once.' : 'เทียบได้พร้อมกันสูงสุด 20 รายการ')
+      return
+    }
+    setSelectedCompareItems((current) => [...current, nextItem])
+    setCompareSuggestions([])
+    setCompareInput('')
+    setCompareNotice('')
+    patchSearch({ view: 'compare', product_id: '', canonical_group_id: '', productId: '', groupId: '' })
+  }
+
+  function removeCompareItem(compareKey: string) {
+    setSelectedCompareItems((current) => current.filter((item) => item.compareKey !== compareKey))
+    setCompareNotice('')
+  }
+
+  async function runLegacyCompare() {
+    if (!productId && !canonicalGroupId) {
+      setLegacyCompareResult(null)
+      return
+    }
+    setCompareBusy(true)
+    setCompareNotice('')
+    try {
+      setLegacyCompareResult(
+        await fetchZoneCompare({
+          product_id: productId || undefined,
+          canonical_group_id: canonicalGroupId || undefined,
+          quantity: Number(quantity || 1),
+          mode,
+        })
+      )
+    } finally {
+      setCompareBusy(false)
+    }
+  }
+
+  async function runQuickCompare(items: CompareSelection[]) {
+    if (items.length < MIN_COMPARE_ITEMS) {
+      setQuickCompareRows([])
+      setCompareNotice(
+        isEn
+          ? `Select at least ${MIN_COMPARE_ITEMS - items.length} more item before comparing.`
+          : `เลือกสินค้าเพิ่มอีก ${MIN_COMPARE_ITEMS - items.length} รายการก่อนเริ่มเทียบ`
+      )
+      return
+    }
+    setCompareBusy(true)
+    setCompareNotice('')
+    try {
+      const settled = await Promise.allSettled(
+        items.map(async (item) => {
+          const result = await fetchZoneCompare({
+            product_id: item.productId,
+            canonical_group_id: item.canonicalGroupId || undefined,
+            quantity: Number(quantity || 1),
+            mode,
+          })
+          return {
+            item,
+            rows: result.rows,
+          }
+        })
+      )
+
+      const nextRows: QuickCompareSummaryRow[] = settled.map((entry, index) => {
+        if (entry.status !== 'fulfilled') {
+          return {
+            compareKey: items[index].compareKey,
+            productId: items[index].productId,
+            sku: items[index].sku,
+            name: items[index].name,
+            canonicalGroupName: items[index].canonicalGroupName,
+            bestRow: null,
+            matchedRowCount: 0,
+          }
+        }
+        return {
+          compareKey: entry.value.item.compareKey,
+          productId: entry.value.item.productId,
+          sku: entry.value.item.sku,
+          name: entry.value.item.name,
+          canonicalGroupName: entry.value.item.canonicalGroupName,
+          bestRow: entry.value.rows[0] || null,
+          matchedRowCount: entry.value.rows.length,
+        }
+      })
+
+      nextRows.sort((left, right) => {
+        const leftValue = left.bestRow?.final_total_cost_thb ?? Number.MAX_SAFE_INTEGER
+        const rightValue = right.bestRow?.final_total_cost_thb ?? Number.MAX_SAFE_INTEGER
+        if (leftValue !== rightValue) return leftValue - rightValue
+        return left.sku.localeCompare(right.sku)
+      })
+      setQuickCompareRows(nextRows)
+      setLegacyCompareResult(null)
+    } finally {
+      setCompareBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    if (view !== 'quick') return
+    const timer = window.setTimeout(() => {
+      void runQuickSearch(query)
+    }, 220)
+    return () => window.clearTimeout(timer)
+  }, [query, view])
+
+  useEffect(() => {
+    if (view !== 'compare') return
+    const timer = window.setTimeout(async () => {
+      try {
+        const items = await fetchZoneQuickSearch({ q: compareInput || undefined, limit: 8 })
+        setCompareSuggestions(items)
+      } catch {
+        setCompareSuggestions([])
+      }
+    }, 220)
+    return () => window.clearTimeout(timer)
+  }, [compareInput, view])
+
+  useEffect(() => {
+    if (view !== 'compare') return
+    if (selectedCompareItems.length >= MIN_COMPARE_ITEMS) {
+      const timer = window.setTimeout(() => {
+        void runQuickCompare(selectedCompareItems)
+      }, 260)
+      return () => window.clearTimeout(timer)
+    }
+    if (productId || canonicalGroupId) {
+      const timer = window.setTimeout(() => {
+        void runLegacyCompare()
+      }, 260)
+      return () => window.clearTimeout(timer)
+    }
+    setLegacyCompareResult(null)
+    setQuickCompareRows([])
+  }, [canonicalGroupId, mode, productId, quantity, selectedCompareItems, view])
+
+  useEffect(() => {
+    if (view !== 'history') return
+    if (!fromAt || !toAt) {
+      setHistoryItems([])
+      return
+    }
+    const timer = window.setTimeout(() => {
+      void runHistory()
+    }, 260)
+    return () => window.clearTimeout(timer)
+  }, [canonicalGroupId, fromAt, productId, toAt, view])
+
+  const quickCompareTitle = isEn ? 'Quick product compare' : 'เทียบสินค้าแบบไว'
+  const quickCompareHint = isEn
+    ? 'Type part of the product name, SKU, alias, or supplier. Suggestions appear automatically.'
+    : 'พิมพ์ชื่อสินค้า รหัสสินค้า alias หรือชื่อร้านค้าได้เลย ระบบจะเด้งรายการให้เลือกอัตโนมัติ'
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
@@ -103,23 +306,23 @@ export function SearchWorkspacePage() {
         </div>
         <div className="flex gap-2 text-sm">
           <button className={viewButtonClass(view === 'quick')} onClick={() => patchSearch({ view: 'quick' })} type="button">
-            {t('zones.search.quickTab')}
+            {isEn ? 'Quick search' : 'ค้นหาอัตโนมัติ'}
           </button>
           <button className={viewButtonClass(view === 'compare')} onClick={() => patchSearch({ view: 'compare' })} type="button">
-            {t('zones.search.compareTab')}
+            {quickCompareTitle}
           </button>
           <button className={viewButtonClass(view === 'history')} onClick={() => patchSearch({ view: 'history' })} type="button">
-            {t('zones.search.historyTab')}
+            {isEn ? 'History' : 'ประวัติราคา'}
           </button>
         </div>
       </div>
 
       {view === 'quick' ? (
         <div className="surface-panel space-y-3 rounded p-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <div className="grid gap-3">
             <FieldLabel
-              label={t('zones.search.quickLabel')}
-              helper={t('zones.search.quickHelper')}
+              label={isEn ? 'Keyword' : 'คำค้นหา'}
+              helper={isEn ? 'Results appear automatically while you type.' : 'พิมพ์แล้วระบบจะค้นหาให้ทันที ไม่ต้องกดค้นหาทุกครั้ง'}
               example={t('zones.search.quickPlaceholder')}
               helpKey="search.quick"
             >
@@ -127,78 +330,77 @@ export function SearchWorkspacePage() {
                 className={inputClass()}
                 value={query}
                 onChange={(e) => patchSearch({ q: e.target.value })}
-                placeholder={t('zones.search.quickPlaceholder')}
+                placeholder={isEn ? 'Example: SKU-001, steel pipe, supplier A' : 'ตัวอย่าง: รหัสสินค้า 001, ท่อเหล็ก, ร้าน A'}
               />
             </FieldLabel>
-            <button
-              className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-medium text-black md:self-end"
-              onClick={() => void runQuickSearch()}
-              type="button"
-            >
-              {t('zones.search.searchButton')}
-            </button>
+          </div>
+          <div className="text-xs text-[color:var(--color-muted)]">
+            {quickBusy
+              ? isEn
+                ? 'Searching...'
+                : 'กำลังค้นหา...'
+              : isEn
+                ? `Found ${searchItems.length} quick result(s)`
+                : `พบผลลัพธ์แบบเร็ว ${searchItems.length} รายการ`}
           </div>
           <div className="space-y-2">
             {searchItems.map((item) => (
-              <div key={item.product_id} className="surface-item rounded px-3 py-2 text-sm">
+              <div key={item.product_id} className="surface-item rounded px-3 py-3 text-sm">
                 <div className="font-medium">
                   {item.sku} - {item.name_th || item.name_en}
                 </div>
-                <div className="text-[color:var(--color-muted)]">
-                  {t('zones.search.groupName')}: {item.canonical_group_name || '-'}
+                <div className="mt-1 text-[color:var(--color-muted)]">
+                  {isEn ? 'Compare group' : 'กลุ่มเทียบ'}: {item.canonical_group_name || '-'}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+                  {isEn ? 'Suppliers' : 'ร้านค้าที่ผูกไว้'}: {item.supplier_text || '-'} |{' '}
+                  {isEn ? 'Lowest current price' : 'ราคาต่ำสุดตอนนี้'}:{' '}
+                  {item.cheapest_active_final_total_cost_thb != null ? `${item.cheapest_active_final_total_cost_thb.toFixed(2)} THB` : '-'}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Link
                     className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
                     to={`/products?productId=${item.product_id}&sku=${encodeURIComponent(item.sku)}`}
                   >
-                    {t('zones.search.openProduct')}
+                    {isEn ? 'Product details' : 'ดูรายละเอียดสินค้า'}
                   </Link>
                   <button
                     className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
-                    onClick={() =>
-                      patchSearch({
-                        view: 'compare',
-                        product_id: item.product_id,
-                        canonical_group_id: item.canonical_group_id || '',
-                        quantity: '1',
-                        mode: 'active',
-                      })
-                    }
+                    onClick={() => addCompareItem(item)}
                     type="button"
                   >
-                    {t('zones.search.openCompare')}
+                    {isEn ? 'Add to quick compare' : 'เพิ่มไปเทียบสินค้า'}
                   </button>
                 </div>
               </div>
             ))}
-            {!busy && searchItems.length === 0 ? (
-              <div className="text-sm text-[color:var(--color-muted)]">{t('zones.search.noQuickResults')}</div>
+            {!quickBusy && searchItems.length === 0 ? (
+              <div className="text-sm text-[color:var(--color-muted)]">
+                {query
+                  ? isEn
+                    ? 'No result found. Try another keyword.'
+                    : 'ยังไม่พบผลลัพธ์ ลองเปลี่ยนคำค้นหาได้เลย'
+                  : isEn
+                    ? 'Start typing and the system will suggest products automatically.'
+                    : 'เริ่มพิมพ์คำค้นหาแล้วระบบจะแนะนำสินค้าให้ทันที'}
+              </div>
             ) : null}
           </div>
         </div>
       ) : null}
 
       {view === 'compare' ? (
-        <div className="surface-panel space-y-3 rounded p-4">
-          <div className="grid gap-3 md:grid-cols-4">
-            <FieldLabel label={t('zones.search.productId')} helpKey="search.compare">
+        <div className="surface-panel space-y-4 rounded p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(180px,220px)_minmax(180px,220px)]">
+            <FieldLabel label={quickCompareTitle} helper={quickCompareHint} helpKey="search.compare">
               <input
                 className={inputClass()}
-                value={productId}
-                onChange={(e) => patchSearch({ product_id: e.target.value, productId: '' })}
-                placeholder={t('zones.search.productId')}
+                value={compareInput}
+                onChange={(e) => setCompareInput(e.target.value)}
+                placeholder={isEn ? 'Example: steel pipe, SKU-001, supplier A' : 'ตัวอย่าง: ท่อเหล็ก, รหัสสินค้า 001, ร้าน A'}
               />
             </FieldLabel>
-            <FieldLabel label={t('zones.search.groupId')} helper={t('zones.search.groupLabel')}>
-              <input
-                className={inputClass()}
-                value={canonicalGroupId}
-                onChange={(e) => patchSearch({ canonical_group_id: e.target.value, groupId: '' })}
-                placeholder={t('zones.search.groupId')}
-              />
-            </FieldLabel>
-            <FieldLabel label={t('zones.search.quantity')} example={t('zones.search.quantityPlaceholder')}>
+            <FieldLabel label={isEn ? 'Quantity to compare' : 'จำนวนที่ใช้เทียบ'} example={t('zones.search.quantityPlaceholder')}>
               <input
                 className={inputClass()}
                 value={quantity}
@@ -206,31 +408,182 @@ export function SearchWorkspacePage() {
                 placeholder={t('zones.search.quantityPlaceholder')}
               />
             </FieldLabel>
-            <FieldLabel label={t('zones.search.selectionMode')}>
+            <FieldLabel label={isEn ? 'Compare mode' : 'โหมดที่ใช้เทียบ'}>
               <select className={inputClass()} value={mode} onChange={(e) => patchSearch({ mode: e.target.value })}>
-                <option value="active">{t('zones.search.selectionModeActive')}</option>
-                <option value="latest">{t('zones.search.selectionModeLatest')}</option>
+                <option value="active">{isEn ? 'Active price now' : 'ราคาใช้งานอยู่ตอนนี้'}</option>
+                <option value="latest">{isEn ? 'Latest recorded price' : 'ราคาล่าสุดที่บันทึกไว้'}</option>
               </select>
             </FieldLabel>
           </div>
-          <button className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-medium text-black" onClick={() => void runCompare()} type="button">
-            {t('zones.search.compareButton')}
-          </button>
-          <div className="space-y-2">
-            {(compareResult?.rows ?? []).map((row) => (
-              <div key={row.price_record_id} className="surface-item rounded px-3 py-2 text-sm">
-                <div className="font-medium">
-                  {row.supplier_name} - {t('zones.search.resultCost', { amount: row.final_total_cost_thb.toFixed(2) })}
+
+          <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-2 text-sm text-[color:var(--color-muted)]">
+            {isEn
+              ? `Selected ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} items. Pick at least ${MIN_COMPARE_ITEMS} items to compare automatically.`
+              : `เลือกแล้ว ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} รายการ เลือกอย่างน้อย ${MIN_COMPARE_ITEMS} รายการเพื่อให้ระบบเทียบให้อัตโนมัติ`}
+          </div>
+
+          {compareSuggestions.length > 0 ? (
+            <div className="space-y-2 rounded border border-[color:var(--color-border)] surface-soft p-3">
+              {compareSuggestions.map((item) => (
+                <button
+                  key={`${item.product_id}-${item.canonical_group_id || 'single'}`}
+                  className="surface-item block w-full rounded px-3 py-2 text-left text-sm"
+                  type="button"
+                  onClick={() => addCompareItem(item)}
+                >
+                  <div className="font-medium">
+                    {item.sku} - {item.name_th || item.name_en}
+                  </div>
+                  <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+                    {item.canonical_group_name || (isEn ? 'No compare group' : 'ยังไม่มีกลุ่มเทียบ')} |{' '}
+                    {item.cheapest_active_final_total_cost_thb != null
+                      ? `${item.cheapest_active_final_total_cost_thb.toFixed(2)} THB`
+                      : isEn
+                        ? 'No active price'
+                        : 'ยังไม่มีราคาที่ใช้อยู่'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {selectedCompareItems.length > 0 ? (
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {selectedCompareItems.map((item) => (
+                <div key={item.compareKey} className="surface-item rounded px-3 py-3 text-sm">
+                  <div className="font-medium">
+                    {item.sku} - {item.name}
+                  </div>
+                  <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+                    {item.canonicalGroupName || (isEn ? 'Compare this product only' : 'เทียบเฉพาะสินค้านี้')}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
+                      to={`/products?productId=${item.productId}&sku=${encodeURIComponent(item.sku)}`}
+                    >
+                      {isEn ? 'Details' : 'รายละเอียด'}
+                    </Link>
+                    <button
+                      className="rounded border border-red-400/30 px-2 py-1 text-red-200 hover:bg-red-500/10"
+                      onClick={() => removeCompareItem(item.compareKey)}
+                      type="button"
+                    >
+                      {isEn ? 'Remove' : 'เอาออก'}
+                    </button>
+                  </div>
                 </div>
-                <div className="text-[color:var(--color-muted)]">
-                  {row.sku} - {row.delivery_mode} - {row.area_scope} - {row.selection_mode}
+              ))}
+            </div>
+          ) : null}
+
+          {selectedCompareItems.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-[color:var(--color-fg)] hover:bg-white/10"
+                onClick={() => {
+                  setSelectedCompareItems([])
+                  setQuickCompareRows([])
+                  setCompareNotice('')
+                }}
+                type="button"
+              >
+                {isEn ? 'Clear selected items' : 'ล้างสินค้าที่เลือก'}
+              </button>
+            </div>
+          ) : null}
+
+          {compareNotice ? <div className="text-sm text-[color:var(--color-muted)]">{compareNotice}</div> : null}
+
+          {selectedCompareItems.length >= MIN_COMPARE_ITEMS ? (
+            <div className="space-y-3">
+              <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-3 text-sm">
+                <div className="font-medium">{isEn ? 'Quick compare summary' : 'สรุปการเทียบสินค้าแบบไว'}</div>
+                <div className="mt-1 text-[color:var(--color-muted)]">
+                  {quickCompareSummary.comparableCount > 0
+                    ? isEn
+                      ? `Cheapest item now: ${quickCompareSummary.cheapestName} (${quickCompareSummary.cheapestCost?.toFixed(2)} THB)`
+                      : `ตอนนี้สินค้าที่ราคาดีสุดคือ ${quickCompareSummary.cheapestName} (${quickCompareSummary.cheapestCost?.toFixed(2)} บาท)`
+                    : isEn
+                      ? 'No comparable active price found yet.'
+                      : 'ยังไม่พบราคาที่พร้อมเทียบในตอนนี้'}
                 </div>
               </div>
-            ))}
-            {!busy && (compareResult?.rows.length ?? 0) === 0 ? (
-              <div className="text-sm text-[color:var(--color-muted)]">{t('zones.search.noCompareRows')}</div>
-            ) : null}
-          </div>
+
+              <div className="space-y-2">
+                {quickCompareRows.map((row, index) => (
+                  <div key={row.compareKey} className="surface-item rounded px-3 py-3 text-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium">
+                          {index + 1}. {row.sku} - {row.name}
+                        </div>
+                        <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+                          {row.canonicalGroupName || (isEn ? 'No compare group' : 'เทียบเฉพาะสินค้านี้')} |{' '}
+                          {isEn ? 'Offer count' : 'จำนวนราคาที่พบ'}: {row.matchedRowCount}
+                        </div>
+                      </div>
+                      <Link
+                        className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
+                        to={`/products?productId=${row.productId}&sku=${encodeURIComponent(row.sku)}`}
+                      >
+                        {isEn ? 'Details' : 'รายละเอียด'}
+                      </Link>
+                    </div>
+                    {row.bestRow ? (
+                      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-2">
+                          <div className="text-xs text-[color:var(--color-muted)]">{isEn ? 'Best supplier' : 'ร้านที่ดีที่สุดตอนนี้'}</div>
+                          <div className="mt-1 font-medium">{row.bestRow.supplier_name}</div>
+                        </div>
+                        <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-2">
+                          <div className="text-xs text-[color:var(--color-muted)]">{isEn ? 'Final total cost' : 'ต้นทุนรวมที่ใช้เทียบ'}</div>
+                          <div className="mt-1 font-medium">{row.bestRow.final_total_cost_thb.toFixed(2)} THB</div>
+                        </div>
+                        <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-2">
+                          <div className="text-xs text-[color:var(--color-muted)]">{isEn ? 'Base normalized price' : 'ราคาก่อนบวกต้นทุนอื่น'}</div>
+                          <div className="mt-1 font-medium">{row.bestRow.normalized_amount_thb.toFixed(2)} THB</div>
+                        </div>
+                        <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-2">
+                          <div className="text-xs text-[color:var(--color-muted)]">{isEn ? 'Delivery / area' : 'วิธีรับของ / พื้นที่'}</div>
+                          <div className="mt-1 font-medium">
+                            {row.bestRow.delivery_mode} / {row.bestRow.area_scope}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-sm text-[color:var(--color-muted)]">
+                        {isEn
+                          ? 'No active price found for this item under the current quantity and mode.'
+                          : 'ยังไม่พบราคาที่พร้อมเทียบสำหรับสินค้านี้ตามจำนวนและโหมดที่เลือก'}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : productId || canonicalGroupId ? (
+            <div className="space-y-2">
+              <div className="text-sm text-[color:var(--color-muted)]">
+                {isEn
+                  ? 'This compare view was opened from a link. The system still shows the current comparison below.'
+                  : 'หน้านี้ถูกเปิดมาจากลิงก์เดิม ระบบจะแสดงผลเทียบปัจจุบันให้ก่อน แม้ยังไม่ได้เลือกหลายสินค้า'}
+              </div>
+              {(legacyCompareResult?.rows ?? []).map((row) => (
+                <div key={row.price_record_id} className="surface-item rounded px-3 py-2 text-sm">
+                  <div className="font-medium">
+                    {row.supplier_name} - {t('zones.search.resultCost', { amount: row.final_total_cost_thb.toFixed(2) })}
+                  </div>
+                  <div className="text-[color:var(--color-muted)]">
+                    {row.sku} - {row.delivery_mode} - {row.area_scope} - {row.selection_mode}
+                  </div>
+                </div>
+              ))}
+              {!compareBusy && (legacyCompareResult?.rows.length ?? 0) === 0 ? (
+                <div className="text-sm text-[color:var(--color-muted)]">{t('zones.search.noCompareRows')}</div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -260,9 +613,15 @@ export function SearchWorkspacePage() {
               <input className={inputClass()} type="datetime-local" value={toAt} onChange={(e) => patchSearch({ toAt: e.target.value })} />
             </FieldLabel>
           </div>
-          <button className="rounded bg-[color:var(--color-primary)] px-4 py-2 text-sm font-medium text-black" onClick={() => void runHistory()} type="button">
-            {t('zones.search.historyButton')}
-          </button>
+          <div className="text-xs text-[color:var(--color-muted)]">
+            {historyBusy
+              ? isEn
+                ? 'Loading history...'
+                : 'กำลังโหลดประวัติ...'
+              : isEn
+                ? 'Once both dates are filled in, history will load automatically.'
+                : 'เมื่อกรอกวันเริ่มและวันสิ้นสุดครบ ระบบจะโหลดประวัติให้อัตโนมัติ'}
+          </div>
           <div className="space-y-2">
             {historyItems.map((row) => (
               <div key={row.price_record_id} className="surface-item rounded px-3 py-2 text-sm">
@@ -272,7 +631,7 @@ export function SearchWorkspacePage() {
                 </div>
               </div>
             ))}
-            {!busy && historyItems.length === 0 ? (
+            {!historyBusy && historyItems.length === 0 ? (
               <div className="text-sm text-[color:var(--color-muted)]">{t('zones.search.noHistoryRows')}</div>
             ) : null}
           </div>

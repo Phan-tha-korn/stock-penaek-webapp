@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 
@@ -11,22 +11,33 @@ function fieldClass() {
 }
 
 export function VerificationWorkspacePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const role = useAuthStore((s) => s.role)
   const [params, setParams] = useSearchParams()
   const [items, setItems] = useState<VerificationQueueItem[]>([])
   const [busy, setBusy] = useState(true)
 
+  const isEn = i18n.language === 'en'
+  const quickQuery = params.get('q') || ''
   const requestId = params.get('requestId') || ''
   const status = params.get('status') || ''
   const risk = params.get('risk') || ''
   const assignee = params.get('assignee') || ''
 
+  const summary = useMemo(
+    () => ({
+      total: items.length,
+      overdue: items.filter((item) => item.is_overdue).length,
+      blocked: items.filter((item) => item.has_blocking_dependency).length,
+    }),
+    [items]
+  )
+
   async function reload() {
     setBusy(true)
     try {
       const queue = await fetchZoneVerificationQueue({
-        q: requestId || undefined,
+        q: quickQuery || requestId || undefined,
         statuses: status || undefined,
         risk_levels: risk || undefined,
         assignee_user_id: assignee || undefined,
@@ -41,7 +52,7 @@ export function VerificationWorkspacePage() {
     void reload()
     const timer = window.setInterval(() => void reload(), 15_000)
     return () => window.clearInterval(timer)
-  }, [requestId, status, risk, assignee])
+  }, [quickQuery, requestId, status, risk, assignee])
 
   function patchSearch(next: Record<string, string>) {
     const draft = new URLSearchParams(params)
@@ -64,7 +75,34 @@ export function VerificationWorkspacePage() {
         </button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="surface-item rounded px-3 py-3 text-sm">
+          <div className="text-xs text-[color:var(--color-muted)]">{isEn ? 'Items showing now' : 'รายการที่ขึ้นอยู่ตอนนี้'}</div>
+          <div className="mt-1 text-xl font-semibold">{summary.total}</div>
+        </div>
+        <div className="surface-item rounded px-3 py-3 text-sm">
+          <div className="text-xs text-[color:var(--color-muted)]">{isEn ? 'Overdue items' : 'รายการที่เกินเวลา'}</div>
+          <div className="mt-1 text-xl font-semibold">{summary.overdue}</div>
+        </div>
+        <div className="surface-item rounded px-3 py-3 text-sm">
+          <div className="text-xs text-[color:var(--color-muted)]">{isEn ? 'Blocked by dependency' : 'รายการที่ติดเงื่อนไขบล็อก'}</div>
+          <div className="mt-1 text-xl font-semibold">{summary.blocked}</div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <FieldLabel
+          label={isEn ? 'Quick search' : 'ค้นหาแบบไว'}
+          helper={isEn ? 'Type a request code, keyword, or rough text. The queue updates automatically.' : 'พิมพ์เลขที่คำขอ คำที่เกี่ยวข้อง หรือพิมพ์คร่าว ๆ ได้เลย คิวจะอัปเดตให้อัตโนมัติ'}
+          helpKey="verification.queue"
+        >
+          <input
+            className={fieldClass()}
+            value={quickQuery}
+            onChange={(e) => patchSearch({ q: e.target.value })}
+            placeholder={isEn ? 'Example: supplier, price, VR-2026-001' : 'ตัวอย่าง: supplier, price, VR-2026-001'}
+          />
+        </FieldLabel>
         <FieldLabel label={t('zones.verification.requestLabel')} example={t('zones.verification.requestPlaceholder')} helpKey="verification.queue">
           <input className={fieldClass()} value={requestId} onChange={(e) => patchSearch({ requestId: e.target.value })} placeholder={t('zones.verification.requestPlaceholder')} />
         </FieldLabel>
@@ -85,6 +123,15 @@ export function VerificationWorkspacePage() {
       </div>
 
       <div className="surface-panel rounded p-4">
+        <div className="mb-3 text-xs text-[color:var(--color-muted)]">
+          {busy
+            ? isEn
+              ? 'Updating queue...'
+              : 'กำลังอัปเดตคิวตรวจสอบ...'
+            : isEn
+              ? 'The system shows pending work automatically, even if you do not search.'
+              : 'ระบบจะแสดงงานที่ค้างอยู่ให้อัตโนมัติ แม้ยังไม่ค้นหา'}
+        </div>
         <div className="space-y-2">
           {items.map((item) => (
             <div key={item.request_id} className="surface-item rounded px-3 py-2 text-sm">
@@ -97,6 +144,10 @@ export function VerificationWorkspacePage() {
               <div className="mt-1 text-[color:var(--color-muted)]">
                 {item.subject_domain} - {item.is_overdue ? t('zones.verification.overdueYes') : t('zones.verification.overdueNo')} -{' '}
                 {item.has_blocking_dependency ? t('zones.verification.blockingYes') : t('zones.verification.blockingNo')}
+              </div>
+              <div className="mt-2 text-xs text-[color:var(--color-muted)]">
+                {isEn ? 'Assignee' : 'ผู้รับผิดชอบ'}: {item.assignee_role || item.assignee_user_id || '-'} |{' '}
+                {isEn ? 'Escalation' : 'ระดับเร่งด่วน'}: {item.current_escalation_level}
               </div>
             </div>
           ))}
