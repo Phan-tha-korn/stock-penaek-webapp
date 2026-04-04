@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -212,6 +213,11 @@ export function AppShell() {
   const role = user?.role as AppRole | undefined
   const isEn = i18n.language === 'en'
   const navSections = sectionsFor(role, isEn)
+  const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({})
+
+  function toggleSection(index: number) {
+    setCollapsedSections((prev) => ({ ...prev, [index]: !prev[index] }))
+  }
 
   return (
     <div className="bg-app min-h-screen text-app">
@@ -291,18 +297,31 @@ export function AppShell() {
               <div className="mt-1 text-xs text-[color:var(--color-muted)]">{roleDisplay(role, isEn)}</div>
             </div>
             <nav className="mt-3 space-y-3">
-              {navSections.map((section) => (
-                <div key={section.title} className="space-y-1">
-                  <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--color-muted)]">
-                    {section.title}
-                  </div>
-                  <div className="space-y-1">
-                    {section.items.map((item) => (
-                      <NavLink key={item.to} to={item.to} className={({ isActive }) => navClass(isActive)}>
-                        {item.label}
-                      </NavLink>
-                    ))}
-                  </div>
+              {navSections.map((section, index) => (
+                <div key={section.title} className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(index)}
+                    className="flex w-full items-center justify-between rounded-xl border border-[color:var(--color-border)] bg-white/5 px-3 py-2.5 text-left shadow-sm transition hover:bg-white/8"
+                  >
+                    <span className="text-sm font-bold text-[color:var(--color-fg)]">
+                      {section.title}
+                    </span>
+                    <span
+                      className={`text-sm font-semibold text-[color:var(--color-muted)] transition-transform ${collapsedSections[index] ? '' : 'rotate-90'}`}
+                    >
+                      {'>'}
+                    </span>
+                  </button>
+                  {!collapsedSections[index] ? (
+                    <div className="space-y-1 px-1">
+                      {section.items.map((item) => (
+                        <NavLink key={item.to} to={item.to} className={({ isActive }) => navClass(isActive)}>
+                          {item.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </nav>

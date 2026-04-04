@@ -48,10 +48,12 @@ function Root() {
   if (!ready) {
     return (
       <div className="bg-app auth-shell">
-        <div className="card w-full max-w-sm rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-card)]/88 p-6 text-center shadow-2xl">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-[color:var(--color-primary)]" />
-          <div className="mt-4 text-base font-semibold">กำลังโหลดระบบ</div>
-          <div className="mt-1 text-sm text-[color:var(--color-muted)]">กรุณารอสักครู่ ระบบกำลังเตรียมข้อมูลให้พร้อมใช้งาน</div>
+        <div className="fixed inset-0 flex items-center justify-center bg-black/55 px-4 backdrop-blur-xl">
+          <div className="card w-full max-w-sm rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-card)]/92 p-6 text-center shadow-2xl">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-[color:var(--color-primary)]" />
+            <div className="mt-4 text-base font-semibold">กำลังโหลดระบบ</div>
+            <div className="mt-1 text-sm text-[color:var(--color-muted)]">กรุณารอสักครู่ ระบบกำลังเตรียมข้อมูลให้พร้อมใช้งาน</div>
+          </div>
         </div>
       </div>
     )
