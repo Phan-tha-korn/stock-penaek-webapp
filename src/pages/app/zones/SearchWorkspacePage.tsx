@@ -413,137 +413,163 @@ export function SearchWorkspacePage() {
       ) : null}
 
       {view === 'compare' ? (
-        <div className="surface-panel space-y-4 rounded p-4">
-          <div className="rounded border border-[color:var(--color-border)] surface-soft px-4 py-3">
-            <div className="text-base font-semibold">{compareAddTitle}</div>
-            <div className="mt-1 text-sm text-[color:var(--color-muted)]">{compareAddHelper}</div>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(180px,220px)_minmax(180px,220px)]">
-            <FieldLabel label={quickCompareTitle} helper={quickCompareHint} helpKey="search.compare">
-              <input
-                className={inputClass()}
-                value={compareInput}
-                onChange={(e) => setCompareInput(e.target.value)}
-                placeholder={isEn ? 'Example: steel pipe, SKU-001, supplier A' : 'ตัวอย่าง: ท่อเหล็ก, รหัสสินค้า 001, ร้าน A'}
-              />
-            </FieldLabel>
-            <FieldLabel label={isEn ? 'Quantity to compare' : 'จำนวนที่ใช้เทียบ'} example={t('zones.search.quantityPlaceholder')}>
-              <input
-                className={inputClass()}
-                value={quantity}
-                onChange={(e) => patchSearch({ quantity: e.target.value })}
-                placeholder={t('zones.search.quantityPlaceholder')}
-              />
-            </FieldLabel>
-            <FieldLabel label={isEn ? 'Compare mode' : 'โหมดที่ใช้เทียบ'}>
-              <select className={inputClass()} value={mode} onChange={(e) => patchSearch({ mode: e.target.value })}>
-                <option value="active">{isEn ? 'Active price now' : 'ราคาใช้งานอยู่ตอนนี้'}</option>
-                <option value="latest">{isEn ? 'Latest recorded price' : 'ราคาล่าสุดที่บันทึกไว้'}</option>
-              </select>
-            </FieldLabel>
-          </div>
-
-          <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-2 text-sm text-[color:var(--color-muted)]">
-            {isEn
-              ? `Selected ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} items. Pick at least ${MIN_COMPARE_ITEMS} items to compare automatically.`
-              : `เลือกแล้ว ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} รายการ เลือกอย่างน้อย ${MIN_COMPARE_ITEMS} รายการเพื่อให้ระบบเทียบให้อัตโนมัติ`}
-          </div>
-
-          <div className="rounded border border-[color:var(--color-border)] surface-soft px-4 py-3">
-            <div className="text-base font-semibold">{selectedTitle}</div>
-            <div className="mt-1 text-sm text-[color:var(--color-muted)]">{selectedHelper}</div>
-          </div>
-
-          {compareSuggestions.length > 0 ? (
-            <div className="space-y-2 rounded border border-[color:var(--color-border)] surface-soft p-3">
-              {compareSuggestions.map((item) => (
-                <button
-                  key={`${item.product_id}-${item.canonical_group_id || 'single'}`}
-                  className="surface-item block w-full rounded px-3 py-2 text-left text-sm"
-                  type="button"
-                  onClick={() => addCompareItem(item)}
-                >
-                  <div className="font-medium">
-                    {item.sku} - {item.name_th || item.name_en}
-                  </div>
-                  <div className="mt-1 text-xs text-[color:var(--color-muted)]">
-                    {item.canonical_group_name || (isEn ? 'No compare group' : 'ยังไม่มีกลุ่มเทียบ')} |{' '}
-                    {item.cheapest_active_final_total_cost_thb != null
-                      ? `${item.cheapest_active_final_total_cost_thb.toFixed(2)} THB`
-                      : isEn
-                        ? 'No active price'
-                        : 'ยังไม่มีราคาที่ใช้อยู่'}
-                  </div>
-                </button>
-              ))}
+        <div className="space-y-6">
+          {/* ── Section 1: ค้นหาและเพิ่มสินค้าเข้าเทียบ ── */}
+          <div className="surface-panel rounded p-4 space-y-3">
+            <div className="border-b border-[color:var(--color-border)] pb-3">
+              <div className="text-base font-semibold">{compareAddTitle}</div>
+              <div className="mt-1 text-sm text-[color:var(--color-muted)]">{compareAddHelper}</div>
             </div>
-          ) : null}
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(180px,220px)_minmax(180px,220px)]">
+              <FieldLabel label={quickCompareTitle} helper={quickCompareHint} helpKey="search.compare">
+                <input
+                  className={inputClass()}
+                  value={compareInput}
+                  onChange={(e) => setCompareInput(e.target.value)}
+                  placeholder={isEn ? 'Example: steel pipe, SKU-001, supplier A' : 'ตัวอย่าง: ท่อเหล็ก, รหัสสินค้า 001, ร้าน A'}
+                />
+              </FieldLabel>
+              <FieldLabel label={isEn ? 'Quantity to compare' : 'จำนวนที่ใช้เทียบ'} example={t('zones.search.quantityPlaceholder')}>
+                <input
+                  className={inputClass()}
+                  value={quantity}
+                  onChange={(e) => patchSearch({ quantity: e.target.value })}
+                  placeholder={t('zones.search.quantityPlaceholder')}
+                />
+              </FieldLabel>
+              <FieldLabel label={isEn ? 'Compare mode' : 'โหมดที่ใช้เทียบ'}>
+                <select className={inputClass()} value={mode} onChange={(e) => patchSearch({ mode: e.target.value })}>
+                  <option value="active">{isEn ? 'Active price now' : 'ราคาใช้งานอยู่ตอนนี้'}</option>
+                  <option value="latest">{isEn ? 'Latest recorded price' : 'ราคาล่าสุดที่บันทึกไว้'}</option>
+                </select>
+              </FieldLabel>
+            </div>
 
-          {selectedCompareItems.length > 0 ? (
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {selectedCompareItems.map((item) => (
-                <div key={item.compareKey} className="surface-item rounded px-3 py-3 text-sm">
-                  <div className="font-medium">
-                    {item.sku} - {item.name}
-                  </div>
-                  <div className="mt-1 text-xs text-[color:var(--color-muted)]">
-                    {item.canonicalGroupName || (isEn ? 'Compare this product only' : 'เทียบเฉพาะสินค้านี้')}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Link
-                      className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
-                      to={`/products?productId=${item.productId}&sku=${encodeURIComponent(item.sku)}`}
-                    >
-                      {isEn ? 'Details' : 'รายละเอียด'}
-                    </Link>
-                    <button
-                      className="rounded border border-red-400/30 px-2 py-1 text-red-200 hover:bg-red-500/10"
-                      onClick={() => removeCompareItem(item.compareKey)}
-                      type="button"
-                    >
-                      {isEn ? 'Remove' : 'เอาออก'}
-                    </button>
-                  </div>
+            <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-2 text-sm text-[color:var(--color-muted)]">
+              {isEn
+                ? `Selected ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} items. Pick at least ${MIN_COMPARE_ITEMS} items to compare automatically.`
+                : `เลือกแล้ว ${selectedCompareItems.length}/${MAX_COMPARE_ITEMS} รายการ เลือกอย่างน้อย ${MIN_COMPARE_ITEMS} รายการเพื่อให้ระบบเทียบให้อัตโนมัติ`}
+            </div>
+
+            {compareSuggestions.length > 0 ? (
+              <div className="space-y-1 rounded border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 p-3">
+                <div className="text-xs font-medium text-[color:var(--color-muted)] mb-2">
+                  {isEn ? `Found ${compareSuggestions.length} product(s) — click to add` : `พบ ${compareSuggestions.length} สินค้า — กดเพื่อเพิ่มเข้ารายการเทียบ`}
                 </div>
-              ))}
-            </div>
-          ) : null}
-
-          {selectedCompareItems.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-[color:var(--color-fg)] hover:bg-white/10"
-                onClick={() => {
-                  setSelectedCompareItems([])
-                  setQuickCompareRows([])
-                  setCompareNotice('')
-                }}
-                type="button"
-              >
-                {isEn ? 'Clear selected items' : 'ล้างสินค้าที่เลือก'}
-              </button>
-            </div>
-          ) : null}
-
-          {compareNotice ? <div className="text-sm text-[color:var(--color-muted)]">{compareNotice}</div> : null}
-
-          <div className="rounded border border-[color:var(--color-border)] surface-soft px-4 py-3">
-            <div className="text-base font-semibold">{summaryTitle}</div>
-            <div className="mt-1 text-sm text-[color:var(--color-muted)]">{summaryHelper}</div>
+                {compareSuggestions.map((item) => (
+                  <button
+                    key={`${item.product_id}-${item.canonical_group_id || 'single'}`}
+                    className="surface-item block w-full rounded px-3 py-2 text-left text-sm hover:ring-1 hover:ring-[color:var(--color-primary)]/50"
+                    type="button"
+                    onClick={() => addCompareItem(item)}
+                  >
+                    <div className="font-medium">
+                      {item.sku} - {item.name_th || item.name_en}
+                    </div>
+                    <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+                      {item.canonical_group_name || (isEn ? 'No compare group' : 'ยังไม่มีกลุ่มเทียบ')} |{' '}
+                      {item.cheapest_active_final_total_cost_thb != null
+                        ? `${item.cheapest_active_final_total_cost_thb.toFixed(2)} THB`
+                        : isEn
+                          ? 'No active price'
+                          : 'ยังไม่มีราคาที่ใช้อยู่'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : compareInput.trim() ? (
+              <div className="text-sm text-[color:var(--color-muted)]">
+                {isEn ? 'No products found. Try another keyword.' : 'ไม่พบสินค้า ลองเปลี่ยนคำค้นหาดู'}
+              </div>
+            ) : null}
           </div>
+
+          {/* ── Section 2: สินค้าที่เลือกไว้แล้ว ── */}
+          <div className="surface-panel rounded p-4 space-y-3">
+            <div className="border-b border-[color:var(--color-border)] pb-3">
+              <div className="text-base font-semibold">{selectedTitle}</div>
+              <div className="mt-1 text-sm text-[color:var(--color-muted)]">{selectedHelper}</div>
+            </div>
+
+            {selectedCompareItems.length > 0 ? (
+              <>
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {selectedCompareItems.map((item) => (
+                    <div key={item.compareKey} className="surface-item rounded px-3 py-3 text-sm">
+                      <div className="font-medium">
+                        {item.sku} - {item.name}
+                      </div>
+                      <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+                        {item.canonicalGroupName || (isEn ? 'Compare this product only' : 'เทียบเฉพาะสินค้านี้')}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
+                          to={`/products?productId=${item.productId}&sku=${encodeURIComponent(item.sku)}`}
+                        >
+                          {isEn ? 'Details' : 'รายละเอียด'}
+                        </Link>
+                        <button
+                          className="rounded border border-red-400/30 px-2 py-1 text-red-200 hover:bg-red-500/10"
+                          onClick={() => removeCompareItem(item.compareKey)}
+                          type="button"
+                        >
+                          {isEn ? 'Remove' : 'เอาออก'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="rounded border border-[color:var(--color-border)] px-3 py-2 text-sm text-[color:var(--color-fg)] hover:bg-white/10"
+                    onClick={() => {
+                      setSelectedCompareItems([])
+                      setQuickCompareRows([])
+                      setCompareNotice('')
+                    }}
+                    type="button"
+                  >
+                    {isEn ? 'Clear selected items' : 'ล้างสินค้าที่เลือก'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="rounded border border-dashed border-[color:var(--color-border)] px-4 py-6 text-center text-sm text-[color:var(--color-muted)]">
+                {isEn
+                  ? 'No products selected yet. Search and click a product above to add it here.'
+                  : 'ยังไม่ได้เลือกสินค้า ค้นหาสินค้าจากช่องด้านบนแล้วกดเพิ่มเข้ามาได้เลย'}
+              </div>
+            )}
+          </div>
+
+          {compareNotice ? (
+            <div className="rounded border border-yellow-400/30 bg-yellow-500/5 px-4 py-3 text-sm text-[color:var(--color-muted)]">{compareNotice}</div>
+          ) : null}
+
+          {/* ── Section 3: สรุปผลเทียบ ── */}
+          <div className="surface-panel rounded p-4 space-y-3">
+            <div className="border-b border-[color:var(--color-border)] pb-3">
+              <div className="text-base font-semibold">{summaryTitle}</div>
+              <div className="mt-1 text-sm text-[color:var(--color-muted)]">{summaryHelper}</div>
+            </div>
 
           {selectedCompareItems.length >= MIN_COMPARE_ITEMS ? (
             <div className="space-y-3">
               <div className="rounded border border-[color:var(--color-border)] surface-soft px-3 py-3 text-sm">
                 <div className="font-medium">{isEn ? 'Quick compare summary' : 'สรุปการเทียบสินค้าแบบไว'}</div>
                 <div className="mt-1 text-[color:var(--color-muted)]">
-                  {quickCompareSummary.comparableCount > 0
+                  {compareBusy
+                    ? isEn
+                      ? 'Comparing prices...'
+                      : 'กำลังเทียบราคา...'
+                    : quickCompareSummary.comparableCount > 0
                     ? isEn
                       ? `Cheapest item now: ${quickCompareSummary.cheapestName} (${quickCompareSummary.cheapestCost?.toFixed(2)} THB)`
                       : `ตอนนี้สินค้าที่ราคาดีสุดคือ ${quickCompareSummary.cheapestName} (${quickCompareSummary.cheapestCost?.toFixed(2)} บาท)`
                     : isEn
-                      ? 'No comparable active price found yet.'
-                      : 'ยังไม่พบราคาที่พร้อมเทียบในตอนนี้'}
+                      ? 'No active price record found for any selected product. Try switching the compare mode to "Latest recorded price" or adjusting the quantity.'
+                      : 'ยังไม่พบราคาที่ใช้งานอยู่สำหรับสินค้าที่เลือก ลองเปลี่ยนโหมดเป็น "ราคาล่าสุดที่บันทึกไว้" หรือปรับจำนวนที่ใช้เทียบดู'}
                 </div>
               </div>
 
@@ -633,7 +659,14 @@ export function SearchWorkspacePage() {
                 <div className="text-sm text-[color:var(--color-muted)]">{t('zones.search.noCompareRows')}</div>
               ) : null}
             </div>
+          ) : selectedCompareItems.length === 0 ? (
+            <div className="rounded border border-dashed border-[color:var(--color-border)] px-4 py-6 text-center text-sm text-[color:var(--color-muted)]">
+              {isEn
+                ? 'Select at least 2 products above to begin comparing prices.'
+                : 'เลือกสินค้าอย่างน้อย 2 รายการจากด้านบนเพื่อเริ่มเทียบราคา'}
+            </div>
           ) : null}
+          </div>
         </div>
       ) : null}
 
