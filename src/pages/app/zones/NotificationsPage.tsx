@@ -50,20 +50,20 @@ export function NotificationsPage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4">
+        <div className="surface-panel rounded p-4">
           <div className="text-xs text-[color:var(--color-muted)]">{t('zones.notifications.pendingRetry')}</div>
           <div className="mt-2 text-2xl font-semibold">{busy ? '...' : data?.summary.pending_total ?? 0}</div>
         </div>
-        <div className="rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4">
+        <div className="surface-panel rounded p-4">
           <div className="text-xs text-[color:var(--color-muted)]">{t('zones.notifications.failed')}</div>
           <div className="mt-2 text-2xl font-semibold">{busy ? '...' : data?.summary.failed_total ?? 0}</div>
         </div>
       </div>
 
-      <div className="rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4">
+      <div className="surface-panel rounded p-4">
         <div className="space-y-2">
           {(data?.items ?? []).map((item) => (
-            <div key={item.outbox_id} className="rounded border border-white/10 px-3 py-2 text-sm">
+            <div key={item.outbox_id} className="surface-item rounded px-3 py-2 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="font-medium">{item.message_title || item.event_type}</div>
                 <div className="text-[color:var(--color-muted)]">
@@ -74,7 +74,7 @@ export function NotificationsPage() {
                 {item.source_domain} - {item.routing_role || '-'}
               </div>
               <div className="mt-2">
-                <Link className="rounded border border-white/15 px-2 py-1" to={buildNotificationTargetPath(item)}>
+                <Link className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]" to={buildNotificationTargetPath(item)}>
                   {t('zones.notifications.openRelated')}
                 </Link>
               </div>

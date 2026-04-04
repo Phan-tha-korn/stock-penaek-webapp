@@ -34,7 +34,7 @@ export function HelpHint(props: { helpKey: string }) {
   return (
     <span className="relative inline-flex items-center">
       <button
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[color:var(--color-border)] bg-black/20 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-soft)] text-[11px] font-semibold text-[color:var(--color-muted-strong)] hover:bg-white/10"
         type="button"
         aria-label={t('help.open')}
         onClick={() => void toggleOpen()}
@@ -42,17 +42,17 @@ export function HelpHint(props: { helpKey: string }) {
         ?
       </button>
       {open ? (
-        <div className="absolute left-0 top-7 z-30 w-72 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)] p-3 text-xs text-white shadow-2xl">
+        <div className="absolute left-0 top-7 z-30 w-72 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--panel-strong-bg)] p-3 text-xs text-[color:var(--color-fg)] shadow-2xl">
           {loading ? (
-            <div className="text-white/70">{t('help.loading')}</div>
+            <div className="text-[color:var(--color-muted)]">{t('help.loading')}</div>
           ) : entry ? (
             <div className="space-y-2">
-              <div className="font-semibold text-white">{entry.title}</div>
-              <div className="text-white/75">{entry.body}</div>
-              {entry.example ? <div className="rounded-lg bg-black/20 px-2 py-1 text-white/65">{entry.example}</div> : null}
+              <div className="font-semibold text-[color:var(--color-fg)]">{entry.title}</div>
+              <div className="text-[color:var(--color-muted)]">{entry.body}</div>
+              {entry.example ? <div className="rounded-lg bg-[color:var(--color-surface-soft)] px-2 py-1 text-[color:var(--color-muted-strong)]">{entry.example}</div> : null}
             </div>
           ) : (
-            <div className="text-white/70">{t('help.empty')}</div>
+            <div className="text-[color:var(--color-muted)]">{t('help.empty')}</div>
           )}
         </div>
       ) : null}

@@ -31,8 +31,8 @@ export function LoginPage() {
   return (
     <div className="bg-app auth-shell">
       {busy ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 backdrop-blur-xl">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[color:var(--color-card)]/92 p-6 text-center shadow-2xl">
+        <div className="loading-overlay">
+          <div className="loading-card p-6 text-center shadow-2xl">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-[color:var(--color-primary)]" />
             <div className="mt-4 text-base font-semibold">{t('auth.signingIn')}</div>
             <div className="mt-1 text-sm text-[color:var(--color-muted)]">{t('auth.signingInHint')}</div>

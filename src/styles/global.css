@@ -22,6 +22,9 @@
   --app-bg-gradient-accent: #1e6fd9;
   --app-bg-blur: 0px;
   --app-bg-overlay-opacity: 0.35;
+  --loading-overlay-bg: rgba(0, 0, 0, 0.64);
+  --panel-strong-bg: rgba(18, 18, 18, 0.92);
+  --surface-border-strong: rgba(255, 255, 255, 0.12);
 }
 
 :root[data-theme='light'] {
@@ -34,6 +37,9 @@
   --shadow-soft: 0 12px 35px rgba(80, 122, 186, 0.14);
   --color-input-bg: rgba(255, 255, 255, 0.72);
   --color-surface-soft: rgba(255, 255, 255, 0.48);
+  --loading-overlay-bg: rgba(219, 234, 254, 0.58);
+  --panel-strong-bg: rgba(255, 255, 255, 0.94);
+  --surface-border-strong: rgba(16, 35, 63, 0.14);
 }
 
 :root[data-theme='dark'] {
@@ -53,6 +59,10 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   margin: 0;
+}
+
+#root {
+  min-height: 100dvh;
 }
 
 .bg-app {
@@ -139,6 +149,39 @@ button {
 
 .input-surface {
   background: var(--color-input-bg);
+}
+
+.input-surface::placeholder {
+  color: var(--color-muted-strong);
+  opacity: 1;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: var(--loading-overlay-bg);
+  backdrop-filter: blur(18px);
+}
+
+.loading-card {
+  width: min(100%, 24rem);
+  border-radius: 1rem;
+  border: 1px solid var(--surface-border-strong);
+  background: var(--panel-strong-bg);
+}
+
+.surface-panel {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-card) 88%, transparent);
+}
+
+.surface-item {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-card) 72%, transparent);
 }
 
 @keyframes fade-in {

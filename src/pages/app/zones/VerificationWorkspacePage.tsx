@@ -84,10 +84,10 @@ export function VerificationWorkspacePage() {
         </FieldLabel>
       </div>
 
-      <div className="rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4">
+      <div className="surface-panel rounded p-4">
         <div className="space-y-2">
           {items.map((item) => (
-            <div key={item.request_id} className="rounded border border-white/10 px-3 py-2 text-sm">
+            <div key={item.request_id} className="surface-item rounded px-3 py-2 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="font-medium">{item.request_code}</div>
                 <div className="text-[color:var(--color-muted)]">

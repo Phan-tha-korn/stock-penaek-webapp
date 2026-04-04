@@ -115,7 +115,7 @@ export function SearchWorkspacePage() {
       </div>
 
       {view === 'quick' ? (
-        <div className="space-y-3 rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4">
+        <div className="surface-panel space-y-3 rounded p-4">
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <FieldLabel
               label={t('zones.search.quickLabel')}
@@ -140,7 +140,7 @@ export function SearchWorkspacePage() {
           </div>
           <div className="space-y-2">
             {searchItems.map((item) => (
-              <div key={item.product_id} className="rounded border border-white/10 px-3 py-2 text-sm">
+              <div key={item.product_id} className="surface-item rounded px-3 py-2 text-sm">
                 <div className="font-medium">
                   {item.sku} - {item.name_th || item.name_en}
                 </div>
@@ -149,13 +149,13 @@ export function SearchWorkspacePage() {
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Link
-                    className="rounded border border-white/15 px-2 py-1"
+                    className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
                     to={`/products?productId=${item.product_id}&sku=${encodeURIComponent(item.sku)}`}
                   >
                     {t('zones.search.openProduct')}
                   </Link>
                   <button
-                    className="rounded border border-white/15 px-2 py-1"
+                    className="rounded border border-[color:var(--color-border)] px-2 py-1 text-[color:var(--color-fg)]"
                     onClick={() =>
                       patchSearch({
                         view: 'compare',
@@ -180,7 +180,7 @@ export function SearchWorkspacePage() {
       ) : null}
 
       {view === 'compare' ? (
-        <div className="space-y-3 rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4">
+        <div className="surface-panel space-y-3 rounded p-4">
           <div className="grid gap-3 md:grid-cols-4">
             <FieldLabel label={t('zones.search.productId')} helpKey="search.compare">
               <input
@@ -218,7 +218,7 @@ export function SearchWorkspacePage() {
           </button>
           <div className="space-y-2">
             {(compareResult?.rows ?? []).map((row) => (
-              <div key={row.price_record_id} className="rounded border border-white/10 px-3 py-2 text-sm">
+              <div key={row.price_record_id} className="surface-item rounded px-3 py-2 text-sm">
                 <div className="font-medium">
                   {row.supplier_name} - {t('zones.search.resultCost', { amount: row.final_total_cost_thb.toFixed(2) })}
                 </div>
@@ -235,7 +235,7 @@ export function SearchWorkspacePage() {
       ) : null}
 
       {view === 'history' ? (
-        <div className="space-y-3 rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4">
+        <div className="surface-panel space-y-3 rounded p-4">
           <div className="grid gap-3 md:grid-cols-4">
             <FieldLabel label={t('zones.search.productId')} helpKey="search.history">
               <input
@@ -265,7 +265,7 @@ export function SearchWorkspacePage() {
           </button>
           <div className="space-y-2">
             {historyItems.map((row) => (
-              <div key={row.price_record_id} className="rounded border border-white/10 px-3 py-2 text-sm">
+              <div key={row.price_record_id} className="surface-item rounded px-3 py-2 text-sm">
                 <div className="font-medium">{t('zones.search.resultCost', { amount: row.final_total_cost_thb.toFixed(2) })}</div>
                 <div className="text-[color:var(--color-muted)]">
                   {t('zones.search.historyWindow', { from: row.effective_at || '-', to: row.expire_at || 'open' })}
