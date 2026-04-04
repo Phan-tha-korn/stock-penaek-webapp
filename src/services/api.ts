@@ -3,7 +3,7 @@ import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 
 import { useAuthStore } from '../store/authStore'
 import type { AuthTokens } from '../types/models'
 
-function resolveApiBaseUrl(): string {
+export function resolveApiBaseUrl(): string {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
   if (typeof window === 'undefined') return '/api'
   const { hostname, protocol } = window.location
@@ -23,6 +23,14 @@ function resolveApiBaseUrl(): string {
 }
 
 const API_BASE_URL = resolveApiBaseUrl()
+
+export function resolveApiUrl(value: string) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return ''
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) return normalized
+  if (normalized.startsWith('/api')) return `${API_BASE_URL.replace(/\/api$/, '')}${normalized}`
+  return `${API_BASE_URL}${normalized.startsWith('/') ? '' : '/'}${normalized}`
+}
 
 interface RequestConfigExtra extends InternalAxiosRequestConfig {
   __countedMutation?: boolean

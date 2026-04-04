@@ -1,4 +1,4 @@
-import { api } from './api'
+import { api, resolveApiUrl } from './api'
 
 export type DevBackupCreateResult = {
   ok: boolean
@@ -43,8 +43,5 @@ export async function previewDevBackup(file: File) {
 }
 
 export function getDevBackupDownloadUrl(downloadUrl: string) {
-  const baseUrl = ((import.meta as any).env?.VITE_API_URL || '/api').replace(/\/+$/, '')
-  if (downloadUrl.startsWith('http://') || downloadUrl.startsWith('https://')) return downloadUrl
-  if (downloadUrl.startsWith('/api')) return `${baseUrl.replace(/\/api$/, '')}${downloadUrl}`
-  return `${baseUrl}${downloadUrl.startsWith('/') ? '' : '/'}${downloadUrl}`
+  return resolveApiUrl(downloadUrl)
 }

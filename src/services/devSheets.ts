@@ -1,4 +1,4 @@
-import { api } from './api'
+import { api, resolveApiUrl } from './api'
 
 export type DevSheetsConfig = {
   enabled: boolean
@@ -35,10 +35,5 @@ export async function createDevSheet(payload: { title: string; share_emails: str
 }
 
 export function resolveDevSheetUrl(url: string) {
-  const value = String(url || '').trim()
-  if (!value) return ''
-  if (value.startsWith('http://') || value.startsWith('https://')) return value
-  const baseUrl = ((import.meta as any).env?.VITE_API_URL || '/api').replace(/\/+$/, '')
-  if (value.startsWith('/api')) return `${baseUrl.replace(/\/api$/, '')}${value}`
-  return `${baseUrl}${value.startsWith('/') ? '' : '/'}${value}`
+  return resolveApiUrl(url)
 }
