@@ -12,8 +12,8 @@ type AppRole = 'STOCK' | 'ADMIN' | 'ACCOUNTANT' | 'OWNER' | 'DEV'
 
 function navClass(isActive: boolean) {
   return [
-    'block rounded px-3 py-2 text-sm transition',
-    isActive ? 'bg-[color:var(--color-primary)] text-black' : 'text-[color:var(--color-muted-strong)] hover:bg-white/10'
+    'block rounded-lg px-3 py-2 text-sm transition',
+    isActive ? 'bg-[color:var(--color-primary)] text-black shadow-sm' : 'text-[color:var(--color-muted-strong)] hover:bg-white/8'
   ].join(' ')
 }
 
@@ -37,42 +37,165 @@ function roleDisplay(role: AppRole | undefined, isEn: boolean) {
   }[role]
 }
 
-function homeLabel(role: AppRole | undefined, isEn: boolean) {
-  if (isEn) {
-    return {
-      OWNER: 'Executive home',
-      DEV: 'Verification home',
-      ADMIN: 'Operations home',
-      STOCK: 'Product search & check',
-      ACCOUNTANT: 'Work home',
-    }[role || 'STOCK']
-  }
-  return {
-    OWNER: 'หน้าเริ่มต้นผู้บริหาร',
-    DEV: 'หน้าตรวจสอบงาน',
-    ADMIN: 'หน้าดูแลงานหลัก',
-    STOCK: 'ค้นหาสินค้าและเช็ค',
-    ACCOUNTANT: 'หน้าทำงานหลัก',
-  }[role || 'STOCK']
+function homePathFor(role: AppRole | undefined) {
+  if (role === 'OWNER') return '/zones/owner'
+  if (role === 'DEV') return '/zones/dev'
+  if (role === 'ADMIN') return '/zones/admin'
+  return '/zones/stock/search'
 }
 
-function sidebarIntro(role: AppRole | undefined, isEn: boolean) {
-  if (isEn) {
-    return {
-      OWNER: 'Main menus for business overview, verification, and system control.',
-      DEV: 'Main menus for verification, matching, search, and system tools.',
-      ADMIN: 'Main menus for supplier operations, monitoring, and daily admin work.',
-      STOCK: 'Main menus for product lookup, compare, and stock-related checks.',
-      ACCOUNTANT: 'Main menus for operational reports, transactions, and supporting tools.',
-    }[role || 'STOCK']
+function sectionsFor(role: AppRole | undefined, isEn: boolean) {
+  if (role === 'STOCK') {
+    return [
+      {
+        title: isEn ? 'Main' : 'เมนูหลัก',
+        items: [
+          { to: '/zones/stock/search', label: isEn ? 'Find products' : 'ค้นหาสินค้าและเช็ก' },
+          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
+          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+        ],
+      },
+      {
+        title: isEn ? 'Data' : 'ข้อมูลงาน',
+        items: [
+          { to: '/products', label: isEn ? 'Products' : 'รายการสินค้า' },
+          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'รายชื่อร้านค้า' }] : []),
+          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
+        ],
+      },
+      {
+        title: isEn ? 'Settings' : 'การตั้งค่า',
+        items: [{ to: '/settings', label: isEn ? 'Display settings' : 'ตั้งค่าหน้าตา' }],
+      },
+    ]
   }
-  return {
-    OWNER: 'เมนูหลักสำหรับดูภาพรวมธุรกิจ ติดตามงานตรวจสอบ และควบคุมระบบ',
-    DEV: 'เมนูหลักสำหรับตรวจสอบงาน เทียบราคา ค้นหา และดูแลเครื่องมือระบบ',
-    ADMIN: 'เมนูหลักสำหรับดูแลงานร้านค้า ติดตามคิวงาน และทำงานประจำวัน',
-    STOCK: 'เมนูหลักสำหรับค้นหาสินค้า เทียบราคา และตรวจเช็กข้อมูลสต็อก',
-    ACCOUNTANT: 'เมนูหลักสำหรับดูรายงาน ธุรกรรม และเครื่องมือประกอบการทำงาน',
-  }[role || 'STOCK']
+
+  if (role === 'ADMIN') {
+    return [
+      {
+        title: isEn ? 'Main' : 'เมนูหลัก',
+        items: [
+          { to: '/zones/admin', label: isEn ? 'Operations home' : 'หน้าดูแลงานหลัก' },
+          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+        ],
+      },
+      {
+        title: isEn ? 'Review' : 'ตรวจสอบงาน',
+        items: [
+          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
+          { to: '/zones/verification', label: isEn ? 'Review monitor' : 'ติดตามคิวตรวจสอบ' },
+        ],
+      },
+      {
+        title: isEn ? 'Data' : 'ข้อมูลงาน',
+        items: [
+          { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' },
+          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }] : []),
+          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
+          { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
+        ],
+      },
+      {
+        title: isEn ? 'Settings' : 'การตั้งค่า',
+        items: [{ to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' }],
+      },
+    ]
+  }
+
+  if (role === 'DEV') {
+    return [
+      {
+        title: isEn ? 'Main' : 'เมนูหลัก',
+        items: [
+          { to: '/zones/dev', label: isEn ? 'My review home' : 'งานตรวจสอบของฉัน' },
+          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+        ],
+      },
+      {
+        title: isEn ? 'Review' : 'ตรวจสอบงาน',
+        items: [
+          { to: '/zones/verification', label: isEn ? 'Verification queue' : 'คิวงานรอตรวจสอบ' },
+          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
+        ],
+      },
+      {
+        title: isEn ? 'Data' : 'ข้อมูลงาน',
+        items: [
+          { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' },
+          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }] : []),
+          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
+          { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
+        ],
+      },
+      {
+        title: isEn ? 'System' : 'ระบบ',
+        items: [
+          { to: '/admin/users', label: isEn ? 'Users' : 'จัดการผู้ใช้' },
+          { to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' },
+          { to: '/dev', label: isEn ? 'Developer tools' : 'เครื่องมือพัฒนา' },
+        ],
+      },
+    ]
+  }
+
+  if (role === 'OWNER') {
+    return [
+      {
+        title: isEn ? 'Main' : 'เมนูหลัก',
+        items: [
+          { to: '/zones/owner', label: isEn ? 'Executive home' : 'ภาพรวมผู้บริหาร' },
+          { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+        ],
+      },
+      {
+        title: isEn ? 'Review' : 'ตรวจสอบงาน',
+        items: [
+          { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
+          { to: '/zones/verification', label: isEn ? 'Verification queue' : 'คิวงานรอตรวจสอบ' },
+          { to: '/owner-check', label: isEn ? 'Deep insights' : 'มุมมองเชิงลึก' },
+        ],
+      },
+      {
+        title: isEn ? 'Data' : 'ข้อมูลงาน',
+        items: [
+          { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' },
+          ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }] : []),
+          { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
+          { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
+        ],
+      },
+      {
+        title: isEn ? 'System' : 'ระบบ',
+        items: [
+          { to: '/admin/users', label: isEn ? 'Users' : 'จัดการผู้ใช้' },
+          { to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' },
+        ],
+      },
+    ]
+  }
+
+  return [
+    {
+      title: isEn ? 'Main' : 'เมนูหลัก',
+      items: [
+        { to: homePathFor(role), label: isEn ? 'Work home' : 'หน้าทำงานหลัก' },
+        { to: '/zones/notifications', label: isEn ? 'Notifications' : 'การแจ้งเตือน' },
+      ],
+    },
+    {
+      title: isEn ? 'Data' : 'ข้อมูลงาน',
+      items: [
+        { to: '/zones/search', label: isEn ? 'Compare prices' : 'ค้นหาการเทียบราคา' },
+        ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: isEn ? 'Suppliers' : 'รายชื่อร้านค้า' }] : []),
+        { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' },
+        { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' },
+      ],
+    },
+    {
+      title: isEn ? 'Settings' : 'การตั้งค่า',
+      items: [{ to: '/settings', label: isEn ? 'Display settings' : 'ตั้งค่าหน้าตา' }],
+    },
+  ]
 }
 
 export function AppShell() {
@@ -86,60 +209,9 @@ export function AppShell() {
   const themePreference = useUiPreferencesStore((s) => s.themePreference)
   const setThemePreference = useUiPreferencesStore((s) => s.setThemePreference)
 
-  const role = user?.role
+  const role = user?.role as AppRole | undefined
   const isEn = i18n.language === 'en'
-
-  const homePath =
-    role === 'OWNER' ? '/zones/owner' :
-    role === 'DEV' ? '/zones/dev' :
-    role === 'ADMIN' ? '/zones/admin' :
-    '/zones/stock/search'
-
-  const navSections = [
-    {
-      title: isEn ? 'Main menu' : 'เมนูหลัก',
-      roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const,
-      items: [
-        { to: homePath, label: homeLabel(role as AppRole | undefined, isEn), roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
-        { to: '/zones/notifications', label: isEn ? 'Important notifications' : 'การแจ้งเตือนสำคัญ', roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
-      ],
-    },
-    {
-      title: isEn ? 'Search & review' : 'ค้นหาและตรวจสอบ',
-      roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const,
-      items: [
-        { to: '/zones/search', label: isEn ? 'Price compare search' : 'ค้นหาการเทียบราคา', roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
-        { to: '/zones/verification', label: isEn ? 'Review queue' : 'คิวงานรอตรวจสอบ', roles: ['ADMIN', 'OWNER', 'DEV'] as const },
-        { to: '/owner-check', label: isEn ? 'Owner insight view' : 'มุมมองผู้บริหาร', roles: ['OWNER'] as const },
-      ],
-    },
-    {
-      title: isEn ? 'Products & business data' : 'สินค้าและข้อมูลงาน',
-      roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const,
-      items: [
-        { to: '/products', label: role === 'STOCK' ? (isEn ? 'Product list & check' : 'รายการสินค้าและเช็ก') : (isEn ? 'Product management' : 'จัดการสินค้า'), roles: ['STOCK', 'ADMIN', 'OWNER', 'DEV'] as const },
-        ...(featureFlags.supplierModule ? [{ to: '/suppliers', label: role === 'STOCK' ? (isEn ? 'Supplier list' : 'รายชื่อร้านค้า') : (isEn ? 'Supplier management' : 'จัดการร้านค้า'), roles: ['STOCK', 'ADMIN', 'OWNER', 'DEV', 'ACCOUNTANT'] as const }] : []),
-        { to: '/transactions', label: isEn ? 'Transactions & stock movement' : 'ธุรกรรมและการเคลื่อนไหว', roles: ['STOCK', 'ADMIN', 'OWNER', 'DEV', 'ACCOUNTANT'] as const },
-        { to: '/reports', label: isEn ? 'Reports & summaries' : 'รายงานและสรุปผล', roles: ['ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
-        { to: '/dashboard', label: isEn ? 'Legacy overview dashboard' : 'แดชบอร์ดภาพรวมแบบเดิม', roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
-      ],
-    },
-    {
-      title: isEn ? 'System & setup' : 'ระบบและการตั้งค่า',
-      roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const,
-      items: [
-        { to: '/admin/users', label: isEn ? 'User accounts' : 'จัดการผู้ใช้', roles: ['OWNER', 'DEV'] as const },
-        { to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา', roles: ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV'] as const },
-        { to: '/dev', label: isEn ? 'Developer tools' : 'เครื่องมือพัฒนา', roles: ['DEV'] as const },
-      ],
-    },
-  ]
-    .filter((section) => (role ? section.roles.includes(role as never) : false))
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => (role ? item.roles.includes(role as never) : false)),
-    }))
-    .filter((section) => section.items.length > 0)
+  const navSections = sectionsFor(role, isEn)
 
   return (
     <div className="bg-app min-h-screen text-app">
@@ -212,23 +284,22 @@ export function AppShell() {
       </header>
 
       <div className="mx-auto grid max-w-7xl grid-cols-12 gap-4 px-4 py-4">
-        <aside className="col-span-12 md:col-span-3 lg:col-span-2">
-          <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-3 backdrop-blur">
-            <div className="border-b border-[color:var(--color-border)] pb-3">
-              <div className="text-sm font-semibold">{isEn ? 'Menu for your role' : 'เมนูสำหรับบทบาทนี้'}</div>
-              <div className="mt-1 text-xs text-[color:var(--color-muted)]">{roleDisplay(role as AppRole | undefined, isEn)}</div>
-              <div className="mt-2 text-xs leading-5 text-[color:var(--color-muted-strong)]">{sidebarIntro(role as AppRole | undefined, isEn)}</div>
+        <aside className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2">
+          <div className="card rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-3 backdrop-blur">
+            <div className="border-b border-[color:var(--color-border)] pb-2">
+              <div className="text-sm font-semibold">{isEn ? 'Menu' : 'เมนู'}</div>
+              <div className="mt-1 text-xs text-[color:var(--color-muted)]">{roleDisplay(role, isEn)}</div>
             </div>
-            <nav className="mt-3 space-y-4">
+            <nav className="mt-3 space-y-3">
               {navSections.map((section) => (
                 <div key={section.title} className="space-y-1">
-                  <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--color-muted)]">
+                  <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--color-muted)]">
                     {section.title}
                   </div>
                   <div className="space-y-1">
-                    {section.items.map((x) => (
-                      <NavLink key={x.to} to={x.to} className={({ isActive }) => navClass(isActive)}>
-                        {x.label}
+                    {section.items.map((item) => (
+                      <NavLink key={item.to} to={item.to} className={({ isActive }) => navClass(isActive)}>
+                        {item.label}
                       </NavLink>
                     ))}
                   </div>
@@ -237,7 +308,7 @@ export function AppShell() {
             </nav>
           </div>
         </aside>
-        <main className="col-span-12 md:col-span-9 lg:col-span-10">
+        <main className="col-span-12 md:col-span-8 lg:col-span-9 xl:col-span-10">
           <div key={location.pathname} className="animate-fade-in">
             <Outlet />
           </div>
@@ -246,4 +317,3 @@ export function AppShell() {
     </div>
   )
 }
-
