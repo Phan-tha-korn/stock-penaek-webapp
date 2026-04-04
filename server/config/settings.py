@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+import secrets
 
 from .config_loader import load_master_config
 from .paths import app_db_path, ensure_local_data_layout
@@ -17,7 +18,7 @@ class Settings(BaseSettings):
     database_url: str | None = None
     redis_url: str | None = None
 
-    jwt_secret: str = "dev-secret"
+    jwt_secret: str = ""
     jwt_issuer: str = "enterprise-stock-platform"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
@@ -52,6 +53,8 @@ class Settings(BaseSettings):
     notification_email_accountant: str = ""
     notification_email_owner: str = ""
     notification_email_dev: str = ""
+    dev_backup_password: str = ""
+    login_rate_limit_per_minute: int = 10
     notification_lock_seconds: int = 120
     notification_worker_batch_size: int = 25
     notification_max_retry_attempts: int = 4
@@ -77,9 +80,11 @@ class Settings(BaseSettings):
         cfg = load_master_config()
         s = Settings()
         jwt_secret = str(cfg.get("jwt_secret") or s.jwt_secret)
-        if jwt_secret == "CHANGE_ME_IN_INSTALLER":
-            jwt_secret = s.jwt_secret
+        if jwt_secret in ("CHANGE_ME_IN_INSTALLER", "dev-secret", ""):
+            jwt_secret = secrets.token_urlsafe(48)
         s.jwt_secret = jwt_secret
+
+        s.dev_backup_password = str(cfg.get("dev_backup_password") or s.dev_backup_password)
 
         raw_login_phrase = cfg.get("login_secret_phrase", None)
         if raw_login_phrase is not None:

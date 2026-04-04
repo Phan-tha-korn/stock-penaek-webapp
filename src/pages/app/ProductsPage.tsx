@@ -24,6 +24,7 @@ import { useAuthStore } from '../../store/authStore'
 import { getSocket } from '../../services/socketManager'
 import { ProductDetailModal } from '../../components/products/ProductDetailModal'
 import { productDisplayName } from '../../utils/product'
+import { useAlert, useConfirm, usePrompt } from '../../components/ui/ConfirmDialog'
 
 const UNCATEGORIZED_VALUE = '__uncategorized__'
 
@@ -316,6 +317,9 @@ function ProductFormFields(props: {
 export function ProductsPage() {
   const role = useAuthStore((s) => s.role)
   const user = useAuthStore((s) => s.user)
+  const showAlert = useAlert()
+  const showConfirm = useConfirm()
+  const showPrompt = usePrompt()
   const canManage = role === 'ADMIN' || role === 'OWNER' || role === 'DEV'
   const canAdjust = canManage
 
@@ -475,7 +479,7 @@ export function ProductsPage() {
     const sku = createDraft.sku.trim()
     const name_th = createDraft.name_th.trim()
     if (!sku || !name_th) {
-      window.alert('กรุณากรอกรหัสสินค้าและชื่อสินค้า')
+      await showAlert('กรุณากรอกรหัสสินค้าและชื่อสินค้า')
       return
     }
     setSavingCreate(true)
@@ -503,7 +507,7 @@ export function ProductsPage() {
       setCreateDraft(emptyDraft())
       await refreshList()
     } catch (e: any) {
-      window.alert(e?.response?.data?.detail || 'เพิ่มสินค้าไม่สำเร็จ')
+      await showAlert(e?.response?.data?.detail || 'เพิ่มสินค้าไม่สำเร็จ')
     } finally {
       setSavingCreate(false)
     }
@@ -511,12 +515,12 @@ export function ProductsPage() {
 
   async function handleBulkCreate() {
     if (bulkRows.length < 2) {
-      window.alert('ต้องมีอย่างน้อย 2 รายการ')
+      await showAlert('ต้องมีอย่างน้อย 2 รายการ')
       return
     }
     const invalid = bulkRows.find((row) => !row.sku.trim() || !row.name_th.trim())
     if (invalid) {
-      window.alert('กรอกรหัสสินค้าและชื่อสินค้าให้ครบทุกแถว')
+      await showAlert('กรอกรหัสสินค้าและชื่อสินค้าให้ครบทุกแถว')
       return
     }
     setBulkSaving(true)
@@ -543,7 +547,7 @@ export function ProductsPage() {
       setBulkRows([emptyDraft(), emptyDraft()])
       await refreshList()
     } catch (e: any) {
-      window.alert(e?.response?.data?.detail || 'เพิ่มหลายรายการไม่สำเร็จ')
+      await showAlert(e?.response?.data?.detail || 'เพิ่มหลายรายการไม่สำเร็จ')
     } finally {
       setBulkSaving(false)
     }
@@ -573,7 +577,7 @@ export function ProductsPage() {
       setEditing(null)
       await refreshList()
     } catch (e: any) {
-      window.alert(e?.response?.data?.detail || 'แก้ไขสินค้าไม่สำเร็จ')
+      await showAlert(e?.response?.data?.detail || 'แก้ไขสินค้าไม่สำเร็จ')
     }
   }
 
@@ -684,14 +688,14 @@ export function ProductsPage() {
               className="rounded border border-red-500/30 px-3 py-1.5 text-sm text-red-200 hover:bg-red-500/10"
               type="button"
               onClick={async () => {
-                const ok = window.confirm(`ยืนยันลบ ${selectedSkus.length} รายการ?`)
+                const ok = await showConfirm(`ยืนยันลบ ${selectedSkus.length} รายการ?`)
                 if (!ok) return
-                const reason = window.prompt('เหตุผลในการลบ (ไม่บังคับ)') || ''
+                const reason = (await showPrompt('เหตุผลในการลบ (ไม่บังคับ)')) || ''
                 try {
                   await bulkDeleteProducts(selectedSkus, reason)
                   await refreshList()
                 } catch {
-                  window.alert('ลบหลายรายการไม่สำเร็จ')
+                  await showAlert('ลบหลายรายการไม่สำเร็จ')
                 }
               }}
             >
@@ -1024,19 +1028,19 @@ export function ProductsPage() {
                             className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
                             type="button"
                             onClick={async () => {
-                              const nextQtyRaw = window.prompt(`ตั้งยอดสต็อกสำหรับ ${p.sku}`, String(p.stock_qty || '0'))
+                              const nextQtyRaw = await showPrompt(`ตั้งยอดสต็อกสำหรับ ${p.sku}`, String(p.stock_qty || '0'))
                               if (nextQtyRaw == null) return
                               const nextQty = Number(nextQtyRaw)
                               if (!Number.isFinite(nextQty) || nextQty < 0) {
-                                window.alert('จำนวนไม่ถูกต้อง')
+                                await showAlert('จำนวนไม่ถูกต้อง')
                                 return
                               }
-                              const reason = window.prompt('หมายเหตุ (ไม่บังคับ)') || ''
+                              const reason = (await showPrompt('หมายเหตุ (ไม่บังคับ)')) || ''
                               try {
                                 const updated = await adjustStock(p.sku, { qty: nextQty, type: 'ADJUST', reason })
                                 setItems((prev) => prev.map((x) => (x.sku === p.sku ? updated : x)))
                               } catch (e: any) {
-                                window.alert(e?.response?.data?.detail || 'ตั้งยอดไม่สำเร็จ')
+                                await showAlert(e?.response?.data?.detail || 'ตั้งยอดไม่สำเร็จ')
                               }
                             }}
                           >
@@ -1048,14 +1052,14 @@ export function ProductsPage() {
                             className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
                             type="button"
                             onClick={async () => {
-                              const ok = window.confirm(`ยืนยันลบสินค้า ${p.sku}?`)
+                              const ok = await showConfirm(`ยืนยันลบสินค้า ${p.sku}?`)
                               if (!ok) return
                               try {
-                                const reason = window.prompt('เหตุผลในการลบ (ไม่บังคับ)') || ''
+                                const reason = (await showPrompt('เหตุผลในการลบ (ไม่บังคับ)')) || ''
                                 await deleteProduct(p.sku, reason)
                                 await refreshList()
                               } catch {
-                                window.alert('ลบสินค้าไม่สำเร็จ')
+                                await showAlert('ลบสินค้าไม่สำเร็จ')
                               }
                             }}
                           >

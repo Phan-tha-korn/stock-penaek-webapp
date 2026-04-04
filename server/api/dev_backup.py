@@ -14,11 +14,14 @@ from server.services.system_backup import backups_root, create_backup_archive, p
 
 
 router = APIRouter(prefix="/dev/backup", tags=["dev-backup"])
-DEV_PASSWORD = "phanthakorn"
 
 
 def _check_password(password: str) -> None:
-    if (password or "").strip() != DEV_PASSWORD:
+    from server.config.settings import settings
+    expected = (settings.dev_backup_password or "").strip()
+    if not expected:
+        raise HTTPException(status_code=403, detail="dev_backup_password_not_configured")
+    if (password or "").strip() != expected:
         raise HTTPException(status_code=403, detail="invalid_dev_password")
 
 

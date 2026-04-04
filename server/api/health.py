@@ -16,10 +16,5 @@ STARTED_AT = datetime.now(timezone.utc)
 @router.get("/health")
 async def health(db: AsyncSession = Depends(get_db)):
     await db.execute(text("SELECT 1"))
-    uptime_seconds = max(0, int((datetime.now(timezone.utc) - STARTED_AT).total_seconds()))
-    return {
-        "status": "ok",
-        "started_at": STARTED_AT.isoformat(),
-        "uptime_seconds": uptime_seconds,
-    }
+    return {"status": "ok"}
 

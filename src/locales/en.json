@@ -73,9 +73,18 @@
     "stock": {
       "title": "Stock search",
       "totalProducts": "Products",
+      "fullStock": "Full",
+      "normalStock": "Normal",
       "lowStock": "Low stock",
+      "criticalStock": "Critical",
       "outOfStock": "Out of stock",
-      "scannedToday": "Scanned today"
+      "scannedToday": "Scanned today",
+      "autoUpdate": "Auto-updating",
+      "summaryTitle": "Stock overview",
+      "watchlistTitle": "Stock watchlist",
+      "watchlistHint": "Click a product to view details and check restock quantity",
+      "watchlistUpdated": "Updated based on latest warehouse status",
+      "searchWatchlist": "Search watchlist"
     },
     "admin": {
       "pendingApproval": "Pending approval",

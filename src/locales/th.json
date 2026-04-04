@@ -73,9 +73,18 @@
     "stock": {
       "title": "ค้นหาสินค้า",
       "totalProducts": "จำนวนสินค้า",
+      "fullStock": "เต็ม",
+      "normalStock": "ปกติ",
       "lowStock": "ใกล้หมด",
+      "criticalStock": "ควรเติม",
       "outOfStock": "หมดสต็อก",
-      "scannedToday": "สแกนวันนี้"
+      "scannedToday": "สแกนวันนี้",
+      "autoUpdate": "อัพเดตอัตโนมัติ",
+      "summaryTitle": "ภาพรวมสต็อก",
+      "watchlistTitle": "โซนเฝ้าระวังสต็อก",
+      "watchlistHint": "กดที่สินค้าเพื่อเปิดดูรายละเอียดและเช็กจำนวนที่ต้องเติม",
+      "watchlistUpdated": "อัปเดตตามสถานะล่าสุดของคลังสินค้า",
+      "searchWatchlist": "ค้นหาในโซนเฝ้าระวัง"
     },
     "admin": {
       "pendingApproval": "รออนุมัติ",

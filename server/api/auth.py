@@ -22,6 +22,10 @@ from server.services.security import (
     verify_password,
 )
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+_limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -45,6 +49,7 @@ async def _get_lock(db: AsyncSession, username: str, ip: str) -> LoginLock:
 
 
 @router.post("/login", response_model=TokenOut)
+@_limiter.limit(lambda: f"{settings.login_rate_limit_per_minute}/minute")
 async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(get_db)):
     username = payload.username.strip()
     ip = request.client.host if request.client else "unknown"
@@ -148,18 +153,19 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
         expires_at=expires_at.replace(tzinfo=None),
     )
     db.add(sess)
-    await db.commit()
+    await db.flush()
 
     res = await db.execute(
         select(RefreshSession)
         .where(RefreshSession.user_id == user.id, RefreshSession.revoked.is_(False))
         .order_by(RefreshSession.created_at.desc())
+        .with_for_update()
     )
     sessions = res.scalars().all()
     if len(sessions) > settings.session_max_per_user:
         for s in sessions[settings.session_max_per_user :]:
             s.revoked = True
-        await db.commit()
+    await db.commit()
 
     await write_audit_log(
         db,

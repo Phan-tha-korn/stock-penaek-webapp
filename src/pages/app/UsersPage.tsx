@@ -2,12 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import type { Role, User } from '../../types/models'
 import { createUser, deleteUser, listUsers, resetUserPassword, updateUser } from '../../services/auth'
+import { useAlert, useConfirm, usePrompt } from '../../components/ui/ConfirmDialog'
 
 const roles: Role[] = ['STOCK', 'ADMIN', 'ACCOUNTANT', 'OWNER', 'DEV']
 
 export function UsersPage() {
   const myRole = useAuthStore((s) => s.role)
   const canManage = myRole === 'OWNER' || myRole === 'DEV'
+  const showAlert = useAlert()
+  const showConfirm = useConfirm()
+  const showPrompt = usePrompt()
 
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(true)
@@ -237,6 +241,13 @@ export function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--color-border)]">
+              {!busy && items.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-[color:var(--color-muted)]">
+                    ยังไม่มีผู้ใช้ในระบบ
+                  </td>
+                </tr>
+              ) : null}
               {items.map((u) => (
                 <tr key={u.id} className="hover:bg-white/5">
                   <td className="px-4 py-2 font-mono text-xs text-white/80">{u.username}</td>
@@ -287,13 +298,13 @@ export function UsersPage() {
                         className="rounded border border-[color:var(--color-border)] px-2 py-1 text-xs text-white/80 hover:bg-white/10"
                         type="button"
                         onClick={async () => {
-                          const next = window.prompt('username ใหม่', u.username)?.trim()
+                          const next = (await showPrompt('username ใหม่', u.username))?.trim()
                           if (!next || next === u.username) return
                           try {
                             await updateUser(u.id, { username: next })
                             await reload()
                           } catch {
-                            alert('แก้ username ไม่สำเร็จ')
+                            await showAlert('แก้ username ไม่สำเร็จ')
                           }
                         }}
                       >
@@ -310,13 +321,13 @@ export function UsersPage() {
                         className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
                         type="button"
                         onClick={async () => {
-                          const ok = window.confirm(`ยืนยันลบผู้ใช้ ${u.username}?`)
+                          const ok = await showConfirm(`ยืนยันลบผู้ใช้ ${u.username}?`)
                           if (!ok) return
                           try {
                             await deleteUser(u.id)
                             await reload()
                           } catch (e: any) {
-                            alert(e?.response?.data?.detail === 'cannot_delete_self' ? 'ไม่สามารถลบบัญชีตัวเองได้' : 'ลบผู้ใช้ไม่สำเร็จ')
+                            await showAlert(e?.response?.data?.detail === 'cannot_delete_self' ? 'ไม่สามารถลบบัญชีตัวเองได้' : 'ลบผู้ใช้ไม่สำเร็จ')
                           }
                         }}
                       >

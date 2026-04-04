@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { api } from '../../services/api'
+import { useConfirm, usePrompt } from '../../components/ui/ConfirmDialog'
 import { createDevBackup, getDevBackupDownloadUrl, previewDevBackup, restoreDevBackup, type DevBackupPreviewResult } from '../../services/devBackup'
 import { fetchConfig } from '../../services/config'
 import { fetchActivity } from '../../services/dashboard'
@@ -40,6 +41,8 @@ export function DevPage() {
   const navigate = useNavigate()
   const role = useAuthStore((s) => s.role)
   const canUse = role === 'DEV'
+  const showConfirm = useConfirm()
+  const showPrompt = usePrompt()
 
   const [busy, setBusy] = useState(true)
   const [health, setHealth] = useState<any>(null)
@@ -692,10 +695,10 @@ export function DevPage() {
                               className="rounded border border-[color:var(--color-border)] px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
                               type="button"
                               onClick={async () => {
-                                const nextName = window.prompt('แก้ชื่อหมวดหมู่', item.name)
+                                const nextName = await showPrompt('แก้ชื่อหมวดหมู่', item.name)
                                 if (nextName == null) return
-                                const nextDescription = window.prompt('แก้รายละเอียด', item.description || '') ?? item.description
-                                const nextSort = window.prompt('ลำดับแสดงผล', String(item.sort_order ?? 0))
+                                const nextDescription = (await showPrompt('แก้รายละเอียด', item.description || '')) ?? item.description
+                                const nextSort = await showPrompt('ลำดับแสดงผล', String(item.sort_order ?? 0))
                                 setCategoryBusy(true)
                                 setCategoryMsg('กำลังอัปเดตหมวดหมู่...')
                                 try {
@@ -719,7 +722,7 @@ export function DevPage() {
                               className="rounded border border-red-500/30 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
                               type="button"
                               onClick={async () => {
-                                const ok = window.confirm(`ลบหมวดหมู่ ${item.name}? สินค้าจะย้ายไปไม่ระบุหมวด`)
+                                const ok = await showConfirm(`ลบหมวดหมู่ ${item.name}? สินค้าจะย้ายไปไม่ระบุหมวด`)
                                 if (!ok) return
                                 setCategoryBusy(true)
                                 setCategoryMsg('กำลังลบหมวดหมู่และย้ายสินค้า...')

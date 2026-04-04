@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { SessionGuard } from './components/auth/SessionGuard'
 import { AppShell } from './components/layout/AppShell'
 import { AppErrorBoundary } from './components/system/AppErrorBoundary'
+import { ConfirmDialogProvider } from './components/ui/ConfirmDialog'
 import { featureFlags } from './config/features'
 import { lazyWithRetry } from './utils/lazyWithRetry'
 
@@ -36,6 +37,7 @@ function AppFallback() {
 export function App() {
   return (
     <AppErrorBoundary>
+      <ConfirmDialogProvider>
       <Suspense fallback={<AppFallback />}>
         <SessionGuard />
         <Routes>
@@ -81,6 +83,7 @@ export function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
+      </ConfirmDialogProvider>
     </AppErrorBoundary>
   )
 }

@@ -286,7 +286,11 @@ async def list_products(
     return ProductListOut(items=out, total=int(total or 0))
 
 
-@router.get("/public/products/{sku}", response_model=ProductOut)
+@router.get(
+    "/public/products/{sku}",
+    response_model=ProductOut,
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN, Role.STOCK, Role.ACCOUNTANT]))],
+)
 async def get_public_product(sku: str, db: AsyncSession = Depends(get_db)):
     product = await db.scalar(select(Product).where(Product.sku == sku))
     if not product or _is_deleted(product):
@@ -547,7 +551,7 @@ async def bulk_create_products(
         if sku in seen:
             raise HTTPException(status_code=400, detail="duplicate_bulk_sku")
         seen.add(sku)
-        existing = await db.scalar(select(Product).where(Product.sku == sku))
+        existing = await db.scalar(select(Product).where(Product.sku == sku).with_for_update(skip_locked=True))
         if existing and not _is_deleted(existing):
             raise HTTPException(status_code=409, detail=f"sku_exists:{sku}")
         category = await _resolve_category(db, item.category_id)

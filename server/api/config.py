@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from server.api.deps import get_current_user
+from server.api.deps import get_current_user, require_roles
 from server.api.schemas import ConfigUpdateIn, GoogleOAuthStartOut, GoogleSetupIn, GoogleSetupOut, PublicConfig
 from server.config.config_loader import load_master_config, repo_root, write_master_config
 from server.config.settings import settings
@@ -202,15 +202,13 @@ async def get_public_config():
     )
 
 
-@router.put("/config", response_model=PublicConfig)
+@router.put("/config", response_model=PublicConfig, dependencies=[Depends(require_roles([Role.OWNER, Role.DEV]))])
 async def update_config(
     payload: ConfigUpdateIn,
     request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if user.role not in (Role.OWNER, Role.DEV):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     before = load_master_config()
     cfg = dict(before)
 

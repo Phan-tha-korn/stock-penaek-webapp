@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { AttachmentItem, Supplier, SupplierProposal } from '../../types/models'
 import { useAuthStore } from '../../store/authStore'
+import { useAlert, useConfirm, usePrompt } from '../../components/ui/ConfirmDialog'
 import {
   approveSupplierProposal,
   archiveSupplier,
@@ -141,6 +142,9 @@ export function SuppliersPage() {
   const role = useAuthStore((s) => s.role)
   const canManage = role === 'ADMIN' || role === 'OWNER' || role === 'DEV'
   const canVerify = role === 'OWNER' || role === 'DEV'
+  const showAlert = useAlert()
+  const showConfirm = useConfirm()
+  const showPrompt = usePrompt()
 
   const [busy, setBusy] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -211,7 +215,7 @@ export function SuppliersPage() {
       pickup_points: [],
     }
     if (!draft.name.trim()) {
-      window.alert('กรุณากรอกชื่อร้านค้า')
+      await showAlert('กรุณากรอกชื่อร้านค้า')
       return
     }
     setSaving(true)
@@ -242,8 +246,8 @@ export function SuppliersPage() {
 
   async function handleArchive() {
     if (!selectedSupplierId || !canManage) return
-    const reason = window.prompt('ระบุเหตุผลที่ต้องการลบร้านค้านี้ออกจากรายการใช้งาน') || ''
-    if (!window.confirm('ยืนยันการลบร้านค้านี้ออกจากรายการใช้งานหรือไม่?')) return
+    const reason = (await showPrompt('ระบุเหตุผลที่ต้องการลบร้านค้านี้ออกจากรายการใช้งาน')) || ''
+    if (!(await showConfirm('ยืนยันการลบร้านค้านี้ออกจากรายการใช้งานหรือไม่?'))) return
     try {
       const result = await archiveSupplier(selectedSupplierId, reason)
       setMessage(isProposal(result) ? 'สร้างคำขอลบร้านค้าออกจากรายการแล้ว' : 'ลบร้านค้าออกจากรายการเรียบร้อยแล้ว')
@@ -279,7 +283,7 @@ export function SuppliersPage() {
   }
 
   async function reviewProposal(item: SupplierProposal, action: 'approve' | 'reject') {
-    const reviewNote = window.prompt(action === 'approve' ? 'หมายเหตุสำหรับการอนุมัติ' : 'เหตุผลที่ไม่อนุมัติ') || ''
+    const reviewNote = (await showPrompt(action === 'approve' ? 'หมายเหตุสำหรับการอนุมัติ' : 'เหตุผลที่ไม่อนุมัติ')) || ''
     try {
       if (action === 'approve') await approveSupplierProposal(item.id, reviewNote)
       else await rejectSupplierProposal(item.id, reviewNote)

@@ -418,23 +418,23 @@ function StockDashboard() {
       {/* ── Summary cards ── */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <div className="text-xs font-medium text-white/40 uppercase tracking-wider">ภาพรวมสต็อก</div>
+          <div className="text-xs font-medium text-white/40 uppercase tracking-wider">{t('dashboard.stock.summaryTitle')}</div>
           {summaryReady && (
             <div className="flex items-center gap-1.5 text-xs text-green-400">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
               </span>
-              อัพเดตอัตโนมัติ
+              {t('dashboard.stock.autoUpdate')}
             </div>
           )}
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
           <Card title={t('dashboard.stock.totalProducts')} value={String(summary.totalProducts)} loading={summaryBusy && !summaryReady} color="blue" />
-          <Card title="เต็ม" value={String(summary.fullStock)} loading={!summaryReady} color="green" />
-          <Card title="ปกติ" value={String(summary.normalStock)} loading={!summaryReady} color="sky" />
+          <Card title={t('dashboard.stock.fullStock')} value={String(summary.fullStock)} loading={!summaryReady} color="green" />
+          <Card title={t('dashboard.stock.normalStock')} value={String(summary.normalStock)} loading={!summaryReady} color="sky" />
           <Card title={t('dashboard.stock.lowStock')} value={String(summary.lowStock)} loading={!summaryReady} color="yellow" />
-          <Card title="ควรเติม" value={String(summary.criticalStock)} loading={!summaryReady} color="amber" />
+          <Card title={t('dashboard.stock.criticalStock')} value={String(summary.criticalStock)} loading={!summaryReady} color="amber" />
           <Card title={t('dashboard.stock.outOfStock')} value={String(summary.outOfStock)} loading={!summaryReady} color="red" />
           <Card title={t('dashboard.stock.scannedToday')} value={String(scannedToday)} loading={false} color="orange" />
         </div>
@@ -443,10 +443,10 @@ function StockDashboard() {
       <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-5 backdrop-blur">
         <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
           <div>
-            <h3 className="text-base font-semibold">โซนเฝ้าระวังสต็อก</h3>
-            <p className="text-sm text-white/50">กดที่สินค้าเพื่อเปิดดูรายละเอียดและเช็กจำนวนที่ต้องเติม</p>
+            <h3 className="text-base font-semibold">{t('dashboard.stock.watchlistTitle')}</h3>
+            <p className="text-sm text-white/50">{t('dashboard.stock.watchlistHint')}</p>
           </div>
-          <div className="text-xs text-white/40">อัปเดตตามสถานะล่าสุดของคลังสินค้า</div>
+          <div className="text-xs text-white/40">{t('dashboard.stock.watchlistUpdated')}</div>
         </div>
 
         <div className="mb-4">
@@ -457,7 +457,7 @@ function StockDashboard() {
               setWatchlistQuery(e.target.value)
               setWatchlistPage({ LOW: 1, CRITICAL: 1, OUT: 1 })
             }}
-            placeholder="ค้นหาในโซนเฝ้าระวัง"
+            placeholder={t('dashboard.stock.searchWatchlist')}
           />
         </div>
 

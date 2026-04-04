@@ -1,18 +1,28 @@
-import axios from 'axios'
+import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 
 import { useAuthStore } from '../store/authStore'
+import type { AuthTokens } from '../types/models'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+
+interface RequestConfigExtra extends InternalAxiosRequestConfig {
+  __countedMutation?: boolean
+  _retry?: boolean
+}
 
 export const api = axios.create({
-  baseURL: (import.meta as any).env?.VITE_API_URL || '/api',
+  baseURL: API_BASE_URL,
   timeout: 20_000
 })
 
 const refreshClient = axios.create({
-  baseURL: (import.meta as any).env?.VITE_API_URL || '/api',
+  baseURL: API_BASE_URL,
   timeout: 20_000
 })
 
-let refreshPromise: Promise<any> | null = null
+type RefreshResponse = Omit<AuthTokens, 'token_type'> & { token_type?: AuthTokens['token_type'] }
+
+let refreshPromise: Promise<AuthTokens> | null = null
 
 function isMutationRequest(method?: string) {
   return ['post', 'put', 'patch', 'delete'].includes(String(method || '').toLowerCase())
@@ -24,6 +34,7 @@ function isAuthEndpoint(url?: string) {
 }
 
 api.interceptors.request.use((config) => {
+  const ext = config as RequestConfigExtra
   const store = useAuthStore.getState()
   const tokens = store.tokens
   if (tokens?.access_token) {
@@ -31,7 +42,7 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${tokens.access_token}`
   }
   if (isMutationRequest(config.method) && !isAuthEndpoint(config.url)) {
-    ;(config as any).__countedMutation = true
+    ext.__countedMutation = true
     store.incrementPendingMutation()
   }
   return config
@@ -39,19 +50,19 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
-    if ((response.config as any)?.__countedMutation) {
+    if ((response.config as RequestConfigExtra)?.__countedMutation) {
       useAuthStore.getState().decrementPendingMutation()
     }
     return response
   },
   async (error) => {
-    const original = error?.config
-    if ((original as any)?.__countedMutation) {
+    const original = error?.config as RequestConfigExtra | undefined
+    if (original?.__countedMutation) {
       useAuthStore.getState().decrementPendingMutation()
-      ;(original as any).__countedMutation = false
+      original.__countedMutation = false
     }
 
-    if (error?.response?.status !== 401 || !original || (original as any)._retry || isAuthEndpoint(original.url)) {
+    if (error?.response?.status !== 401 || !original || original._retry || isAuthEndpoint(original.url)) {
       return Promise.reject(error)
     }
 
@@ -63,24 +74,26 @@ api.interceptors.response.use(
     }
 
     try {
-      ;(original as any)._retry = true
+      original._retry = true
       if (!refreshPromise) {
         refreshPromise = refreshClient
-          .post('/auth/refresh', { refresh_token: refreshToken })
-          .then((res) => res.data)
+          .post<RefreshResponse>('/auth/refresh', { refresh_token: refreshToken })
+          .then<AuthTokens>((res) => ({
+            token_type: 'bearer' as const,
+            ...res.data
+          }))
           .finally(() => {
             refreshPromise = null
           })
       }
-      const newTokens = await refreshPromise
+      const newTokens = await refreshPromise!
       store.setTokens(newTokens)
       original.headers = original.headers ?? {}
       original.headers.Authorization = `Bearer ${newTokens.access_token}`
-      return api(original)
+      return api(original as AxiosRequestConfig)
     } catch (refreshError) {
       store.markReauthRequired(true)
       return Promise.reject(refreshError)
     }
   }
 )
-

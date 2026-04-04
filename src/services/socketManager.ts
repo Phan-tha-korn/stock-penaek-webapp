@@ -1,11 +1,12 @@
 import { io, type Socket } from 'socket.io-client'
+import { useAuthStore } from '../store/authStore'
 
 let socket: Socket | null = null
 let currentUserId: string | null = null
 
 export function getSocket(userId: string | null | undefined) {
-  const enabled = (import.meta as any).env?.VITE_SOCKET_ENABLED === 'true'
-  const baseUrl = (import.meta as any).env?.VITE_SOCKET_URL || ''
+  const enabled = import.meta.env.VITE_SOCKET_ENABLED === 'true'
+  const baseUrl = import.meta.env.VITE_SOCKET_URL || ''
   if (!enabled) return null
   if (!userId) {
     if (socket) {
@@ -24,7 +25,8 @@ export function getSocket(userId: string | null | undefined) {
   }
 
   currentUserId = userId
-  socket = io(baseUrl || '/', { path: '/socket.io', auth: { user_id: userId } })
+  const token = useAuthStore.getState().tokens?.access_token || ''
+  socket = io(baseUrl || '/', { path: '/socket.io', auth: { token, user_id: userId } })
   return socket
 }
 
