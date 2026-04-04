@@ -221,7 +221,7 @@ export function AppShell() {
 
   return (
     <div className="bg-app min-h-screen text-app">
-      <header className="card border-b border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 backdrop-blur">
+      <header className="card surface-panel border-b">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link to="/" className="text-sm font-semibold tracking-wide">
             {t('app.name')}
@@ -291,7 +291,7 @@ export function AppShell() {
 
       <div className="mx-auto grid max-w-7xl grid-cols-12 gap-4 px-4 py-4">
         <aside className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2">
-          <div className="card rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-3 backdrop-blur">
+          <div className="card surface-panel rounded-xl p-3">
             <div className="border-b border-[color:var(--color-border)] pb-2">
               <div className="text-sm font-semibold">{isEn ? 'Menu' : 'เมนู'}</div>
               <div className="mt-1 text-xs text-[color:var(--color-muted)]">{roleDisplay(role, isEn)}</div>
@@ -302,7 +302,7 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={() => toggleSection(index)}
-                    className="flex w-full items-center justify-between rounded-xl border border-[color:var(--color-border)] bg-white/5 px-3 py-2.5 text-left shadow-sm transition hover:bg-white/8"
+                    className="surface-item flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left shadow-sm transition"
                   >
                     <span className="text-sm font-bold text-[color:var(--color-fg)]">
                       {section.title}

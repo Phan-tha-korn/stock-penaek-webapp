@@ -7,13 +7,13 @@
   --color-fg: #ffffff;
   --color-primary: #ff6b00;
   --color-secondary: #1e6fd9;
-  --color-card: #121212;
-  --color-border: rgba(255, 255, 255, 0.08);
+  --color-card: rgba(70, 42, 22, 0.82);
+  --color-border: rgba(255, 236, 214, 0.14);
   --color-muted: rgba(255, 255, 255, 0.72);
   --color-muted-strong: rgba(255, 255, 255, 0.58);
-  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --color-input-bg: rgba(0, 0, 0, 0.22);
-  --color-surface-soft: rgba(255, 255, 255, 0.04);
+  --shadow-soft: 0 14px 38px rgba(29, 15, 5, 0.34);
+  --color-input-bg: rgba(33, 18, 8, 0.42);
+  --color-surface-soft: rgba(255, 245, 235, 0.06);
   --app-bg-mode: gradient;
   --app-bg-color: #0d0d0d;
   --app-bg-image: none;
@@ -25,6 +25,9 @@
   --loading-overlay-bg: rgba(0, 0, 0, 0.64);
   --panel-strong-bg: rgba(18, 18, 18, 0.92);
   --surface-border-strong: rgba(255, 255, 255, 0.12);
+  --surface-panel-bg: rgba(71, 43, 24, 0.82);
+  --surface-item-bg: rgba(86, 52, 30, 0.56);
+  --surface-item-hover-bg: rgba(255, 245, 235, 0.1);
 }
 
 :root[data-theme='light'] {
@@ -40,6 +43,9 @@
   --loading-overlay-bg: rgba(219, 234, 254, 0.58);
   --panel-strong-bg: rgba(255, 255, 255, 0.94);
   --surface-border-strong: rgba(16, 35, 63, 0.14);
+  --surface-panel-bg: rgba(255, 255, 255, 0.86);
+  --surface-item-bg: rgba(255, 255, 255, 0.68);
+  --surface-item-hover-bg: rgba(16, 35, 63, 0.08);
 }
 
 :root[data-theme='dark'] {
@@ -51,6 +57,9 @@
   --color-muted-strong: rgba(255, 247, 237, 0.58);
   --color-input-bg: rgba(0, 0, 0, 0.28);
   --color-surface-soft: rgba(255, 255, 255, 0.04);
+  --surface-panel-bg: rgba(29, 19, 12, 0.86);
+  --surface-item-bg: rgba(41, 26, 16, 0.66);
+  --surface-item-hover-bg: rgba(255, 247, 237, 0.08);
 }
 
 html,
@@ -176,12 +185,17 @@ button {
 
 .surface-panel {
   border: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-card) 88%, transparent);
+  background: var(--surface-panel-bg);
+  backdrop-filter: blur(12px);
 }
 
 .surface-item {
   border: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-card) 72%, transparent);
+  background: var(--surface-item-bg);
+}
+
+.surface-item:hover {
+  background: var(--surface-item-hover-bg);
 }
 
 @keyframes fade-in {
