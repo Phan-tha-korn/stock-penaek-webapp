@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -167,6 +167,9 @@ async def list_price_records(
         rec["product_sku"] = product.sku if product else ""
         rec["product_name_th"] = product.name_th if product else ""
         rec["supplier_name"] = supplier.name if supplier else ""
+        rec["note"] = r.note or ""
+        rec["created_at"] = serialize_utc_datetime(r.created_at)
+        rec["updated_at"] = serialize_utc_datetime(r.updated_at)
         items.append(rec)
 
     return {"items": items, "total": total}
@@ -178,6 +181,7 @@ async def list_price_records(
 )
 async def create_price_record(
     body: PriceRecordCreateIn,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -279,15 +283,21 @@ async def create_price_record(
 
     await write_audit_log(
         db,
-        actor_id=user.id,
+        request=request,
+        actor=user,
         action="price_record.create",
-        entity_type="price_record",
+        entity="price_record",
         entity_id=record.id,
-        details={"product_id": record.product_id, "supplier_id": record.supplier_id},
+        success=True,
+        message=f"Created price record for product {record.product_id}",
     )
     await db.commit()
 
-    return serialize_price_record(record)
+    result = serialize_price_record(record)
+    result["note"] = record.note or ""
+    result["created_at"] = serialize_utc_datetime(record.created_at)
+    result["updated_at"] = serialize_utc_datetime(record.updated_at)
+    return result
 
 
 @router.put(
@@ -297,6 +307,7 @@ async def create_price_record(
 async def update_price_record(
     record_id: str,
     body: PriceRecordUpdateIn,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -375,22 +386,22 @@ async def update_price_record(
     record.quantity_min = quantity_min
     record.quantity_max = quantity_max
     record.original_currency = comp.normalized_money.original_currency
-    record.original_amount = comp.normalized_money.original_amount
+    record.original_amount = float(comp.normalized_money.original_amount)
     record.normalized_currency = comp.normalized_money.normalized_currency
-    record.normalized_amount = comp.normalized_money.normalized_amount
-    record.exchange_rate = comp.normalized_money.exchange_rate
-    record.base_price = comp.base_price
-    record.vat_percent = comp.vat_percent
-    record.vat_amount = comp.vat_amount
-    record.shipping_cost = comp.shipping_cost
-    record.fuel_cost = comp.fuel_cost
-    record.labor_cost = comp.labor_cost
-    record.utility_cost = comp.utility_cost
-    record.distance_meter = comp.distance_meter
-    record.distance_cost = comp.distance_cost
-    record.supplier_fee = comp.supplier_fee
-    record.discount = comp.discount
-    record.final_total_cost = comp.final_total_cost
+    record.normalized_amount = float(comp.normalized_money.normalized_amount)
+    record.exchange_rate = float(comp.normalized_money.exchange_rate)
+    record.base_price = float(comp.base_price)
+    record.vat_percent = float(comp.vat_percent)
+    record.vat_amount = float(comp.vat_amount)
+    record.shipping_cost = float(comp.shipping_cost)
+    record.fuel_cost = float(comp.fuel_cost)
+    record.labor_cost = float(comp.labor_cost)
+    record.utility_cost = float(comp.utility_cost)
+    record.distance_meter = float(comp.distance_meter)
+    record.distance_cost = float(comp.distance_cost)
+    record.supplier_fee = float(comp.supplier_fee)
+    record.discount = float(comp.discount)
+    record.final_total_cost = float(comp.final_total_cost)
     record.effective_at = effective_at
     record.expire_at = expire_at
     if body.note is not None:
@@ -403,15 +414,21 @@ async def update_price_record(
 
     await write_audit_log(
         db,
-        actor_id=user.id,
+        request=request,
+        actor=user,
         action="price_record.update",
-        entity_type="price_record",
+        entity="price_record",
         entity_id=record.id,
-        details={"product_id": record.product_id, "supplier_id": record.supplier_id},
+        success=True,
+        message=f"Updated price record {record.id}",
     )
     await db.commit()
 
-    return serialize_price_record(record)
+    result = serialize_price_record(record)
+    result["note"] = record.note or ""
+    result["created_at"] = serialize_utc_datetime(record.created_at)
+    result["updated_at"] = serialize_utc_datetime(record.updated_at)
+    return result
 
 
 @router.delete(
@@ -420,6 +437,7 @@ async def update_price_record(
 )
 async def archive_price_record(
     record_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict[str, str]:
@@ -436,11 +454,13 @@ async def archive_price_record(
 
     await write_audit_log(
         db,
-        actor_id=user.id,
+        request=request,
+        actor=user,
         action="price_record.archive",
-        entity_type="price_record",
+        entity="price_record",
         entity_id=record.id,
-        details={"product_id": record.product_id, "supplier_id": record.supplier_id},
+        success=True,
+        message=f"Archived price record {record.id}",
     )
     await db.commit()
 

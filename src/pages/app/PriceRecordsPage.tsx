@@ -96,7 +96,7 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
   function doSearch(q: string) {
     setLoading(true)
     search(q)
-      .then(setItems)
+      .then((result) => setItems(Array.isArray(result) ? result : []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
   }
@@ -230,8 +230,8 @@ export function PriceRecordsPage() {
         status: filterStatus || undefined,
         limit: 100,
       })
-      setItems(res.items)
-      setTotal(res.total)
+      setItems(Array.isArray(res?.items) ? res.items : [])
+      setTotal(res?.total ?? 0)
     } catch (err: any) {
       await showAlert(err?.response?.data?.detail || err?.message || 'โหลดข้อมูลไม่สำเร็จ')
     }

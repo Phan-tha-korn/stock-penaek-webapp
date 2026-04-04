@@ -92,7 +92,7 @@ export interface DropdownSupplier {
 
 export async function listPriceRecords(params: PriceRecordListParams = {}) {
   const { data } = await api.get<{ items: PriceRecordItem[]; total: number }>('/price-records', { params })
-  return data
+  return { items: Array.isArray(data?.items) ? data.items : [], total: data?.total ?? 0 }
 }
 
 export async function createPriceRecord(payload: PriceRecordPayload) {
@@ -112,10 +112,10 @@ export async function archivePriceRecord(id: string) {
 
 export async function dropdownProducts(q = '') {
   const { data } = await api.get<DropdownProduct[]>('/price-records/dropdown/products', { params: { q, limit: 50 } })
-  return data
+  return Array.isArray(data) ? data : []
 }
 
 export async function dropdownSuppliers(q = '') {
   const { data } = await api.get<DropdownSupplier[]>('/price-records/dropdown/suppliers', { params: { q, limit: 50 } })
-  return data
+  return Array.isArray(data) ? data : []
 }
