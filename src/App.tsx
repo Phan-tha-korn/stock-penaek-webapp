@@ -53,9 +53,11 @@ export function App() {
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/zones/search" element={<SearchWorkspacePage />} />
               <Route path="/zones/notifications" element={<NotificationsPage />} />
-              {featureFlags.supplierModule ? <Route path="/suppliers" element={<SuppliersPage />} /> : null}
-              <Route path="/price-records" element={<PriceRecordsPage />} />
-              <Route path="/transactions" element={<TransactionsPage />} />
+              <Route element={<ProtectedRoute allow={['OWNER', 'DEV', 'ADMIN']} />}>
+                {featureFlags.supplierModule ? <Route path="/suppliers" element={<SuppliersPage />} /> : null}
+                <Route path="/price-records" element={<PriceRecordsPage />} />
+                <Route path="/transactions" element={<TransactionsPage />} />
+              </Route>
               <Route path="/reports" element={<ReportsPage />} />
               <Route element={<ProtectedRoute allow={['OWNER']} />}>
                 <Route path="/zones/owner" element={<ZoneDashboardPage zone="owner" />} />

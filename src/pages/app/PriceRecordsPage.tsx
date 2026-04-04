@@ -219,7 +219,7 @@ export function PriceRecordsPage() {
   const { t, i18n } = useTranslation()
   const isEn = i18n.language === 'en'
   const role = useAuthStore((s) => s.role)
-  const canManage = role === 'ADMIN' || role === 'OWNER' || role === 'DEV' || role === 'STOCK'
+  const canManage = role === 'ADMIN' || role === 'OWNER' || role === 'DEV'
   const canDelete = role === 'ADMIN' || role === 'OWNER' || role === 'DEV'
   const showAlert = useAlert()
   const showConfirm = useConfirm()

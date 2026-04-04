@@ -31,7 +31,7 @@ export function TransactionsPage() {
   const [skuSuggestions, setSkuSuggestions] = useState<Product[]>([])
   const [realtimeBusy, setRealtimeBusy] = useState(false)
 
-  const canAccountingAction = role === 'ACCOUNTANT' || role === 'ADMIN' || role === 'DEV' || role === 'OWNER'
+  const canAccountingAction = role === 'ADMIN' || role === 'DEV' || role === 'OWNER'
   const canAdjustAbsolute = role === 'ADMIN' || role === 'DEV' || role === 'OWNER'
 
   const now = Date.now()
@@ -160,7 +160,7 @@ export function TransactionsPage() {
 
       {canAccountingAction ? (
         <div className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
-          <div className="mb-2 text-sm font-semibold">บันทึก เบิก/ขาย/ซื้อเพิ่ม (บัญชี)</div>
+          <div className="mb-2 text-sm font-semibold">บันทึก เบิก/ขาย/ซื้อเพิ่ม</div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
             <div className="relative md:col-span-3">
               <input

@@ -62,7 +62,6 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
   const productItem = { to: '/products', label: isEn ? 'Products' : 'จัดการสินค้า' }
   const priceRecordItem = { to: '/price-records', label: isEn ? 'Price Records' : 'บันทึกราคา' }
   const supplierManageItem = { to: '/suppliers', label: isEn ? 'Suppliers' : 'จัดการร้านค้า' }
-  const supplierListItem = { to: '/suppliers', label: isEn ? 'Suppliers' : 'รายชื่อร้านค้า' }
   const transactionItem = { to: '/transactions', label: isEn ? 'Transactions' : 'ธุรกรรม' }
   const reportItem = { to: '/reports', label: isEn ? 'Reports' : 'รายงาน' }
   const settingsItem = { to: '/settings', label: isEn ? 'Settings & appearance' : 'ตั้งค่าและหน้าตา' }
@@ -79,7 +78,27 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
       },
       {
         title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [productItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), priceRecordItem, transactionItem],
+        items: [productItem],
+      },
+      {
+        title: isEn ? 'Settings' : 'การตั้งค่า',
+        items: [{ ...settingsItem, label: isEn ? 'Display settings' : 'ตั้งค่าหน้าตา' }],
+      },
+    ]
+  }
+
+  if (role === 'ACCOUNTANT') {
+    return [
+      {
+        title: isEn ? 'Main' : 'เมนูหลัก',
+        items: [
+          { to: homePathFor(role), label: isEn ? 'Work home' : 'หน้าทำงานหลัก' },
+          notificationItem,
+        ],
+      },
+      {
+        title: isEn ? 'Data' : 'ข้อมูลงาน',
+        items: [compareItem, reportItem],
       },
       {
         title: isEn ? 'Settings' : 'การตั้งค่า',
@@ -177,7 +196,7 @@ function sectionsFor(role: AppRole | undefined, isEn: boolean): NavSection[] {
     },
     {
       title: isEn ? 'Data' : 'ข้อมูลงาน',
-        items: [compareItem, ...(featureFlags.supplierModule ? [supplierListItem] : []), priceRecordItem, transactionItem, reportItem],
+      items: [compareItem, reportItem],
     },
     {
       title: isEn ? 'Settings' : 'การตั้งค่า',

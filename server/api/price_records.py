@@ -111,7 +111,7 @@ def _utc_now_naive() -> datetime:
 
 @router.get(
     "",
-    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN, Role.STOCK, Role.ACCOUNTANT]))],
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN]))],
 )
 async def list_price_records(
     product_id: str | None = Query(None),
@@ -176,7 +176,7 @@ async def list_price_records(
 
 @router.post(
     "",
-    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN, Role.STOCK]))],
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN]))],
 )
 async def create_price_record(
     body: PriceRecordCreateIn,
@@ -301,7 +301,7 @@ async def create_price_record(
 
 @router.put(
     "/{record_id}",
-    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN, Role.STOCK]))],
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN]))],
 )
 async def update_price_record(
     record_id: str,
@@ -468,7 +468,7 @@ async def archive_price_record(
 
 @router.get(
     "/dropdown/products",
-    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN, Role.STOCK, Role.ACCOUNTANT]))],
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN]))],
 )
 async def dropdown_products(
     q: str = Query("", max_length=200),
@@ -499,7 +499,7 @@ async def dropdown_products(
 
 @router.get(
     "/dropdown/suppliers",
-    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN, Role.STOCK, Role.ACCOUNTANT]))],
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV, Role.ADMIN]))],
 )
 async def dropdown_suppliers(
     q: str = Query("", max_length=200),

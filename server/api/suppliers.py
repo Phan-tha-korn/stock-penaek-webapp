@@ -283,7 +283,7 @@ def _payload_dict(payload: SupplierCreateIn | SupplierUpdateIn, *, existing: Sup
 @router.get(
     "",
     response_model=SupplierListOut,
-    dependencies=[Depends(require_roles([Role.STOCK, Role.ADMIN, Role.ACCOUNTANT, Role.OWNER, Role.DEV]))],
+    dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))],
 )
 async def list_suppliers(
     db: AsyncSession = Depends(get_db),
@@ -332,7 +332,7 @@ async def list_supplier_proposals(
 @router.get(
     "/{supplier_id}",
     response_model=SupplierOut,
-    dependencies=[Depends(require_roles([Role.STOCK, Role.ADMIN, Role.ACCOUNTANT, Role.OWNER, Role.DEV]))],
+    dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))],
 )
 async def get_supplier(
     supplier_id: str,
@@ -718,7 +718,7 @@ async def reject_supplier_proposal(
 @router.get(
     "/{supplier_id}/attachments",
     response_model=list[AttachmentOut],
-    dependencies=[Depends(require_roles([Role.STOCK, Role.ADMIN, Role.ACCOUNTANT, Role.OWNER, Role.DEV]))],
+    dependencies=[Depends(require_roles([Role.ADMIN, Role.OWNER, Role.DEV]))],
 )
 async def supplier_attachments(
     supplier_id: str,
