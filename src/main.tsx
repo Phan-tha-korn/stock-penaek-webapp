@@ -4,10 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 
 import { App } from './App'
 import './styles/global.css'
-import { initI18n } from './services/i18n'
+import { initI18n, readLanguagePreference } from './services/i18n'
 import { useBootstrap } from './hooks/useBootstrap'
 
-initI18n('th')
+initI18n(readLanguagePreference('th'))
 
 const LAST_APP_ERROR_KEY = 'last_app_runtime_error'
 

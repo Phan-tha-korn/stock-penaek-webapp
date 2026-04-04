@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { FieldLabel } from '../../components/ui/FieldLabel'
 import { login as loginApi, getMe } from '../../services/auth'
 import { useAuthStore } from '../../store/authStore'
 
@@ -33,23 +34,28 @@ export function LoginPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md">
           <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[color:var(--color-card)]/90 p-6 text-center shadow-2xl">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-[color:var(--color-primary)]" />
-            <div className="mt-4 text-base font-semibold">กำลังเข้าสู่ระบบ</div>
-            <div className="mt-1 text-sm text-white/60">กรุณารอสักครู่ ระบบกำลังตรวจสอบสิทธิ์และเตรียมข้อมูลให้พร้อม</div>
+            <div className="mt-4 text-base font-semibold">{t('auth.signingIn')}</div>
+            <div className="mt-1 text-sm text-[color:var(--color-muted)]">{t('auth.signingInHint')}</div>
           </div>
         </div>
       ) : null}
+
       <div className="card w-full rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-5 backdrop-blur animate-fade-in">
-        <div className="mb-4 text-lg font-semibold">{t('auth.loginTitle')}</div>
+        <div className="mb-1 text-lg font-semibold">{t('auth.loginTitle')}</div>
+        <div className="mb-4 text-sm text-[color:var(--color-muted)]">{t('auth.loginSubtitle')}</div>
+
         {reauthReason === 'session_expired' ? (
           <div className="mb-3 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-            เซสชันครบ 24 ชั่วโมงแล้ว กรุณาเข้าสู่ระบบใหม่เพื่อใช้งานต่อ
+            {t('auth.sessionExpired')}
           </div>
         ) : null}
+
         {error ? (
           <div className="mb-3 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
             {error}
           </div>
         ) : null}
+
         <form
           className="space-y-3"
           onSubmit={handleSubmit(async (values) => {
@@ -69,40 +75,58 @@ export function LoginPage() {
             }
           })}
         >
-          <label className="block">
-            <div className="mb-1 text-xs text-white/70">{t('auth.username')}</div>
+          <FieldLabel
+            label={t('auth.username')}
+            helper={t('auth.usernameHelper')}
+            example={t('auth.usernamePlaceholder')}
+            helpKey="login.username"
+          >
             <input
               className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               autoComplete="username"
+              placeholder={t('auth.usernamePlaceholder')}
               required
               {...register('username')}
             />
-          </label>
-          <label className="block">
-            <div className="mb-1 text-xs text-white/70">{t('auth.password')}</div>
+          </FieldLabel>
+
+          <FieldLabel
+            label={t('auth.password')}
+            helper={t('auth.passwordHelper')}
+            example={t('auth.passwordPlaceholder')}
+            helpKey="login.password"
+          >
             <input
               className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               autoComplete="current-password"
               type="password"
+              placeholder={t('auth.passwordPlaceholder')}
               required
               {...register('password')}
             />
-          </label>
-          <label className="block">
-            <div className="mb-1 text-xs text-white/70">{t('auth.totp')}</div>
+          </FieldLabel>
+
+          <FieldLabel
+            label={t('auth.totp')}
+            helper={t('auth.totpHelper')}
+            example={t('auth.totpPlaceholder')}
+            helpKey="login.totp"
+          >
             <input
               className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
               inputMode="numeric"
-              placeholder="123456"
+              placeholder={t('auth.totpPlaceholder')}
               {...register('totp')}
             />
-          </label>
+          </FieldLabel>
+
           <div className="hidden">
             <label className="block">
-              <div className="mb-1 text-xs text-white/70">{t('auth.secretPhrase')}</div>
+              <div className="mb-1 text-xs text-[color:var(--color-muted)]">{t('auth.secretPhrase')}</div>
               <input {...register('secret_phrase')} />
             </label>
           </div>
+
           <button
             className="w-full rounded bg-[color:var(--color-primary)] px-3 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
             type="submit"
@@ -115,4 +139,3 @@ export function LoginPage() {
     </div>
   )
 }
-

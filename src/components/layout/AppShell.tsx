@@ -1,23 +1,30 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
+import { HelpHint } from '../ui/HelpHint'
 import { featureFlags } from '../../config/features'
+import { changeLanguagePreference } from '../../services/i18n'
 import { useAuthStore } from '../../store/authStore'
-import i18n from '../../services/i18n'
+import { useUiPreferencesStore } from '../../store/uiPreferencesStore'
+import { applyThemePreference } from '../../utils/theme'
 
 function navClass(isActive: boolean) {
   return [
     'block rounded px-3 py-2 text-sm transition',
-    isActive ? 'bg-[color:var(--color-primary)] text-black' : 'text-white/80 hover:bg-white/10'
+    isActive ? 'bg-[color:var(--color-primary)] text-black' : 'text-[color:var(--color-muted-strong)] hover:bg-white/10'
   ].join(' ')
 }
 
 export function AppShell() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const user = useAuthStore((s) => s.user)
   const clearSession = useAuthStore((s) => s.clearSession)
+  const helpMode = useUiPreferencesStore((s) => s.helpMode)
+  const toggleHelpMode = useUiPreferencesStore((s) => s.toggleHelpMode)
+  const themePreference = useUiPreferencesStore((s) => s.themePreference)
+  const setThemePreference = useUiPreferencesStore((s) => s.setThemePreference)
 
   const role = user?.role
 
@@ -51,14 +58,54 @@ export function AppShell() {
             {t('app.name')}
           </Link>
           <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-2 md:flex">
+              <button
+                className={`rounded border px-2.5 py-1 text-xs ${themePreference === 'light' ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-black' : 'border-[color:var(--color-border)] text-[color:var(--color-muted)] hover:bg-white/10'}`}
+                onClick={() => {
+                  setThemePreference('light')
+                  applyThemePreference('light')
+                }}
+                type="button"
+              >
+                {t('theme.light')}
+              </button>
+              <button
+                className={`rounded border px-2.5 py-1 text-xs ${themePreference === 'dark' ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-black' : 'border-[color:var(--color-border)] text-[color:var(--color-muted)] hover:bg-white/10'}`}
+                onClick={() => {
+                  setThemePreference('dark')
+                  applyThemePreference('dark')
+                }}
+                type="button"
+              >
+                {t('theme.dark')}
+              </button>
+              <button
+                className={`rounded border px-2.5 py-1 text-xs ${themePreference === 'system' ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-black' : 'border-[color:var(--color-border)] text-[color:var(--color-muted)] hover:bg-white/10'}`}
+                onClick={() => {
+                  setThemePreference('system')
+                  applyThemePreference('system')
+                }}
+                type="button"
+              >
+                {t('theme.auto')}
+              </button>
+            </div>
             <button
-              className="rounded border border-[color:var(--color-border)] px-3 py-1 text-xs text-white/80 hover:bg-white/10"
-              onClick={() => i18n.changeLanguage(i18n.language === 'th' ? 'en' : 'th')}
+              className={`rounded border px-3 py-1 text-xs ${helpMode ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-black' : 'border-[color:var(--color-border)] text-[color:var(--color-muted)] hover:bg-white/10'}`}
+              onClick={() => toggleHelpMode()}
               type="button"
             >
-              {i18n.language === 'th' ? 'EN' : 'TH'}
+              {helpMode ? t('help.on') : t('help.off')}
             </button>
-            <div className="text-xs text-white/70">{user?.display_name ?? user?.username}</div>
+            <button
+              className="rounded border border-[color:var(--color-border)] px-3 py-1 text-xs text-[color:var(--color-muted)] hover:bg-white/10"
+              onClick={() => void changeLanguagePreference(i18n.language === 'en' ? 'th' : 'en')}
+              type="button"
+            >
+              {t('language.switch')}
+            </button>
+            <HelpHint helpKey="dashboard.summary" />
+            <div className="text-xs text-[color:var(--color-muted)]">{user?.display_name ?? user?.username}</div>
             <button
               className="rounded bg-[color:var(--color-primary)] px-3 py-1 text-xs font-semibold text-black hover:opacity-90"
               onClick={() => {

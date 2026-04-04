@@ -1,4 +1,5 @@
 import type { AppConfig } from '../types/models'
+import type { ThemePreference } from '../store/uiPreferencesStore'
 
 const PERSONAL_BG_KEY = 'esp_personal_bg_v1'
 
@@ -14,6 +15,22 @@ const defaultPersonalSettings: PersonalBackgroundSettings = {
   mode: 'gradient',
   color: '#0D0D0D',
   imageUrl: ''
+}
+
+export function resolveThemePreference(preference: ThemePreference): 'light' | 'dark' {
+  if (preference === 'light' || preference === 'dark') return preference
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  } catch {
+    return 'dark'
+  }
+}
+
+export function applyThemePreference(preference: ThemePreference) {
+  const root = document.documentElement
+  const resolved = resolveThemePreference(preference)
+  root.setAttribute('data-theme-preference', preference)
+  root.setAttribute('data-theme', resolved)
 }
 
 export function getPersonalBackgroundSettings(): PersonalBackgroundSettings {

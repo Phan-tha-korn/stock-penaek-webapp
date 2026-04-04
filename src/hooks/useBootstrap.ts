@@ -4,12 +4,14 @@ import { useAuthStore } from '../store/authStore'
 import { useConfigStore } from '../store/configStore'
 import { fetchConfig } from '../services/config'
 import { getMe, refresh as refreshTokens } from '../services/auth'
-import { initI18n } from '../services/i18n'
-import { applyTheme } from '../utils/theme'
+import { initI18n, readLanguagePreference } from '../services/i18n'
+import { useUiPreferencesStore } from '../store/uiPreferencesStore'
+import { applyTheme, applyThemePreference } from '../utils/theme'
 
 export function useBootstrap() {
   const [ready, setReady] = useState(false)
   const setConfig = useConfigStore((s) => s.setConfig)
+  const themePreference = useUiPreferencesStore((s) => s.themePreference)
   const { tokens, setSession, clearSession } = useAuthStore()
 
   useEffect(() => {
@@ -21,7 +23,8 @@ export function useBootstrap() {
         setConfig(cfg)
         applyTheme(cfg)
         document.title = cfg.app_name
-        initI18n(cfg.default_language)
+        applyThemePreference(themePreference)
+        initI18n(readLanguagePreference(cfg.default_language))
 
         if (tokens?.access_token) {
           try {
@@ -50,7 +53,7 @@ export function useBootstrap() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [themePreference])
 
   return { ready }
 }

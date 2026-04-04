@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Route, Routes } from 'react-router-dom'
 
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -28,7 +29,8 @@ const NotFoundPage = lazyWithRetry(() => import('./pages/public/NotFoundPage').t
 const PublicProductPage = lazyWithRetry(() => import('./pages/public/PublicProductPage').then((m) => ({ default: m.PublicProductPage })))
 
 function AppFallback() {
-  return <div className="flex min-h-screen items-center justify-center text-sm text-white/70">กำลังโหลด...</div>
+  const { t } = useTranslation()
+  return <div className="flex min-h-screen items-center justify-center text-sm text-[color:var(--color-muted)]">{t('app.loading')}</div>
 }
 
 export function App() {

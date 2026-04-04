@@ -91,7 +91,7 @@ export function SettingsPage() {
         }
       })
       .catch((e: any) => {
-        setError(e?.response?.data?.detail || 'โหลด Google setup ไม่สำเร็จ')
+        setError(e?.response?.data?.detail || t('settings.googleSaveFailed'))
       })
   }, [canManageGlobal])
 
@@ -135,7 +135,7 @@ export function SettingsPage() {
         if (!active) return
         window.localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY)
         setGoogleResultState('error')
-        setError(e?.response?.data?.detail || 'โหลด Google setup ไม่สำเร็จ')
+        setError(e?.response?.data?.detail || t('settings.googleSaveFailed'))
       }
     })()
     return () => {
@@ -287,8 +287,8 @@ export function SettingsPage() {
               value={form.default_language}
               onChange={(e) => setForm({ ...form, default_language: e.target.value as 'th' | 'en' })}
             >
-              <option value="th">Thai</option>
-              <option value="en">English</option>
+              <option value="th">{t('settings.languageThai')}</option>
+              <option value="en">{t('settings.languageEnglish')}</option>
             </select>
           </Field>
 
@@ -493,7 +493,7 @@ export function SettingsPage() {
         <div id="google-setup" className="card rounded border border-[color:var(--color-border)] bg-[color:var(--color-card)]/85 p-4 backdrop-blur">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold">Google Sheets Setup Wizard</div>
+              <div className="text-sm font-semibold">{t('settings.googleTitle')}</div>
               <div className="mt-1 text-xs text-white/60">เชื่อม Google เพื่อให้ระบบสร้างชีตอัตโนมัติ และ sync ข้อมูลขึ้น Google Sheets</div>
             </div>
             {googleCfg?.usable ? (
@@ -563,7 +563,7 @@ export function SettingsPage() {
                 className="w-full rounded border border-[color:var(--color-border)] bg-black/30 px-3 py-2 text-sm outline-none focus:border-[color:var(--color-primary)]"
                 value={googleCfg?.oauth_client_id || ''}
                 onChange={(e) => setGoogleCfg((prev) => ({ ...(prev || EMPTY_GOOGLE_CFG), oauth_client_id: e.target.value }))}
-                placeholder="Google OAuth Client ID"
+                placeholder={t('settings.googleClientId')}
               />
             </Field>
             <Field label="Google OAuth Client Secret">
@@ -621,7 +621,7 @@ export function SettingsPage() {
                   setGoogleOauthSecretDraft('')
                   setOk('บันทึกข้อมูล Google แล้ว')
                 } catch (e: any) {
-                  setError(e?.response?.data?.detail || 'บันทึก Google config ไม่สำเร็จ')
+                  setError(e?.response?.data?.detail || t('settings.googleSaveFailed'))
                 } finally {
                   setGoogleBusy(false)
                 }
@@ -655,7 +655,7 @@ export function SettingsPage() {
                   setGoogleOauthSecretDraft('')
                   setOk('สร้าง/สลับ Google Sheets ใหม่และ sync ข้อมูลแล้ว')
                 } catch (e: any) {
-                  setError(e?.response?.data?.detail || 'ตั้งค่า Google ไม่สำเร็จ')
+                  setError(e?.response?.data?.detail || t('settings.googleSaveFailed'))
                 } finally {
                   setGoogleBusy(false)
                 }
@@ -712,13 +712,13 @@ export function SettingsPage() {
                   setOk('กำลังพาไปหน้า Sign in with Google...')
                   window.location.assign(res.auth_url)
                 } catch (e: any) {
-                  setError(e?.response?.data?.detail || 'เริ่ม Google OAuth ไม่สำเร็จ')
+                  setError(e?.response?.data?.detail || t('settings.googleConnectFailed'))
                 } finally {
                   setGoogleBusy(false)
                 }
               }}
             >
-              Sign in with Google
+              {t('settings.googleSignIn')}
             </button>
             {googleCfg?.current_sheet_url ? (
               <button
