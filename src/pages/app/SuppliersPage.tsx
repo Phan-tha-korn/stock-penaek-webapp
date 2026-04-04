@@ -242,14 +242,14 @@ export function SuppliersPage() {
 
   async function handleArchive() {
     if (!selectedSupplierId || !canManage) return
-    const reason = window.prompt('ระบุเหตุผลที่ต้องการเก็บร้านค้านี้') || ''
-    if (!window.confirm('ยืนยันการเก็บร้านค้านี้หรือไม่?')) return
+    const reason = window.prompt('ระบุเหตุผลที่ต้องการลบร้านค้านี้ออกจากรายการใช้งาน') || ''
+    if (!window.confirm('ยืนยันการลบร้านค้านี้ออกจากรายการใช้งานหรือไม่?')) return
     try {
       const result = await archiveSupplier(selectedSupplierId, reason)
-      setMessage(isProposal(result) ? 'สร้างคำขอเก็บร้านค้าแล้ว' : 'เก็บร้านค้าเรียบร้อยแล้ว')
+      setMessage(isProposal(result) ? 'สร้างคำขอลบร้านค้าออกจากรายการแล้ว' : 'ลบร้านค้าออกจากรายการเรียบร้อยแล้ว')
       await loadSuppliers()
     } catch (error: any) {
-      setMessage(error?.response?.data?.detail || error?.message || 'เก็บร้านค้าไม่สำเร็จ')
+      setMessage(error?.response?.data?.detail || error?.message || 'ลบร้านค้าออกจากรายการไม่สำเร็จ')
     }
   }
 
@@ -438,9 +438,14 @@ export function SuppliersPage() {
                   </button>
                   {!creating && selectedSupplierId ? (
                     <button className="rounded border border-red-400/30 px-4 py-2 text-sm text-red-100 hover:bg-red-500/10" type="button" onClick={handleArchive}>
-                      เก็บร้านค้านี้
+                      ลบร้านค้าออกจากรายการ
                     </button>
                   ) : null}
+                </div>
+              ) : null}
+              {!creating && selectedSupplierId && canManage ? (
+                <div className="text-xs text-[color:var(--color-muted)]">
+                  การลบจะเป็นแบบเก็บออกจากรายการใช้งาน ข้อมูลเดิมยังอยู่ในประวัติและสำรองข้อมูล
                 </div>
               ) : null}
 

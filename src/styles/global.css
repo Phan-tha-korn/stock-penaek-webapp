@@ -48,6 +48,45 @@
   --surface-item-hover-bg: rgba(16, 35, 63, 0.08);
 }
 
+:root[data-theme='light'] [class*='text-white/'] {
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent) !important;
+}
+
+:root[data-theme='light'] [class*='border-white/'] {
+  border-color: var(--color-border) !important;
+}
+
+:root[data-theme='light'] [class*='bg-black/20'] {
+  background-color: rgba(255, 255, 255, 0.54) !important;
+}
+
+:root[data-theme='light'] [class*='bg-black/30'] {
+  background-color: rgba(255, 255, 255, 0.62) !important;
+}
+
+:root[data-theme='light'] [class*='bg-black/40'] {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+}
+
+:root[data-theme='light'] [class*='bg-black/50'],
+:root[data-theme='light'] [class*='bg-black/55'],
+:root[data-theme='light'] [class*='bg-black/60'],
+:root[data-theme='light'] [class*='bg-black/65'] {
+  background-color: rgba(219, 234, 254, 0.78) !important;
+}
+
+:root[data-theme='light'] [class*='bg-white/5'] {
+  background-color: rgba(16, 35, 63, 0.04) !important;
+}
+
+:root[data-theme='light'] [class*='hover:bg-white/5']:hover {
+  background-color: rgba(16, 35, 63, 0.04) !important;
+}
+
+:root[data-theme='light'] [class*='hover:bg-white/10']:hover {
+  background-color: rgba(16, 35, 63, 0.08) !important;
+}
+
 :root[data-theme='dark'] {
   --color-bg: #111111;
   --color-fg: #fff7ed;
