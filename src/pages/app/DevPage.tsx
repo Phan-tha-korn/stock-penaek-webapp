@@ -9,7 +9,17 @@ import { fetchActivity } from '../../services/dashboard'
 import { forceFullSyncToSheets, importFromSheets, syncToSheets } from '../../services/products'
 import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist, type GarbageFileItem } from '../../services/devGarbage'
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
-import { createDevSheet, getDevSheetsConfig, resolveDevSheetUrl, type DevSheetCreateResult, type DevSheetsConfig } from '../../services/devSheets'
+import {
+  createDevSheet,
+  getDevSheetsConfig,
+  listDevSheetSnapshots,
+  prepareDevSheetImportTab,
+  resolveDevSheetUrl,
+  rollbackDevSheetSnapshot,
+  type DevSheetCreateResult,
+  type DevSheetSnapshot,
+  type DevSheetsConfig,
+} from '../../services/devSheets'
 import { permanentDelete, resetStock, type DevPermanentDeletePayload, type DevPermanentDeleteResult, type DevPermanentDeleteScope } from '../../services/devReset'
 import {
   createProductCategory,
@@ -171,8 +181,9 @@ export function DevPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
 
   const [sheetMsg, setSheetMsg] = useState<string | null>(null)
-  const [sheetAction, setSheetAction] = useState<'sync' | 'force-sync' | 'import' | null>(null)
+  const [sheetAction, setSheetAction] = useState<'sync' | 'force-sync' | 'prepare-import' | 'import' | 'import-template' | 'rollback' | null>(null)
   const [sheetsCfg, setSheetsCfg] = useState<DevSheetsConfig | null>(null)
+  const [sheetSnapshots, setSheetSnapshots] = useState<DevSheetSnapshot[]>([])
   const [categoryBusy, setCategoryBusy] = useState(false)
   const [categoryMsg, setCategoryMsg] = useState<string | null>(null)
   const [categoryName, setCategoryName] = useState('')
@@ -256,6 +267,15 @@ export function DevPage() {
     ])
     setCategoryItems(cats.items)
     setInventoryRules(rules)
+  }
+
+  async function reloadSheetsTools() {
+    const [cfg, snapshots] = await Promise.all([
+      getDevSheetsConfig(),
+      listDevSheetSnapshots().catch(() => ({ items: [] as DevSheetSnapshot[] })),
+    ])
+    setSheetsCfg(cfg)
+    setSheetSnapshots(snapshots.items || [])
   }
 
   async function scanNow() {
@@ -407,7 +427,7 @@ export function DevPage() {
         setSheetMsg(`กู้คืนไฟล์สำรองแล้ว: ผู้ใช้ ${res.restored.users || 0}, สินค้า ${res.restored.products || 0}, ธุรกรรม ${res.restored.transactions || 0}`)
         setRestoreFile(null)
         await reload()
-        setSheetsCfg(await getDevSheetsConfig())
+        await reloadSheetsTools()
       } catch (e: any) {
         setSheetMsg(e?.response?.data?.detail || e?.message || 'กู้คืนไฟล์สำรองไม่สำเร็จ')
       } finally {
@@ -499,6 +519,8 @@ export function DevPage() {
       try {
         let c = await getDevSheetsConfig()
         setSheetsCfg(c)
+        const snapshotRes = await listDevSheetSnapshots().catch(() => ({ items: [] as DevSheetSnapshot[] }))
+        setSheetSnapshots(snapshotRes.items || [])
         if (pending && !c.usable) {
           const startedAt = Date.now()
           while (Date.now() - startedAt < 15_000 && !c.usable) {
@@ -556,7 +578,7 @@ export function DevPage() {
                   try {
                     const res = await forceFullSyncToSheets()
                     setSheetMsg(res.ok ? 'ซิงก์ข้อมูลทั้งสมุดงานเสร็จแล้ว' : `ซิงก์ข้อมูลทั้งสมุดงานไม่สำเร็จ: ${res.error || ''}`)
-                    setSheetsCfg(await getDevSheetsConfig())
+                    await reloadSheetsTools()
                   } finally {
                     setSheetAction(null)
                   }
@@ -1302,6 +1324,17 @@ export function DevPage() {
                   ใช้โทเคนนี้
                 </button>
               </div>
+              {sheetSnapshots.length > 0 ? (
+                <div className="mt-3 rounded border border-rose-400/20 bg-black/20 p-3 text-xs text-rose-50/85">
+                  <div className="font-semibold">Snapshot ล่าสุดสำหรับย้อนกลับ</div>
+                  <div className="mt-2 break-words">
+                    {sheetSnapshots[0].operation} | {sheetSnapshots[0].created_at} | backup {sheetSnapshots[0].backup_file_name || '-'}
+                  </div>
+                  <div className="mt-1 text-rose-50/70">
+                    ใช้ปุ่ม “ย้อนกลับชุดล่าสุด” ด้านบนเมื่อ import หรือ sync พลาด ระบบจะสำรองสถานะปัจจุบันให้อีกชั้นก่อนกู้คืน
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1338,7 +1371,7 @@ export function DevPage() {
                     try {
                       const res = await syncToSheets()
                       setSheetMsg(res.ok ? 'ซิงก์ไปยังชีตเสร็จแล้ว' : `ซิงก์ไม่สำเร็จ: ${res.error || ''}`)
-                      setSheetsCfg(await getDevSheetsConfig())
+                      await reloadSheetsTools()
                     } finally {
                       setSheetAction(null)
                     }
@@ -1518,7 +1551,7 @@ export function DevPage() {
                   try {
                     const res = await syncToSheets()
                     setSheetMsg(res.ok ? 'ซิงก์ข้อมูลไปยังชีตเสร็จแล้ว' : `ซิงก์ข้อมูลไม่สำเร็จ: ${res.error || ''}`)
-                    setSheetsCfg(await getDevSheetsConfig())
+                    await reloadSheetsTools()
                   } finally {
                     setSheetAction(null)
                   }
@@ -1537,7 +1570,7 @@ export function DevPage() {
                   try {
                     const res = await forceFullSyncToSheets()
                     setSheetMsg(res.ok ? 'ซิงก์ข้อมูลทั้งสมุดงานเสร็จแล้ว' : `ซิงก์ข้อมูลทั้งสมุดงานไม่สำเร็จ: ${res.error || ''}`)
-                    setSheetsCfg(await getDevSheetsConfig())
+                    await reloadSheetsTools()
                   } finally {
                     setSheetAction(null)
                   }
@@ -1563,6 +1596,92 @@ export function DevPage() {
                 }}
               >
                 {sheetAction === 'import' ? 'กำลังนำเข้า...' : 'นำเข้าสินค้าจากชีต'}
+              </button>
+              <button
+                className="rounded border border-sky-400/30 px-3 py-2 text-sm text-sky-100 hover:bg-sky-500/10 disabled:opacity-60"
+                type="button"
+                disabled={sheetAction !== null}
+                onClick={async () => {
+                  const ok = await showConfirm('อัปเดตแท็บนำเข้าสินค้าจากข้อมูลล่าสุดในเว็บ? ระบบจะสร้าง snapshot ให้ก่อนทุกครั้ง')
+                  if (!ok) return
+                  setSheetMsg(null)
+                  setSheetAction('prepare-import')
+                  setSheetMsg('กำลังเตรียมแท็บนำเข้าสินค้า...')
+                  try {
+                    const res = await prepareDevSheetImportTab()
+                    setSheetMsg(
+                      res.ok
+                        ? `เตรียมแท็บนำเข้าเสร็จแล้ว${res.snapshot_id ? ` • rollback ${res.snapshot_id}` : ''}`
+                        : `เตรียมแท็บนำเข้าไม่สำเร็จ: ${res.error || ''}`
+                    )
+                    await reloadSheetsTools()
+                  } finally {
+                    setSheetAction(null)
+                  }
+                }}
+              >
+                {sheetAction === 'prepare-import' ? 'กำลังเตรียม...' : 'เตรียมแท็บนำเข้า'}
+              </button>
+              <button
+                className="rounded border border-emerald-400/30 px-3 py-2 text-sm text-emerald-100 hover:bg-emerald-500/10 disabled:opacity-60"
+                type="button"
+                disabled={sheetAction !== null}
+                onClick={async () => {
+                  const ok = await showConfirm('นำเข้าจากแท็บ Product Import เข้าเว็บและ sync กลับไปยัง Google Sheets ทันทีหรือไม่?')
+                  if (!ok) return
+                  setSheetMsg(null)
+                  setSheetAction('import-template')
+                  setSheetMsg('กำลังนำเข้าจากแท็บ Product Import เข้าเว็บ...')
+                  try {
+                    const res = await importFromSheets({
+                      source: 'import_template',
+                      overwrite_stock_qty: false,
+                      overwrite_prices: false,
+                      sync_after_import: true,
+                    })
+                    setSheetMsg(
+                      res.ok
+                        ? `นำเข้าเสร็จ: สร้าง ${res.created || 0}, อัปเดต ${res.updated || 0}, ข้าม ${res.skipped || 0}${res.synced ? ' • sync แล้ว' : res.sync_error ? ` • sync ไม่สำเร็จ: ${res.sync_error}` : ''}`
+                        : `นำเข้าไม่สำเร็จ: ${res.error || ''}`
+                    )
+                    await reload()
+                    await reloadSheetsTools()
+                  } finally {
+                    setSheetAction(null)
+                  }
+                }}
+              >
+                {sheetAction === 'import-template' ? 'กำลังนำเข้า...' : 'Import Product Import'}
+              </button>
+              <button
+                className="rounded border border-rose-400/30 px-3 py-2 text-sm text-rose-100 hover:bg-rose-500/10 disabled:opacity-50"
+                type="button"
+                disabled={sheetAction !== null || sheetSnapshots.length === 0}
+                onClick={async () => {
+                  const latest = sheetSnapshots[0]
+                  if (!latest) return
+                  const ok = await showConfirm(`ย้อนกลับชุดล่าสุด (${latest.operation} • ${latest.created_at}) ? ระบบจะสำรองสถานะปัจจุบันไว้อีกชั้นก่อน`)
+                  if (!ok) return
+                  setSheetMsg(null)
+                  setSheetAction('rollback')
+                  setSheetMsg('กำลังกู้คืนจาก snapshot ล่าสุด...')
+                  try {
+                    const res = await rollbackDevSheetSnapshot(latest.id)
+                    setSheetMsg(
+                      res.ok
+                        ? `ย้อนกลับแล้ว: สินค้า ${res.restored_counts.products || 0}, ธุรกรรม ${res.restored_counts.transactions || 0}${res.sheet_restored ? ' • ชีตกู้คืนแล้ว' : res.sheet_resynced ? ' • ชีตถูก sync ใหม่' : ''}`
+                        : 'ย้อนกลับไม่สำเร็จ'
+                    )
+                    await reload()
+                    await reloadSheetsTools()
+                  } catch (e: any) {
+                    setSheetMsg(e?.response?.data?.detail || e?.message || 'ย้อนกลับไม่สำเร็จ')
+                  } finally {
+                    setSheetAction(null)
+                  }
+                }}
+              >
+                {sheetAction === 'rollback' ? 'กำลังกู้คืน...' : 'ย้อนกลับชุดล่าสุด'}
               </button>
             </div>
           ) : sheetsLoading || googleSheetsPending ? (
@@ -1592,7 +1711,7 @@ export function DevPage() {
               <div className="mt-2 text-xs text-white/50 break-words">
                 รหัสชีต: {sheetsCfg?.sheet_id ? sheetsCfg.sheet_id : '-'} | ไฟล์กุญแจ: {sheetsCfg?.key_path ? sheetsCfg.key_path : '-'}
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
                   <div className="text-sm font-semibold text-green-100">โซนสต็อก</div>
                   <div className="mt-1 text-xs text-green-100/80">ดูสต็อกหลัก สถานะ สี และรายการที่ควรเติม</div>
@@ -1605,6 +1724,21 @@ export function DevPage() {
                     </button>
                     <button className="rounded border border-green-400/30 px-3 py-2 text-xs text-green-50 hover:bg-green-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.stock_download_url, 'stock-summary.csv', 'sync')}>
                       โหลดเฉพาะสต็อก .csv
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-3">
+                  <div className="text-sm font-semibold text-emerald-100">แท็บนำเข้า</div>
+                  <div className="mt-1 text-xs text-emerald-100/80">แม่แบบเพิ่มสินค้าและแก้ข้อมูล โดยมีหัวคอลัมน์พร้อมและดึงรายการล่าสุดจากเว็บไปให้ก่อน</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.import_tab_url, 'sync')}>
+                      เปิดแท็บนำเข้า
+                    </button>
+                    <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.import_download_url, 'product-import-sheet.csv', 'sync')}>
+                      โหลดแท็บนำเข้า .csv
+                    </button>
+                    <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.product_import_template_download_url, 'product-import-template.csv', 'sync')}>
+                      โหลดแม่แบบจากเว็บ .csv
                     </button>
                   </div>
                 </div>
@@ -1692,7 +1826,7 @@ export function DevPage() {
                       } catch {
                         setSheetMsg(`สร้างชีตใหม่แล้ว แต่ซิงก์ไม่สำเร็จ`)
                       }
-                      setSheetsCfg(await getDevSheetsConfig())
+                      await reloadSheetsTools()
                     } catch (e: any) {
                       setSheetMsg(e?.response?.data?.detail || e?.message || 'สร้างชีตไม่สำเร็จ')
                     } finally {

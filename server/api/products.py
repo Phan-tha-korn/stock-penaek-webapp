@@ -34,6 +34,7 @@ from server.db.init_db import calc_status
 from server.services.audit import write_audit_log
 from server.services.branches import ensure_default_branch
 from server.services.media_store import choose_image_for_row, parse_products_csv, read_zip_payload, save_product_image_bytes
+from server.services.sheets_snapshots import create_sheet_operation_snapshot
 from server.services.suppliers import sync_product_supplier_links
 from server.realtime.socket_manager import broadcast
 from server.config.config_loader import load_master_config
@@ -96,6 +97,20 @@ def _trigger_sheet_sync() -> None:
         schedule_sheet_sync()
     except Exception:
         pass
+
+
+def _sheet_snapshot_fields(snapshot: dict | None) -> dict[str, str | None]:
+    if not isinstance(snapshot, dict):
+        return {
+            "snapshot_id": None,
+            "snapshot_created_at": None,
+            "snapshot_backup_file_name": None,
+        }
+    return {
+        "snapshot_id": str(snapshot.get("id") or "") or None,
+        "snapshot_created_at": str(snapshot.get("created_at") or "") or None,
+        "snapshot_backup_file_name": str(snapshot.get("backup_file_name") or "") or None,
+    }
 
 
 def _build_line_notification_message(*, product: Product, new_qty: float, new_pct: float, notify_messages: list[str], user: User, reason: str | None) -> str:
@@ -314,13 +329,33 @@ async def import_from_sheets(
     except Exception:
         raise HTTPException(status_code=500, detail="sheets_not_available")
 
+    snapshot = await create_sheet_operation_snapshot(
+        f"import-{payload.source or 'stock'}",
+        note="before import from Google Sheets",
+    )
+
     res = await import_stock_from_sheet(
         actor_id=user.id,
+        source=str(payload.source or "stock"),
         overwrite_stock_qty=bool(payload.overwrite_stock_qty),
         overwrite_prices=bool(payload.overwrite_prices),
     )
     if not res.get("ok"):
-        return SheetsImportOut(ok=False, error=str(res.get("error") or "import_failed"))
+        return SheetsImportOut(
+            ok=False,
+            error=str(res.get("error") or "import_failed"),
+            **_sheet_snapshot_fields(snapshot),
+        )
+
+    synced = False
+    sync_error = None
+    if payload.sync_after_import:
+        try:
+            synced = bool(await sync_all_to_sheets(fail_if_busy=True))
+            if not synced:
+                sync_error = "sync_skipped"
+        except Exception as exc:
+            sync_error = str(exc)
 
     await write_audit_log(
         db,
@@ -330,19 +365,30 @@ async def import_from_sheets(
         entity="sheets",
         entity_id=None,
         success=True,
-        message="import_stock",
+        message=f"import_stock:{payload.source or 'stock'}",
         before=None,
-        after=res,
+        after={
+            **res,
+            "source": str(payload.source or "stock"),
+            "sync_after_import": bool(payload.sync_after_import),
+            "synced": synced,
+            "sync_error": sync_error,
+            **_sheet_snapshot_fields(snapshot),
+        },
         commit=True,
     )
 
-    _trigger_sheet_sync()
+    if not payload.sync_after_import:
+        _trigger_sheet_sync()
 
     return SheetsImportOut(
         ok=True,
         created=int(res.get("created") or 0),
         updated=int(res.get("updated") or 0),
         skipped=int(res.get("skipped") or 0),
+        synced=synced,
+        sync_error=sync_error,
+        **_sheet_snapshot_fields(snapshot),
     )
 
 
@@ -351,18 +397,36 @@ async def import_from_sheets(
     response_model=SheetsSyncOut,
     dependencies=[Depends(require_roles([Role.OWNER, Role.DEV]))],
 )
-async def sync_to_sheets():
+async def sync_to_sheets(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     try:
         from server.services.gsheets import sync_all_to_sheets
     except Exception:
         return SheetsSyncOut(ok=False, error="sheets_not_available")
+    snapshot = await create_sheet_operation_snapshot("sync-to-sheets", note="before sync web data to Google Sheets")
     try:
         ok = await sync_all_to_sheets(fail_if_busy=True)
         if not ok:
-            return SheetsSyncOut(ok=False, error="sync_skipped")
-        return SheetsSyncOut(ok=True)
+            return SheetsSyncOut(ok=False, error="sync_skipped", **_sheet_snapshot_fields(snapshot))
+        await write_audit_log(
+            db,
+            request=request,
+            actor=user,
+            action="SHEETS_SYNC",
+            entity="sheets",
+            entity_id=None,
+            success=True,
+            message="sync_to_sheets",
+            before=None,
+            after={"ok": True, **_sheet_snapshot_fields(snapshot)},
+            commit=True,
+        )
+        return SheetsSyncOut(ok=True, **_sheet_snapshot_fields(snapshot))
     except Exception as e:
-        return SheetsSyncOut(ok=False, error=str(e))
+        return SheetsSyncOut(ok=False, error=str(e), **_sheet_snapshot_fields(snapshot))
 
 
 @router.post(
@@ -370,18 +434,36 @@ async def sync_to_sheets():
     response_model=SheetsSyncOut,
     dependencies=[Depends(require_roles([Role.OWNER, Role.DEV]))],
 )
-async def force_full_sync_to_sheets():
+async def force_full_sync_to_sheets(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     try:
         from server.services.gsheets import sync_all_to_sheets
     except Exception:
         return SheetsSyncOut(ok=False, error="sheets_not_available")
+    snapshot = await create_sheet_operation_snapshot("full-sync-to-sheets", note="before full sync to Google Sheets")
     try:
         ok = await sync_all_to_sheets(fail_if_busy=True)
         if not ok:
-            return SheetsSyncOut(ok=False, error="sync_skipped")
-        return SheetsSyncOut(ok=True)
+            return SheetsSyncOut(ok=False, error="sync_skipped", **_sheet_snapshot_fields(snapshot))
+        await write_audit_log(
+            db,
+            request=request,
+            actor=user,
+            action="SHEETS_SYNC_FULL",
+            entity="sheets",
+            entity_id=None,
+            success=True,
+            message="sync_to_sheets_full",
+            before=None,
+            after={"ok": True, **_sheet_snapshot_fields(snapshot)},
+            commit=True,
+        )
+        return SheetsSyncOut(ok=True, **_sheet_snapshot_fields(snapshot))
     except Exception as e:
-        return SheetsSyncOut(ok=False, error=str(e))
+        return SheetsSyncOut(ok=False, error=str(e), **_sheet_snapshot_fields(snapshot))
 
 
 @router.get("/filter-options", response_model=dict, dependencies=[Depends(require_roles([Role.STOCK, Role.ADMIN, Role.OWNER, Role.DEV, Role.ACCOUNTANT]))])

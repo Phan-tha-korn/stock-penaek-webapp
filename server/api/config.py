@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.deps import get_current_user, require_roles
 from server.api.schemas import ConfigUpdateIn, GoogleOAuthStartOut, GoogleSetupIn, GoogleSetupOut, PublicConfig
-from server.config.config_loader import load_master_config, repo_root, write_master_config
+from server.config.config_loader import load_master_config, repo_root, resolve_repo_path, write_master_config
 from server.config.settings import settings
 from server.db.database import get_db
 from server.db.models import Role, User
@@ -154,15 +154,6 @@ def _safe_return_to(value: str, cfg: dict) -> str:
     return "/settings#google-setup"
 
 
-def _resolve_repo_path(value: str) -> Path:
-    p = Path(str(value or "").strip())
-    if not p:
-        return p
-    if p.is_absolute():
-        return p
-    return repo_root() / p
-
-
 def _oauth_pending_cleanup(max_age_seconds: int = 900) -> None:
     now = time.time()
     stale_keys = [
@@ -262,6 +253,20 @@ async def get_google_setup(user: User = Depends(get_current_user)):
     cfg = load_master_config()
     sheet_id = str(cfg.get("google_sheets_id") or cfg.get("google_sheets", {}).get("sheet_id") or "")
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}" if sheet_id else ""
+    raw_service_account_key_path = str(
+        cfg.get("google_service_account_key_path")
+        or cfg.get("google_sheets", {}).get("service_account_key_path")
+        or ""
+    )
+    raw_oauth_token_path = str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path or "")
+    resolved_service_account_key_path = resolve_repo_path(
+        raw_service_account_key_path,
+        fallback_relative="credentials/google_key.json",
+    )
+    resolved_oauth_token_path = resolve_repo_path(
+        raw_oauth_token_path,
+        fallback_relative="credentials/google_oauth_token.json",
+    )
     usable = False
     err = ""
     if not sheet_id:
@@ -280,23 +285,27 @@ async def get_google_setup(user: User = Depends(get_current_user)):
     return GoogleSetupOut(
         configured=bool(
             sheet_id
-            and (
-                cfg.get("google_service_account_key_path")
-                or cfg.get("google_sheets", {}).get("service_account_key_path")
-                or Path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path)).exists()
-            )
+            and (resolved_service_account_key_path.exists() or resolved_oauth_token_path.exists())
         ),
         usable=usable,
         error=err,
         workspace_email=str(cfg.get("google_workspace_email") or ""),
         drive_folder_name=str(cfg.get("google_drive_folder_name") or ""),
         default_sheet_title=str(cfg.get("google_default_sheet_title") or ""),
-        service_account_key_path=str(cfg.get("google_service_account_key_path") or cfg.get("google_sheets", {}).get("service_account_key_path") or ""),
+        service_account_key_path=(
+            str(resolved_service_account_key_path)
+            if raw_service_account_key_path or resolved_service_account_key_path.exists()
+            else ""
+        ),
         oauth_client_id=str(cfg.get("google_oauth_client_id") or ""),
         oauth_client_secret_masked=_mask_secret(str(cfg.get("google_oauth_client_secret") or "")),
         oauth_redirect_uri=str(cfg.get("google_oauth_redirect_uri") or ""),
-        oauth_token_path=str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path),
-        oauth_connected=Path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path)).exists(),
+        oauth_token_path=(
+            str(resolved_oauth_token_path)
+            if raw_oauth_token_path or resolved_oauth_token_path.exists()
+            else ""
+        ),
+        oauth_connected=resolved_oauth_token_path.exists(),
         current_sheet_id=sheet_id,
         current_sheet_url=sheet_url,
     )
@@ -426,7 +435,10 @@ async def google_oauth_callback(request: Request):
         authorization_response = f"{redirect_uri}?{request.url.query}" if request.url.query else redirect_uri
         flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
-        token_path = _resolve_repo_path(str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path))
+        token_path = resolve_repo_path(
+            str(cfg.get("google_oauth_token_path") or settings.google_oauth_token_path),
+            fallback_relative="credentials/google_oauth_token.json",
+        )
         token_path.parent.mkdir(parents=True, exist_ok=True)
         token_path.write_text(credentials.to_json(), encoding="utf-8")
         cfg["google_oauth_token_path"] = str(token_path)

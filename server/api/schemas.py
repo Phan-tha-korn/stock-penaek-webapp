@@ -401,8 +401,10 @@ class ProductDeleteIn(BaseModel):
 
 
 class SheetsImportIn(BaseModel):
+    source: str = "stock"
     overwrite_stock_qty: bool = False
     overwrite_prices: bool = False
+    sync_after_import: bool = False
 
 
 class SheetsImportOut(BaseModel):
@@ -410,12 +412,56 @@ class SheetsImportOut(BaseModel):
     created: int = 0
     updated: int = 0
     skipped: int = 0
+    synced: bool = False
     error: str | None = None
+    sync_error: str | None = None
+    snapshot_id: str | None = None
+    snapshot_created_at: str | None = None
+    snapshot_backup_file_name: str | None = None
 
 
 class SheetsSyncOut(BaseModel):
     ok: bool
     error: str | None = None
+    snapshot_id: str | None = None
+    snapshot_created_at: str | None = None
+    snapshot_backup_file_name: str | None = None
+
+
+class SheetsSnapshotOut(BaseModel):
+    id: str
+    created_at: str
+    operation: str
+    note: str = ""
+    sheet_id: str = ""
+    has_sheet_snapshot: bool = False
+    tab_count: int = 0
+    tab_titles: list[str] = []
+    backup_file_name: str = ""
+    backup_exists: bool = False
+    archive_file_name: str = ""
+
+
+class SheetsSnapshotListOut(BaseModel):
+    items: list[SheetsSnapshotOut] = []
+
+
+class SheetsRollbackIn(BaseModel):
+    snapshot_id: str
+
+
+class SheetsRollbackOut(BaseModel):
+    ok: bool
+    snapshot_id: str
+    snapshot_created_at: str = ""
+    snapshot_operation: str = ""
+    snapshot_archive_file_name: str = ""
+    rollback_backup_file_name: str = ""
+    rollback_backup_download_url: str = ""
+    restored_counts: dict[str, int] = {}
+    sheet_restored: bool = False
+    sheet_resynced: bool = False
+    sheet_error: str | None = None
 
 
 class ProductBulkCreateItemIn(BaseModel):

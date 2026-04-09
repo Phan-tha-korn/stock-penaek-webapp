@@ -160,13 +160,26 @@ export async function deleteAllProducts(confirm: string) {
   return res.data
 }
 
-export async function importFromSheets(params: { overwrite_stock_qty?: boolean; overwrite_prices?: boolean } = {}) {
-  const res = await api.post<{ ok: boolean; created?: number; updated?: number; skipped?: number; error?: string }>('/products/import-from-sheets', params)
+export type SheetsImportResult = {
+  ok: boolean
+  created?: number
+  updated?: number
+  skipped?: number
+  synced?: boolean
+  error?: string
+  sync_error?: string | null
+  snapshot_id?: string | null
+  snapshot_created_at?: string | null
+  snapshot_backup_file_name?: string | null
+}
+
+export async function importFromSheets(params: { source?: 'stock' | 'import_template'; overwrite_stock_qty?: boolean; overwrite_prices?: boolean; sync_after_import?: boolean } = {}) {
+  const res = await api.post<SheetsImportResult>('/products/import-from-sheets', params)
   return res.data
 }
 
 export async function syncToSheets() {
-  const res = await api.post<{ ok: boolean; error?: string }>('/products/sync-to-sheets', {})
+  const res = await api.post<{ ok: boolean; error?: string; snapshot_id?: string | null; snapshot_created_at?: string | null; snapshot_backup_file_name?: string | null }>('/products/sync-to-sheets', {})
   return res.data
 }
 
@@ -176,7 +189,7 @@ export async function bulkCreateProducts(items: ProductBulkCreateItem[]) {
 }
 
 export async function forceFullSyncToSheets() {
-  const res = await api.post<{ ok: boolean; error?: string }>('/products/sync-to-sheets/full', {})
+  const res = await api.post<{ ok: boolean; error?: string; snapshot_id?: string | null; snapshot_created_at?: string | null; snapshot_backup_file_name?: string | null }>('/products/sync-to-sheets/full', {})
   return res.data
 }
 

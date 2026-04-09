@@ -43,3 +43,8 @@ credentials/*.json
 **/google_oauth_token*.json
 
 .vercel
+.aider*
+.env
+.env
+logs/
+vite.config.ts.timestamp-*.mjs

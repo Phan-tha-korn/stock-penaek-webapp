@@ -177,3 +177,9 @@ class Settings(BaseSettings):
 
 settings = Settings.from_master_config()
 
+
+def refresh_runtime_settings_from_master_config() -> None:
+    updated = Settings.from_master_config()
+    for field_name, value in updated.model_dump().items():
+        setattr(settings, field_name, value)
+

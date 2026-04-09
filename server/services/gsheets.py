@@ -12,7 +12,7 @@ from google.oauth2.service_account import Credentials
 from sqlalchemy import select
 
 from server.config.config_loader import load_master_config
-from server.config.config_loader import repo_root
+from server.config.config_loader import repo_root, resolve_repo_path
 from server.config.settings import settings
 from server.db.database import SessionLocal
 from server.db.models import AuditLog, Product, Role, User
@@ -42,10 +42,12 @@ TAB_ACCOUNTING = "สรุปบัญชี"
 TAB_INCOME_LOG = "รายรับเพิ่มเติม"
 TAB_EXPENSE_LOG = "รายจ่ายเพิ่มเติม"
 TAB_USERS = "ข้อมูลบัญชีผู้ใช้"
+TAB_PRODUCT_IMPORT = "Product Import"
 
 WORKBOOK_TABS = [
     TAB_OVERVIEW,
     TAB_STOCK,
+    TAB_PRODUCT_IMPORT,
     TAB_STOCK_ALERTS,
     TAB_ACCOUNTING,
     TAB_AUDIT_LOG,
@@ -60,6 +62,7 @@ WORKBOOK_TABS = [
 LEGACY_TAB_ALIASES = {
     TAB_OVERVIEW: ["Overview"],
     TAB_STOCK: ["Stock"],
+    TAB_PRODUCT_IMPORT: ["ProductImport", "ImportProducts"],
     TAB_STOCK_ALERTS: ["StockAlerts"],
     TAB_ACCOUNTING: ["Accounting"],
     TAB_AUDIT_LOG: ["AuditLog"],
@@ -89,6 +92,19 @@ HEADERS = {
         "ไลน์กลุ่ม",
         "ข้อความแจ้งเตือน",
         "อัปเดตล่าสุด",
+    ],
+    TAB_PRODUCT_IMPORT: [
+        "SKU",
+        "Name",
+        "Category",
+        "Unit",
+        "Current_Qty",
+        "Max_Stock",
+        "Unit_Price",
+        "Threshold%",
+        "Current_Status",
+        "Updated_At",
+        "Notes",
     ],
     TAB_STOCK_ALERTS: ["ระดับความสำคัญ", "รหัสสินค้า", "ชื่อสินค้า", "คงเหลือ", "ขั้นต่ำ", "ควรมี", "สถานะ", "อัปเดตล่าสุด", "หมายเหตุ"],
     TAB_EDIT_LOG: ["วันที่-เวลา", "ประเภทการกระทำ", "รหัสสินค้า", "ชื่อสินค้า", "รายละเอียด", "ผู้ทำรายการ"],
@@ -175,9 +191,10 @@ def schedule_sheet_sync(delay_seconds: float = 1.0) -> bool:
         return False
 
 def get_client() -> gspread.client.Client | None:
-    oauth_token_path = Path(str(settings.google_oauth_token_path or "").strip())
-    if oauth_token_path and not oauth_token_path.is_absolute():
-        oauth_token_path = repo_root() / oauth_token_path
+    oauth_token_path = resolve_repo_path(
+        str(settings.google_oauth_token_path or "").strip(),
+        fallback_relative="credentials/google_oauth_token.json",
+    )
     if oauth_token_path.exists():
         try:
             credentials = OAuthCredentials.from_authorized_user_file(str(oauth_token_path), scopes=SCOPES)
@@ -185,9 +202,10 @@ def get_client() -> gspread.client.Client | None:
         except Exception as e:
             logger.error(f"Failed to authorize Google Sheets OAuth client: {e}")
 
-    key_path = Path(str(settings.google_service_account_key_path or "").strip())
-    if key_path and not key_path.is_absolute():
-        key_path = repo_root() / key_path
+    key_path = resolve_repo_path(
+        str(settings.google_service_account_key_path or "").strip(),
+        fallback_relative="credentials/google_key.json",
+    )
     if not key_path.exists():
         logger.warning(f"Google Sheets service account key not found at {key_path}")
         return None
@@ -336,6 +354,7 @@ def _theme_sheet_styles() -> dict[str, dict]:
     return {
         TAB_OVERVIEW: {"tab": _mix_color(secondary, black, 0.12), "header": soft_secondary},
         TAB_STOCK: {"tab": _mix_color(secondary, black, 0.12), "header": soft_secondary},
+        TAB_PRODUCT_IMPORT: {"tab": _mix_color(primary, secondary, 0.18), "header": _mix_color(primary, white, 0.84)},
         TAB_STOCK_ALERTS: {"tab": amber, "header": _mix_color(amber, white, 0.76)},
         TAB_ACCOUNTING: {"tab": _mix_color(accent, black, 0.08), "header": soft_accent},
         TAB_AUDIT_LOG: {"tab": red, "header": _mix_color(red, white, 0.82)},
@@ -385,6 +404,7 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
 
     col_widths: dict[str, list[int]] = {
         TAB_STOCK: [120, 260, 150, 110, 140, 140, 130, 130, 140, 140, 170, 150, 150, 320, 160],
+        TAB_PRODUCT_IMPORT: [120, 260, 150, 110, 140, 140, 130, 130, 150, 170, 260],
         TAB_STOCK_ALERTS: [140, 140, 260, 110, 110, 110, 140, 170, 300],
         TAB_AUDIT_LOG: [140, 170, 180, 150, 140, 260, 360, 170],
         TAB_EDIT_LOG: [170, 200, 140, 260, 360, 170],
@@ -609,6 +629,13 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
                     ]
                 )
 
+        if ws.title == TAB_PRODUCT_IMPORT:
+            _repeat_number(ws.id, cols, 4, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 5, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 6, "NUMBER", "฿#,##0.00", "RIGHT")
+            _repeat_number(ws.id, cols, 7, "PERCENT", "0%", "RIGHT")
+            _repeat_number(ws.id, cols, 9, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+
         if ws.title == TAB_STOCK_ALERTS:
             _repeat_number(ws.id, cols, 3, "NUMBER", "#,##0.##", "RIGHT")
             _repeat_number(ws.id, cols, 4, "NUMBER", "#,##0.##", "RIGHT")
@@ -704,6 +731,53 @@ def _parse_float(v: str) -> float:
         return float(s)
     except Exception:
         return 0.0
+
+
+def _format_sheet_number(value: float | int | None) -> str:
+    number = float(value or 0)
+    if abs(number - round(number)) < 1e-9:
+        return str(int(round(number)))
+    return f"{number:.3f}".rstrip("0").rstrip(".")
+
+
+def _build_import_template_rows(products: list[dict]) -> list[list[str]]:
+    rows = [HEADERS[TAB_PRODUCT_IMPORT][:]]
+    for product in sorted(products, key=lambda item: str(item.get("sku") or "")):
+        sku = str(product.get("sku") or "").strip()
+        if not sku:
+            continue
+        qty = float(product.get("stock_qty") or 0)
+        max_qty = float(product.get("max_stock") or 0)
+        min_qty = float(product.get("min_stock") or 0)
+        price = product.get("selling_price")
+        if price is None:
+            price = product.get("cost_price") or 0
+        threshold = (min_qty / max_qty * 100.0) if max_qty > 0 and min_qty > 0 else 60.0
+        rows.append(
+            [
+                sku,
+                str(product.get("name_th") or ""),
+                str(product.get("category") or ""),
+                str(product.get("unit") or ""),
+                _format_sheet_number(qty),
+                _format_sheet_number(max_qty) if max_qty > 0 else "",
+                _format_sheet_number(float(price or 0)) if float(price or 0) > 0 else "",
+                _format_sheet_number(threshold),
+                str(product.get("status") or ""),
+                str(product.get("updated_at") or ""),
+                "",
+            ]
+        )
+    return rows
+
+
+def _resolve_import_source_tab(source: str | None) -> str:
+    normalized = str(source or "stock").strip().lower().replace("-", "_")
+    if normalized in ("stock", "stock_sheet", "default"):
+        return TAB_STOCK
+    if normalized in ("import", "import_tab", "import_template", "product_import"):
+        return TAB_PRODUCT_IMPORT
+    raise ValueError("invalid_import_source")
 
 
 def _severity_label(action: str, success: bool, status: str = "") -> str:
@@ -830,13 +904,86 @@ def _sync_stock_sheet(ws: gspread.Worksheet, products: list[dict]) -> None:
     ws.update(f"A1:{end_col}{len(next_values)}", next_values)
 
 
+async def _collect_products_for_sheet_rows() -> list[dict]:
+    products_data: list[dict] = []
+    async with SessionLocal() as db:
+        res = await db.execute(select(Product))
+        products = [p for p in res.scalars().all() if not _is_deleted_product(p)]
+        for p in products:
+            updated = p.updated_at.isoformat(timespec="seconds") if p.updated_at else datetime.utcnow().isoformat(timespec="seconds")
+            products_data.append(
+                {
+                    "id": p.id,
+                    "sku": p.sku,
+                    "name_th": p.name_th,
+                    "category": p.category,
+                    "unit": p.unit,
+                    "stock_qty": float(p.stock_qty or 0),
+                    "min_stock": float(p.min_stock or 0),
+                    "max_stock": float(p.max_stock or 0),
+                    "cost_price": float(p.cost_price or 0),
+                    "selling_price": float(p.selling_price) if p.selling_price is not None else None,
+                    "status": p.status.value,
+                    "updated_at": updated,
+                }
+            )
+    return products_data
+
+
+async def sync_product_import_template_to_sheet(*, fail_if_busy: bool = False) -> bool:
+    if _is_quota_cooling_down():
+        remaining = _quota_cooldown_remaining()
+        if fail_if_busy:
+            raise RuntimeError(f"google_sheets_quota_cooldown:{remaining}")
+        logger.warning("Skipping Google Sheets import template sync during quota cooldown (%ss remaining)", remaining)
+        return False
+
+    if _SYNC_LOCK.locked():
+        if fail_if_busy:
+            raise RuntimeError("google_sheets_sync_in_progress")
+        logger.info("Skipping overlapping Google Sheets import template sync request")
+        return False
+
+    products_data = await _collect_products_for_sheet_rows()
+    import_rows = _build_import_template_rows(products_data)
+
+    def _sync_blocking() -> None:
+        client = get_client()
+        if not client:
+            raise RuntimeError("gsheets_not_configured")
+        sheet = client.open_by_key(settings.google_sheets_id)
+        workbook_tabs = {ws.title: ws for ws in ensure_workbook_template(sheet, write_headers=False)}
+        ws_import = workbook_tabs[TAB_PRODUCT_IMPORT]
+        _write_rows(ws_import, import_rows)
+
+    async with _SYNC_LOCK:
+        try:
+            await _with_retries(lambda: asyncio.to_thread(_sync_blocking), retries=3, delay_sec=1.5)
+            return True
+        except Exception as e:
+            if _is_quota_error(e):
+                _set_quota_cooldown()
+            if fail_if_busy:
+                raise
+            logger.error(f"Google Sheets import template sync failed: {e}")
+            return False
+
+
 async def import_stock_from_sheet(
     *,
     actor_id: str | None = None,
+    source: str = "stock",
     overwrite_stock_qty: bool = False,
     overwrite_prices: bool = False,
     fail_if_busy: bool = False,
 ) -> dict:
+    try:
+        tab_title = _resolve_import_source_tab(source)
+    except ValueError:
+        if fail_if_busy:
+            raise RuntimeError("invalid_import_source")
+        return {"ok": False, "error": "invalid_import_source"}
+
     if _is_quota_cooling_down():
         remaining = _quota_cooldown_remaining()
         if fail_if_busy:
@@ -855,7 +1002,7 @@ async def import_stock_from_sheet(
         if not client:
             return None
         sheet = client.open_by_key(settings.google_sheets_id)
-        ws = _ensure_tab(sheet, TAB_STOCK, write_header=False)
+        ws = _ensure_tab(sheet, tab_title, write_header=(tab_title == TAB_PRODUCT_IMPORT))
         return ws.get_all_values()
 
     async with _IMPORT_LOCK:
@@ -1020,6 +1167,7 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
                 "category": p.category,
                 "unit": p.unit,
                 "stock_qty": float(p.stock_qty or 0),
+                "min_stock": float(p.min_stock or 0),
                 "max_stock": float(p.max_stock or 0),
                 "cost_price": float(p.cost_price or 0),
                 "selling_price": float(p.selling_price) if p.selling_price is not None else None,
@@ -1148,6 +1296,7 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
             ["แท็บบัญชีผู้ใช้งาน", TAB_USERS, "รวมข้อมูลบัญชีของผู้ใช้งานในระบบนี้"],
         ]
     )
+    import_rows = _build_import_template_rows(products_data)
 
     def _sync_blocking() -> None:
         client = get_client()
@@ -1157,6 +1306,7 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
         workbook_tabs = {ws.title: ws for ws in ensure_workbook_template(sheet, write_headers=False)}
         ws_overview = workbook_tabs[TAB_OVERVIEW]
         ws_stock = workbook_tabs[TAB_STOCK]
+        ws_import = workbook_tabs[TAB_PRODUCT_IMPORT]
         ws_alerts = workbook_tabs[TAB_STOCK_ALERTS]
         ws_accounting = workbook_tabs[TAB_ACCOUNTING]
         ws_audit = workbook_tabs[TAB_AUDIT_LOG]
@@ -1169,6 +1319,7 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
 
         _write_rows(ws_overview, overview_rows)
         _sync_stock_sheet(ws_stock, products_data)
+        _write_rows(ws_import, import_rows)
         _write_rows(ws_alerts, alert_rows)
         _write_rows(ws_accounting, accounting_rows)
         _write_rows(ws_audit, audit_rows)
@@ -1178,7 +1329,7 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
         _write_rows(ws_expense, expense_rows)
         _write_rows(ws_edit, edit_rows)
         _write_rows(ws_users, user_rows)
-        _style_sheet(sheet, [ws_overview, ws_stock, ws_alerts, ws_accounting, ws_audit, ws_add, ws_sell, ws_edit, ws_income, ws_expense, ws_users])
+        _style_sheet(sheet, [ws_overview, ws_stock, ws_import, ws_alerts, ws_accounting, ws_audit, ws_add, ws_sell, ws_edit, ws_income, ws_expense, ws_users])
 
     async with _SYNC_LOCK:
         try:

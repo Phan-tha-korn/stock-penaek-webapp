@@ -106,7 +106,7 @@ function SearchDropdown<T>({ label, value, onSelect, search, renderItem, getId, 
         .catch(() => setItems([]))
         .finally(() => setLoading(false))
     }
-  }, [autoLoad]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoLoad])
 
   function doSearch(q: string) {
     setLoading(true)
@@ -298,7 +298,6 @@ export function PriceRecordsPage() {
   useEffect(() => {
     setBusy(true)
     loadRecords().finally(() => setBusy(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterProductId, filterSupplierId, filterStatus])
 
   function openCreate() {

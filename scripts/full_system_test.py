@@ -597,9 +597,19 @@ def wait_for_health(base_url: str, timeout_sec: int = 90) -> bool:
     return False
 
 
+def find_python_executable(project_root: Path) -> str:
+    candidates = [
+        project_root / ".venv" / "Scripts" / "python.exe",
+        project_root / ".venv" / "bin" / "python",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
 def start_server_process(project_root: Path, host: str, port: int) -> subprocess.Popen[Any]:
-    py = project_root / ".venv" / "Scripts" / "python.exe"
-    python_cmd = str(py) if py.exists() else sys.executable
+    python_cmd = find_python_executable(project_root)
     env = os.environ.copy()
     env["PYTHONPATH"] = str(project_root)
     cmd = [python_cmd, "-m", "uvicorn", "server.main:app", "--host", host, "--port", str(port)]

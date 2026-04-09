@@ -12,6 +12,7 @@ from sqlalchemy import delete, select
 
 from server.config.config_loader import load_master_config, write_master_config
 from server.config.paths import app_db_path, backups_root, media_root, repo_root
+from server.config.settings import refresh_runtime_settings_from_master_config
 from server.db.database import SessionLocal
 from server.db.models import (
     Attachment,
@@ -1017,6 +1018,7 @@ async def restore_backup_archive(zip_bytes: bytes) -> dict:
 
     if isinstance(config, dict):
         write_master_config(config)
+        refresh_runtime_settings_from_master_config()
 
     return {
         "branches": len(branches),

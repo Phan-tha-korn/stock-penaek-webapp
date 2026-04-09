@@ -25,7 +25,18 @@ from server.services.security import (
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-_limiter = Limiter(key_func=get_remote_address)
+
+def _rate_limit_key(request: Request) -> str:
+    # FastAPI's TestClient uses the synthetic host "testclient". Using a
+    # request-unique key there keeps automated tests isolated while preserving
+    # normal per-IP limiting for real traffic.
+    client_host = request.client.host if request.client else get_remote_address(request)
+    if client_host == "testclient":
+        return f"{client_host}:{id(request.scope)}"
+    return client_host or "unknown"
+
+
+_limiter = Limiter(key_func=_rate_limit_key)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from server.services.gsheets import HEADERS, TAB_STOCK, _sync_stock_sheet
+from server.services.gsheets import HEADERS, TAB_PRODUCT_IMPORT, TAB_STOCK, _build_import_template_rows, _sync_stock_sheet
 
 
 class _FakeWorksheet:
@@ -55,6 +55,32 @@ class GSheetsSyncTests(unittest.TestCase):
         self.assertEqual(len(values), 2)
         self.assertEqual(values[1][0], "SKU-0001")
         self.assertEqual(values[1][1], "Current Product")
+
+    def test_build_import_template_rows_includes_latest_products_and_threshold(self) -> None:
+        rows = _build_import_template_rows(
+            [
+                {
+                    "sku": "SKU-1000",
+                    "name_th": "Template Product",
+                    "category": "General",
+                    "unit": "pcs",
+                    "stock_qty": 12,
+                    "min_stock": 3,
+                    "max_stock": 15,
+                    "selling_price": 49,
+                    "status": "NORMAL",
+                    "updated_at": "2026-04-09T09:30:00",
+                }
+            ]
+        )
+
+        self.assertEqual(rows[0], HEADERS[TAB_PRODUCT_IMPORT])
+        self.assertEqual(rows[1][0], "SKU-1000")
+        self.assertEqual(rows[1][1], "Template Product")
+        self.assertEqual(rows[1][4], "12")
+        self.assertEqual(rows[1][5], "15")
+        self.assertEqual(rows[1][6], "49")
+        self.assertEqual(rows[1][7], "20")
 
 
 if __name__ == "__main__":
