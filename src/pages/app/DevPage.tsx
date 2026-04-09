@@ -1605,7 +1605,7 @@ export function DevPage() {
                   setSheetAction('import')
                   setSheetMsg('กำลังนำเข้าสต็อกจากชีตเข้าสู่ฐานข้อมูล...')
                   try {
-                    const res = await importFromSheets({ overwrite_stock_qty: false, overwrite_prices: false })
+                    const res = await importFromSheets({ overwrite_stock_qty: true, overwrite_prices: true })
                     setSheetMsg(res.ok ? `นำเข้าเสร็จ: สร้าง ${res.created || 0}, อัปเดต ${res.updated || 0}, ข้าม ${res.skipped || 0}` : `นำเข้าไม่สำเร็จ: ${res.error || ''}`)
                     await reload()
                   } finally {
@@ -1653,8 +1653,8 @@ export function DevPage() {
                   try {
                     const res = await importFromSheets({
                       source: 'import_template',
-                      overwrite_stock_qty: false,
-                      overwrite_prices: false,
+                      overwrite_stock_qty: true,
+                      overwrite_prices: true,
                       sync_after_import: true,
                     })
                     setSheetMsg(
@@ -1760,7 +1760,7 @@ export function DevPage() {
                     </button>
                   </div>
                   <div className="mt-3 rounded border border-emerald-300/20 bg-black/20 p-3">
-                    <div className="text-xs text-emerald-50/90">ไฟล์นำเข้าจะดึงข้อมูลล่าสุดจากเว็บ รวม Current_Qty และจะไม่ใส่ Current_Status แล้ว คุณเอาไปแก้ใน Excel, Google Sheets หรือมือถือ แล้วค่อยอัปโหลดกลับเข้าเว็บได้เลย</div>
+                    <div className="text-xs text-emerald-50/90">ไฟล์นำเข้าจะดึงข้อมูลล่าสุดจากเว็บ รวม Current_Qty และจะไม่ใส่ Current_Status แล้ว ตอน import ระบบจะอัปเดตจำนวนคงเหลือและราคาให้ตรงกับไฟล์ โดยช่องที่ปล่อยว่างจะคงค่าปัจจุบันไว้</div>
                     <div className="mt-3 flex flex-col gap-2">
                       <input
                         type="file"
@@ -1783,8 +1783,8 @@ export function DevPage() {
                           setSheetMsg(`กำลังนำเข้าไฟล์ ${sheetImportFile.name}...`)
                           try {
                             const res = await importFromFile(sheetImportFile, {
-                              overwrite_stock_qty: false,
-                              overwrite_prices: false,
+                              overwrite_stock_qty: true,
+                              overwrite_prices: true,
                               sync_after_import: true,
                             })
                             setSheetMsg(

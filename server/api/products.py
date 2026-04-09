@@ -400,8 +400,8 @@ async def import_from_sheets(
 async def import_from_file(
     request: Request,
     file: UploadFile = File(...),
-    overwrite_stock_qty: bool = Form(False),
-    overwrite_prices: bool = Form(False),
+    overwrite_stock_qty: bool = Form(True),
+    overwrite_prices: bool = Form(True),
     sync_after_import: bool = Form(True),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),

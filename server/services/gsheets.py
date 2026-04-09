@@ -3,6 +3,7 @@ import csv
 import io
 import json
 import logging
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -725,9 +726,21 @@ def _parse_float(v: str) -> float:
     s = (v or "").strip()
     if not s:
         return 0.0
-    s = s.replace(",", "")
     if s.endswith("%"):
         s = s[:-1]
+    s = s.strip()
+    if not s:
+        return 0.0
+    if "," in s and "." in s:
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif "," in s:
+        if re.fullmatch(r"-?\d+,\d{1,2}", s):
+            s = s.replace(",", ".")
+        else:
+            s = s.replace(",", "")
     try:
         return float(s)
     except Exception:
@@ -941,7 +954,12 @@ def _normalize_import_values(values: list[list[object]] | None) -> list[list[str
 
 def _read_import_csv_values(csv_bytes: bytes) -> list[list[str]]:
     text = (csv_bytes or b"").decode("utf-8-sig", errors="replace")
-    reader = csv.reader(io.StringIO(text))
+    sample = text[:4096]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+    except Exception:
+        dialect = csv.excel
+    reader = csv.reader(io.StringIO(text), dialect=dialect)
     return _normalize_import_values([list(row) for row in reader])
 
 
@@ -995,19 +1013,32 @@ async def _import_stock_from_values(
                 continue
             category = (row[type_idx] or "").strip() if type_idx is not None and type_idx < len(row) else ""
             unit = (row[unit_idx] or "").strip() if unit_idx is not None and unit_idx < len(row) else ""
-            qty = _parse_float(row[qty_idx]) if qty_idx is not None and qty_idx < len(row) else 0.0
-            max_qty = _parse_float(row[max_idx]) if max_idx is not None and max_idx < len(row) else 0.0
-            unit_price = _parse_float(row[price_idx]) if price_idx is not None and price_idx < len(row) else 0.0
-            threshold = _parse_float(row[threshold_idx]) if threshold_idx is not None and threshold_idx < len(row) else 60.0
+            qty_raw = (row[qty_idx] or "").strip() if qty_idx is not None and qty_idx < len(row) else ""
+            max_raw = (row[max_idx] or "").strip() if max_idx is not None and max_idx < len(row) else ""
+            price_raw = (row[price_idx] or "").strip() if price_idx is not None and price_idx < len(row) else ""
+            threshold_raw = (row[threshold_idx] or "").strip() if threshold_idx is not None and threshold_idx < len(row) else ""
+
+            has_qty = bool(qty_raw)
+            has_max = bool(max_raw)
+            has_price = bool(price_raw)
+            has_threshold = bool(threshold_raw)
+
+            qty = _parse_float(qty_raw) if has_qty else 0.0
+            max_qty = _parse_float(max_raw) if has_max else 0.0
+            unit_price = _parse_float(price_raw) if has_price else 0.0
+            threshold = _parse_float(threshold_raw) if has_threshold else 0.0
 
             p = await db.scalar(select(Product).where(Product.sku == sku))
             if p and _is_deleted_product(p):
                 skipped += 1
                 continue
 
-            min_qty = max_qty * (threshold / 100.0) if max_qty > 0 and threshold > 0 else 0.0
-
             if not p:
+                effective_max = max_qty if has_max else 0.0
+                effective_threshold = threshold if has_threshold else (60.0 if effective_max > 0 else 0.0)
+                min_qty = effective_max * (effective_threshold / 100.0) if effective_max > 0 and effective_threshold > 0 else 0.0
+                initial_qty = qty if has_qty else 0.0
+                initial_price = unit_price if has_price and unit_price > 0 else 0.0
                 p = Product(
                     sku=sku,
                     branch_id=default_branch.id,
@@ -1016,12 +1047,12 @@ async def _import_stock_from_values(
                     category=category,
                     type="",
                     unit=unit or "ชิ้น",
-                    cost_price=unit_price if unit_price > 0 else 0,
-                    selling_price=unit_price if unit_price > 0 else None,
-                    stock_qty=qty if overwrite_stock_qty else 0,
+                    cost_price=initial_price,
+                    selling_price=initial_price if initial_price > 0 else None,
+                    stock_qty=initial_qty,
                     min_stock=min_qty,
-                    max_stock=max_qty,
-                    status=calc_status(qty if overwrite_stock_qty else 0, min_qty, max_qty, False),
+                    max_stock=effective_max,
+                    status=calc_status(initial_qty, min_qty, effective_max, False),
                     is_test=False,
                     supplier="",
                     barcode="",
@@ -1041,13 +1072,28 @@ async def _import_stock_from_values(
                     p.category = category
                 if unit:
                     p.unit = unit
-                if max_qty > 0:
+
+                current_max_stock = float(p.max_stock or 0)
+                current_min_stock = float(p.min_stock or 0)
+                current_threshold = (current_min_stock / current_max_stock * 100.0) if current_max_stock > 0 and current_min_stock > 0 else 60.0
+
+                if has_max:
                     p.max_stock = max_qty
-                p.min_stock = min_qty
-                if overwrite_stock_qty:
+
+                if has_max or has_threshold:
+                    effective_max = float(p.max_stock or 0)
+                    effective_threshold = threshold if has_threshold else (current_threshold if effective_max > 0 else 0.0)
+                    p.min_stock = (
+                        effective_max * (effective_threshold / 100.0)
+                        if effective_max > 0 and effective_threshold > 0
+                        else 0.0
+                    )
+
+                if overwrite_stock_qty and has_qty:
                     p.stock_qty = qty
-                if overwrite_prices and unit_price > 0:
-                    p.selling_price = unit_price
+                if overwrite_prices and has_price:
+                    p.cost_price = unit_price if unit_price > 0 else 0.0
+                    p.selling_price = unit_price if unit_price > 0 else None
                 p.status = calc_status(float(p.stock_qty), float(p.min_stock), float(p.max_stock), bool(p.is_test))
                 p.updated_at = datetime.utcnow()
                 updated += 1

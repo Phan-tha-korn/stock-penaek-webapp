@@ -212,7 +212,7 @@ class ApiSmokeTests(unittest.TestCase):
         headers = self._login("owner", "Owner@1234")
         csv_data = (
             "SKU,Name,Category,Unit,Current_Qty,Max_Stock,Unit_Price,Threshold%\n"
-            "SKU-0001,Updated Product,General,pcs,20,80,99,25\n"
+            "SKU-0001,Updated Product,General,pcs,35,80,99,25\n"
             "SKU-0002,New Product,Hardware,box,5,12,55,20\n"
         ).encode("utf-8-sig")
 
@@ -228,8 +228,6 @@ class ApiSmokeTests(unittest.TestCase):
                 headers=headers,
                 files={"file": ("product-import-template.csv", csv_data, "text/csv")},
                 data={
-                    "overwrite_stock_qty": "false",
-                    "overwrite_prices": "false",
                     "sync_after_import": "false",
                 },
             )
@@ -251,11 +249,81 @@ class ApiSmokeTests(unittest.TestCase):
         self.assertEqual(list_response.status_code, 200, list_response.text)
         items = {item["sku"]: item for item in list_response.json()["items"]}
         self.assertEqual(items["SKU-0001"]["name"]["th"], "Updated Product")
+        self.assertEqual(float(items["SKU-0001"]["stock_qty"]), 35.0)
         self.assertEqual(float(items["SKU-0001"]["max_stock"]), 80.0)
-        self.assertEqual(float(items["SKU-0001"]["selling_price"]), 15.0)
+        self.assertEqual(float(items["SKU-0001"]["selling_price"]), 99.0)
         self.assertEqual(items["SKU-0002"]["name"]["th"], "New Product")
+        self.assertEqual(float(items["SKU-0002"]["selling_price"]), 55.0)
         self.assertEqual(float(items["SKU-0002"]["max_stock"]), 12.0)
-        self.assertEqual(float(items["SKU-0002"]["stock_qty"]), 0.0)
+        self.assertEqual(float(items["SKU-0002"]["stock_qty"]), 5.0)
+
+    def test_import_from_file_preserves_existing_values_when_cells_are_blank(self) -> None:
+        headers = self._login("owner", "Owner@1234")
+        csv_data = (
+            "SKU,Name,Category,Unit,Current_Qty,Max_Stock,Unit_Price,Threshold%\n"
+            "SKU-0001,Updated Name,General,pcs,,,,\n"
+        ).encode("utf-8-sig")
+
+        with (
+            patch(
+                "server.api.products.create_sheet_operation_snapshot",
+                new=AsyncMock(return_value={"id": "snap-file-2", "created_at": "2026-04-09T10:15:00Z", "backup_file_name": "backup.zip"}),
+            ),
+            patch("server.services.gsheets.SessionLocal", self.SessionLocal),
+        ):
+            response = self.client.post(
+                "/api/products/import-from-file",
+                headers=headers,
+                files={"file": ("product-import-template.csv", csv_data, "text/csv")},
+                data={
+                    "overwrite_stock_qty": "true",
+                    "overwrite_prices": "true",
+                    "sync_after_import": "false",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["ok"])
+
+        list_response = self.client.get("/api/products", headers=headers)
+        self.assertEqual(list_response.status_code, 200, list_response.text)
+        item = next(item for item in list_response.json()["items"] if item["sku"] == "SKU-0001")
+        self.assertEqual(item["name"]["th"], "Updated Name")
+        self.assertEqual(float(item["stock_qty"]), 20.0)
+        self.assertEqual(float(item["max_stock"]), 50.0)
+        self.assertEqual(float(item["selling_price"]), 15.0)
+        self.assertEqual(float(item["min_stock"]), 5.0)
+
+    def test_import_from_file_accepts_semicolon_csv_and_decimal_comma(self) -> None:
+        headers = self._login("owner", "Owner@1234")
+        csv_data = (
+            "SKU;Name;Category;Unit;Current_Qty;Max_Stock;Unit_Price;Threshold%\n"
+            "SKU-0001;Updated Product;General;pcs;20;80;99,5;25\n"
+        ).encode("utf-8-sig")
+
+        with (
+            patch(
+                "server.api.products.create_sheet_operation_snapshot",
+                new=AsyncMock(return_value={"id": "snap-file-3", "created_at": "2026-04-09T10:20:00Z", "backup_file_name": "backup.zip"}),
+            ),
+            patch("server.services.gsheets.SessionLocal", self.SessionLocal),
+        ):
+            response = self.client.post(
+                "/api/products/import-from-file",
+                headers=headers,
+                files={"file": ("product-import-template.csv", csv_data, "text/csv")},
+                data={
+                    "sync_after_import": "false",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["ok"])
+
+        list_response = self.client.get("/api/products", headers=headers)
+        self.assertEqual(list_response.status_code, 200, list_response.text)
+        item = next(item for item in list_response.json()["items"] if item["sku"] == "SKU-0001")
+        self.assertEqual(float(item["selling_price"]), 99.5)
 
     def test_auth_login_me_and_invalid_password(self) -> None:
         bad_login = self.client.post(

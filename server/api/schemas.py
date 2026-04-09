@@ -402,8 +402,8 @@ class ProductDeleteIn(BaseModel):
 
 class SheetsImportIn(BaseModel):
     source: str = "stock"
-    overwrite_stock_qty: bool = False
-    overwrite_prices: bool = False
+    overwrite_stock_qty: bool = True
+    overwrite_prices: bool = True
     sync_after_import: bool = False
 
 
