@@ -6,7 +6,7 @@ import { useConfirm, usePrompt } from '../../components/ui/ConfirmDialog'
 import { createDevBackup, getDevBackupDownloadUrl, previewDevBackup, restoreDevBackup, type DevBackupPreviewResult } from '../../services/devBackup'
 import { fetchConfig } from '../../services/config'
 import { fetchActivity } from '../../services/dashboard'
-import { forceFullSyncToSheets, importFromSheets, syncToSheets } from '../../services/products'
+import { forceFullSyncToSheets, importFromFile, importFromSheets, syncToSheets } from '../../services/products'
 import { deleteGarbage, getGarbageWhitelist, scanGarbage, updateGarbageWhitelist, type GarbageFileItem } from '../../services/devGarbage'
 import { getNotificationConfig, updateNotificationConfig } from '../../services/devNotifications'
 import {
@@ -181,9 +181,10 @@ export function DevPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
 
   const [sheetMsg, setSheetMsg] = useState<string | null>(null)
-  const [sheetAction, setSheetAction] = useState<'sync' | 'force-sync' | 'prepare-import' | 'import' | 'import-template' | 'rollback' | null>(null)
+  const [sheetAction, setSheetAction] = useState<'sync' | 'force-sync' | 'prepare-import' | 'import' | 'import-template' | 'import-file' | 'rollback' | null>(null)
   const [sheetsCfg, setSheetsCfg] = useState<DevSheetsConfig | null>(null)
   const [sheetSnapshots, setSheetSnapshots] = useState<DevSheetSnapshot[]>([])
+  const [sheetImportFile, setSheetImportFile] = useState<File | null>(null)
   const [categoryBusy, setCategoryBusy] = useState(false)
   const [categoryMsg, setCategoryMsg] = useState<string | null>(null)
   const [categoryName, setCategoryName] = useState('')
@@ -362,6 +363,23 @@ export function DevPage() {
         }
       })()
     }, mode)
+  }
+
+  function downloadApiFile(url?: string, fileName = 'product-import-template.csv') {
+    const target = resolveDevSheetUrl(String(url || ''))
+    if (!target) {
+      setSheetMsg('ยังไม่พบลิงก์ดาวน์โหลดสำหรับรายการนี้')
+      return
+    }
+    setSheetMsg(null)
+    void (async () => {
+      try {
+        await downloadAuthorizedFile(target, fileName)
+        setSheetMsg(`ดาวน์โหลดไฟล์แล้ว: ${fileName}`)
+      } catch (e: any) {
+        setSheetMsg(e?.response?.data?.detail || e?.message || 'ดาวน์โหลดไฟล์ไม่สำเร็จ')
+      }
+    })()
   }
 
   function togglePurgeScope(scope: DevPermanentDeleteScope) {
@@ -1651,7 +1669,7 @@ export function DevPage() {
                   }
                 }}
               >
-                {sheetAction === 'import-template' ? 'กำลังนำเข้า...' : 'Import Product Import'}
+                {sheetAction === 'import-template' ? 'กำลังนำเข้า...' : 'Import Product Import (Google Sheets)'}
               </button>
               <button
                 className="rounded border border-rose-400/30 px-3 py-2 text-sm text-rose-100 hover:bg-rose-500/10 disabled:opacity-50"
@@ -1737,9 +1755,53 @@ export function DevPage() {
                     <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.import_download_url, 'product-import-sheet.csv', 'sync')}>
                       โหลดแท็บนำเข้า .csv
                     </button>
-                    <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.product_import_template_download_url, 'product-import-template.csv', 'sync')}>
+                    <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadApiFile(sheetsCfg?.product_import_template_download_url, 'product-import-template.csv')}>
                       โหลดแม่แบบจากเว็บ .csv
                     </button>
+                  </div>
+                  <div className="mt-3 rounded border border-emerald-300/20 bg-black/20 p-3">
+                    <div className="text-xs text-emerald-50/90">แนะนำ: โหลดแม่แบบจากเว็บ .csv ไปแก้ใน Excel, Google Sheets หรือมือถือ แล้วค่อยอัปโหลดกลับเข้าเว็บ ระบบจะไม่ sync ทับแท็บ Product Import อัตโนมัติแล้ว</div>
+                    <div className="mt-3 flex flex-col gap-2">
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="rounded border border-emerald-400/20 bg-black/30 px-3 py-2 text-xs text-emerald-50/85 file:mr-3 file:rounded file:border file:border-emerald-400/30 file:bg-black/40 file:px-3 file:py-1.5"
+                        onChange={(e) => setSheetImportFile(e.target.files?.[0] || null)}
+                      />
+                      <div className="text-[11px] text-emerald-50/70">{sheetImportFile ? `ไฟล์ที่เลือก: ${sheetImportFile.name}` : 'ยังไม่ได้เลือกไฟล์ .csv'}</div>
+                      <button
+                        className="rounded border border-emerald-300/40 px-3 py-2 text-sm text-emerald-50 hover:bg-emerald-500/10 disabled:opacity-60"
+                        type="button"
+                        disabled={sheetAction !== null || !sheetImportFile}
+                        onClick={async () => {
+                          if (!sheetImportFile) {
+                            setSheetMsg('กรุณาเลือกไฟล์ .csv ก่อนนำเข้า')
+                            return
+                          }
+                          setSheetMsg(null)
+                          setSheetAction('import-file')
+                          setSheetMsg(`กำลังนำเข้าไฟล์ ${sheetImportFile.name}...`)
+                          try {
+                            const res = await importFromFile(sheetImportFile, {
+                              overwrite_stock_qty: false,
+                              overwrite_prices: false,
+                              sync_after_import: true,
+                            })
+                            setSheetMsg(
+                              res.ok
+                                ? `นำเข้าไฟล์สำเร็จ: สร้าง ${res.created || 0}, อัปเดต ${res.updated || 0}, ข้าม ${res.skipped || 0}${res.synced ? ' • sync แล้ว' : res.sync_error ? ` • sync ไม่สำเร็จ: ${res.sync_error}` : ''}`
+                                : `นำเข้าไฟล์ไม่สำเร็จ: ${res.error || ''}`
+                            )
+                            await reload()
+                            await reloadSheetsTools()
+                          } finally {
+                            setSheetAction(null)
+                          }
+                        }}
+                      >
+                        {sheetAction === 'import-file' ? 'กำลังนำเข้าไฟล์...' : 'Import ไฟล์ .csv เข้าเว็บ'}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="rounded border border-violet-500/30 bg-violet-500/10 p-3">

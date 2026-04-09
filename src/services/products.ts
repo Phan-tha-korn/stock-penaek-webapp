@@ -178,6 +178,16 @@ export async function importFromSheets(params: { source?: 'stock' | 'import_temp
   return res.data
 }
 
+export async function importFromFile(file: File, params: { overwrite_stock_qty?: boolean; overwrite_prices?: boolean; sync_after_import?: boolean } = {}) {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('overwrite_stock_qty', String(Boolean(params.overwrite_stock_qty)))
+  form.append('overwrite_prices', String(Boolean(params.overwrite_prices)))
+  form.append('sync_after_import', String(params.sync_after_import !== false))
+  const res = await api.post<SheetsImportResult>('/products/import-from-file', form)
+  return res.data
+}
+
 export async function syncToSheets() {
   const res = await api.post<{ ok: boolean; error?: string; snapshot_id?: string | null; snapshot_created_at?: string | null; snapshot_backup_file_name?: string | null }>('/products/sync-to-sheets', {})
   return res.data

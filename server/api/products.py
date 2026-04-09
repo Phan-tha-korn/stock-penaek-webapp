@@ -393,6 +393,103 @@ async def import_from_sheets(
 
 
 @router.post(
+    "/import-from-file",
+    response_model=SheetsImportOut,
+    dependencies=[Depends(require_roles([Role.OWNER, Role.DEV]))],
+)
+async def import_from_file(
+    request: Request,
+    file: UploadFile = File(...),
+    overwrite_stock_qty: bool = Form(False),
+    overwrite_prices: bool = Form(False),
+    sync_after_import: bool = Form(True),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        from server.services.gsheets import import_stock_from_csv_bytes, sync_all_to_sheets
+    except Exception:
+        raise HTTPException(status_code=500, detail="import_not_available")
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="file_required")
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="file_required")
+
+    snapshot = await create_sheet_operation_snapshot(
+        "import-file",
+        note="before import from uploaded csv",
+        include_sheet=False,
+    )
+
+    try:
+        res = await import_stock_from_csv_bytes(
+            payload,
+            actor_id=user.id,
+            overwrite_stock_qty=overwrite_stock_qty,
+            overwrite_prices=overwrite_prices,
+            fail_if_busy=True,
+        )
+    except RuntimeError as exc:
+        return SheetsImportOut(ok=False, error=str(exc), **_sheet_snapshot_fields(snapshot))
+    except Exception:
+        return SheetsImportOut(ok=False, error="invalid_import_file", **_sheet_snapshot_fields(snapshot))
+
+    if not res.get("ok"):
+        return SheetsImportOut(
+            ok=False,
+            error=str(res.get("error") or "import_failed"),
+            **_sheet_snapshot_fields(snapshot),
+        )
+
+    synced = False
+    sync_error = None
+    if sync_after_import:
+        try:
+            synced = bool(await sync_all_to_sheets(fail_if_busy=True))
+            if not synced:
+                sync_error = "sync_skipped"
+        except Exception as exc:
+            sync_error = str(exc)
+
+    await write_audit_log(
+        db,
+        request=request,
+        actor=user,
+        action="SHEETS_IMPORT_FILE",
+        entity="sheets",
+        entity_id=None,
+        success=True,
+        message=f"import_file:{file.filename}",
+        before=None,
+        after={
+            **res,
+            "file_name": str(file.filename or ""),
+            "sync_after_import": bool(sync_after_import),
+            "synced": synced,
+            "sync_error": sync_error,
+            **_sheet_snapshot_fields(snapshot),
+        },
+        commit=True,
+    )
+
+    if not sync_after_import:
+        _trigger_sheet_sync()
+
+    return SheetsImportOut(
+        ok=True,
+        created=int(res.get("created") or 0),
+        updated=int(res.get("updated") or 0),
+        skipped=int(res.get("skipped") or 0),
+        synced=synced,
+        sync_error=sync_error,
+        **_sheet_snapshot_fields(snapshot),
+    )
+
+
+@router.post(
     "/sync-to-sheets",
     response_model=SheetsSyncOut,
     dependencies=[Depends(require_roles([Role.OWNER, Role.DEV]))],

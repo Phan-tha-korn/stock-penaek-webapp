@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import io
 import json
 import logging
 import time
@@ -930,94 +932,32 @@ async def _collect_products_for_sheet_rows() -> list[dict]:
     return products_data
 
 
-async def sync_product_import_template_to_sheet(*, fail_if_busy: bool = False) -> bool:
-    if _is_quota_cooling_down():
-        remaining = _quota_cooldown_remaining()
-        if fail_if_busy:
-            raise RuntimeError(f"google_sheets_quota_cooldown:{remaining}")
-        logger.warning("Skipping Google Sheets import template sync during quota cooldown (%ss remaining)", remaining)
-        return False
-
-    if _SYNC_LOCK.locked():
-        if fail_if_busy:
-            raise RuntimeError("google_sheets_sync_in_progress")
-        logger.info("Skipping overlapping Google Sheets import template sync request")
-        return False
-
-    products_data = await _collect_products_for_sheet_rows()
-    import_rows = _build_import_template_rows(products_data)
-
-    def _sync_blocking() -> None:
-        client = get_client()
-        if not client:
-            raise RuntimeError("gsheets_not_configured")
-        sheet = client.open_by_key(settings.google_sheets_id)
-        workbook_tabs = {ws.title: ws for ws in ensure_workbook_template(sheet, write_headers=False)}
-        ws_import = workbook_tabs[TAB_PRODUCT_IMPORT]
-        _write_rows(ws_import, import_rows)
-
-    async with _SYNC_LOCK:
-        try:
-            await _with_retries(lambda: asyncio.to_thread(_sync_blocking), retries=3, delay_sec=1.5)
-            return True
-        except Exception as e:
-            if _is_quota_error(e):
-                _set_quota_cooldown()
-            if fail_if_busy:
-                raise
-            logger.error(f"Google Sheets import template sync failed: {e}")
-            return False
+def _normalize_import_values(values: list[list[object]] | None) -> list[list[str]]:
+    normalized: list[list[str]] = []
+    for row in values or []:
+        if not isinstance(row, list):
+            continue
+        normalized.append(["" if cell is None else str(cell).strip() for cell in row])
+    return normalized
 
 
-async def import_stock_from_sheet(
+def _read_import_csv_values(csv_bytes: bytes) -> list[list[str]]:
+    text = (csv_bytes or b"").decode("utf-8-sig", errors="replace")
+    reader = csv.reader(io.StringIO(text))
+    return _normalize_import_values([list(row) for row in reader])
+
+
+async def _import_stock_from_values(
+    values: list[list[object]] | None,
     *,
     actor_id: str | None = None,
-    source: str = "stock",
     overwrite_stock_qty: bool = False,
     overwrite_prices: bool = False,
-    fail_if_busy: bool = False,
 ) -> dict:
-    try:
-        tab_title = _resolve_import_source_tab(source)
-    except ValueError:
-        if fail_if_busy:
-            raise RuntimeError("invalid_import_source")
-        return {"ok": False, "error": "invalid_import_source"}
-
-    if _is_quota_cooling_down():
-        remaining = _quota_cooldown_remaining()
-        if fail_if_busy:
-            raise RuntimeError(f"google_sheets_quota_cooldown:{remaining}")
-        logger.warning("Skipping Google Sheets import during quota cooldown (%ss remaining)", remaining)
-        return {"ok": False, "error": "google_sheets_quota_cooldown"}
-
-    if _IMPORT_LOCK.locked():
-        if fail_if_busy:
-            raise RuntimeError("google_sheets_import_in_progress")
-        logger.info("Skipping overlapping Google Sheets import request")
-        return {"ok": False, "error": "google_sheets_import_in_progress"}
-
-    def _read_values_blocking():
-        client = get_client()
-        if not client:
-            return None
-        sheet = client.open_by_key(settings.google_sheets_id)
-        ws = _ensure_tab(sheet, tab_title, write_header=(tab_title == TAB_PRODUCT_IMPORT))
-        return ws.get_all_values()
-
-    async with _IMPORT_LOCK:
-        try:
-            values = await _with_retries(lambda: asyncio.to_thread(_read_values_blocking), retries=3, delay_sec=1.5)
-        except Exception as e:
-            if _is_quota_error(e):
-                _set_quota_cooldown()
-            if fail_if_busy:
-                raise
-            logger.error(f"Google Sheets import failed: {e}")
-            return {"ok": False, "error": str(e)}
+    values = _normalize_import_values(values)
     if not values:
-        return {"ok": False, "error": "sheets_not_configured"}
-    if not values or len(values) < 2:
+        return {"ok": False, "error": "import_data_empty"}
+    if len(values) < 2:
         return {"ok": True, "created": 0, "updated": 0, "skipped": 0}
 
     header = values[0]
@@ -1121,7 +1061,133 @@ async def import_stock_from_sheet(
     return {"ok": True, "created": created, "updated": updated, "skipped": skipped}
 
 
-async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
+async def sync_product_import_template_to_sheet(*, fail_if_busy: bool = False) -> bool:
+    if _is_quota_cooling_down():
+        remaining = _quota_cooldown_remaining()
+        if fail_if_busy:
+            raise RuntimeError(f"google_sheets_quota_cooldown:{remaining}")
+        logger.warning("Skipping Google Sheets import template sync during quota cooldown (%ss remaining)", remaining)
+        return False
+
+    if _SYNC_LOCK.locked():
+        if fail_if_busy:
+            raise RuntimeError("google_sheets_sync_in_progress")
+        logger.info("Skipping overlapping Google Sheets import template sync request")
+        return False
+
+    products_data = await _collect_products_for_sheet_rows()
+    import_rows = _build_import_template_rows(products_data)
+
+    def _sync_blocking() -> None:
+        client = get_client()
+        if not client:
+            raise RuntimeError("gsheets_not_configured")
+        sheet = client.open_by_key(settings.google_sheets_id)
+        workbook_tabs = {ws.title: ws for ws in ensure_workbook_template(sheet, write_headers=False)}
+        ws_import = workbook_tabs[TAB_PRODUCT_IMPORT]
+        _write_rows(ws_import, import_rows)
+
+    async with _SYNC_LOCK:
+        try:
+            await _with_retries(lambda: asyncio.to_thread(_sync_blocking), retries=3, delay_sec=1.5)
+            return True
+        except Exception as e:
+            if _is_quota_error(e):
+                _set_quota_cooldown()
+            if fail_if_busy:
+                raise
+            logger.error(f"Google Sheets import template sync failed: {e}")
+            return False
+
+
+async def import_stock_from_sheet(
+    *,
+    actor_id: str | None = None,
+    source: str = "stock",
+    overwrite_stock_qty: bool = False,
+    overwrite_prices: bool = False,
+    fail_if_busy: bool = False,
+) -> dict:
+    try:
+        tab_title = _resolve_import_source_tab(source)
+    except ValueError:
+        if fail_if_busy:
+            raise RuntimeError("invalid_import_source")
+        return {"ok": False, "error": "invalid_import_source"}
+
+    if _is_quota_cooling_down():
+        remaining = _quota_cooldown_remaining()
+        if fail_if_busy:
+            raise RuntimeError(f"google_sheets_quota_cooldown:{remaining}")
+        logger.warning("Skipping Google Sheets import during quota cooldown (%ss remaining)", remaining)
+        return {"ok": False, "error": "google_sheets_quota_cooldown"}
+
+    if _IMPORT_LOCK.locked():
+        if fail_if_busy:
+            raise RuntimeError("google_sheets_import_in_progress")
+        logger.info("Skipping overlapping Google Sheets import request")
+        return {"ok": False, "error": "google_sheets_import_in_progress"}
+
+    def _read_values_blocking():
+        client = get_client()
+        if not client:
+            return None
+        sheet = client.open_by_key(settings.google_sheets_id)
+        ws = _ensure_tab(sheet, tab_title, write_header=(tab_title == TAB_PRODUCT_IMPORT))
+        return ws.get_all_values()
+
+    async with _IMPORT_LOCK:
+        try:
+            values = await _with_retries(lambda: asyncio.to_thread(_read_values_blocking), retries=3, delay_sec=1.5)
+        except Exception as e:
+            if _is_quota_error(e):
+                _set_quota_cooldown()
+            if fail_if_busy:
+                raise
+            logger.error(f"Google Sheets import failed: {e}")
+            return {"ok": False, "error": str(e)}
+    if not values:
+        return {"ok": False, "error": "sheets_not_configured"}
+    return await _import_stock_from_values(
+        values,
+        actor_id=actor_id,
+        overwrite_stock_qty=overwrite_stock_qty,
+        overwrite_prices=overwrite_prices,
+    )
+
+
+async def import_stock_from_csv_bytes(
+    csv_bytes: bytes,
+    *,
+    actor_id: str | None = None,
+    overwrite_stock_qty: bool = False,
+    overwrite_prices: bool = False,
+    fail_if_busy: bool = False,
+) -> dict:
+    if _IMPORT_LOCK.locked():
+        if fail_if_busy:
+            raise RuntimeError("google_sheets_import_in_progress")
+        logger.info("Skipping overlapping CSV import request")
+        return {"ok": False, "error": "google_sheets_import_in_progress"}
+
+    async with _IMPORT_LOCK:
+        try:
+            values = _read_import_csv_values(csv_bytes)
+        except Exception as e:
+            if fail_if_busy:
+                raise
+            logger.error(f"CSV import parse failed: {e}")
+            return {"ok": False, "error": "invalid_import_file"}
+
+    return await _import_stock_from_values(
+        values,
+        actor_id=actor_id,
+        overwrite_stock_qty=overwrite_stock_qty,
+        overwrite_prices=overwrite_prices,
+    )
+
+
+async def sync_all_to_sheets(*, fail_if_busy: bool = False, include_import_tab: bool = False) -> bool:
     if _is_quota_cooling_down():
         remaining = _quota_cooldown_remaining()
         if fail_if_busy:
@@ -1296,7 +1362,7 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
             ["แท็บบัญชีผู้ใช้งาน", TAB_USERS, "รวมข้อมูลบัญชีของผู้ใช้งานในระบบนี้"],
         ]
     )
-    import_rows = _build_import_template_rows(products_data)
+    import_rows = _build_import_template_rows(products_data) if include_import_tab else None
 
     def _sync_blocking() -> None:
         client = get_client()
@@ -1319,7 +1385,8 @@ async def sync_all_to_sheets(*, fail_if_busy: bool = False) -> bool:
 
         _write_rows(ws_overview, overview_rows)
         _sync_stock_sheet(ws_stock, products_data)
-        _write_rows(ws_import, import_rows)
+        if include_import_tab and import_rows is not None:
+            _write_rows(ws_import, import_rows)
         _write_rows(ws_alerts, alert_rows)
         _write_rows(ws_accounting, accounting_rows)
         _write_rows(ws_audit, audit_rows)

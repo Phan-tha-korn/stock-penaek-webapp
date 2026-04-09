@@ -208,6 +208,55 @@ class ApiSmokeTests(unittest.TestCase):
         )
         sync_mock.assert_awaited_once_with(fail_if_busy=True)
 
+    def test_import_from_file_updates_products_from_csv_template(self) -> None:
+        headers = self._login("owner", "Owner@1234")
+        csv_data = (
+            "SKU,Name,Category,Unit,Current_Qty,Max_Stock,Unit_Price,Threshold%\n"
+            "SKU-0001,Updated Product,General,pcs,20,80,99,25\n"
+            "SKU-0002,New Product,Hardware,box,5,12,55,20\n"
+        ).encode("utf-8-sig")
+
+        with (
+            patch(
+                "server.api.products.create_sheet_operation_snapshot",
+                new=AsyncMock(return_value={"id": "snap-file-1", "created_at": "2026-04-09T10:10:00Z", "backup_file_name": "backup.zip"}),
+            ) as snapshot_mock,
+            patch("server.services.gsheets.SessionLocal", self.SessionLocal),
+        ):
+            response = self.client.post(
+                "/api/products/import-from-file",
+                headers=headers,
+                files={"file": ("product-import-template.csv", csv_data, "text/csv")},
+                data={
+                    "overwrite_stock_qty": "false",
+                    "overwrite_prices": "false",
+                    "sync_after_import": "false",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["created"], 1)
+        self.assertEqual(payload["updated"], 1)
+        self.assertEqual(payload["skipped"], 0)
+        self.assertEqual(payload["snapshot_id"], "snap-file-1")
+        snapshot_mock.assert_awaited_once_with(
+            "import-file",
+            note="before import from uploaded csv",
+            include_sheet=False,
+        )
+
+        list_response = self.client.get("/api/products", headers=headers)
+        self.assertEqual(list_response.status_code, 200, list_response.text)
+        items = {item["sku"]: item for item in list_response.json()["items"]}
+        self.assertEqual(items["SKU-0001"]["name"]["th"], "Updated Product")
+        self.assertEqual(float(items["SKU-0001"]["max_stock"]), 80.0)
+        self.assertEqual(float(items["SKU-0001"]["selling_price"]), 15.0)
+        self.assertEqual(items["SKU-0002"]["name"]["th"], "New Product")
+        self.assertEqual(float(items["SKU-0002"]["max_stock"]), 12.0)
+        self.assertEqual(float(items["SKU-0002"]["stock_qty"]), 0.0)
+
     def test_auth_login_me_and_invalid_password(self) -> None:
         bad_login = self.client.post(
             "/api/auth/login",
