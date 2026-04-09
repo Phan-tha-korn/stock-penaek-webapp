@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -184,6 +185,28 @@ class ApiSmokeTests(unittest.TestCase):
         public_config = self.client.get("/api/config")
         self.assertEqual(public_config.status_code, 200)
         self.assertIn("app_name", public_config.json())
+
+    def test_prepare_import_tab_uses_lightweight_snapshot(self) -> None:
+        headers = self._login("owner", "Owner@1234")
+        with (
+            patch(
+                "server.api.dev_sheets.create_sheet_operation_snapshot",
+                new=AsyncMock(return_value={"id": "snap-1", "created_at": "2026-04-09T10:00:00Z", "backup_file_name": ""}),
+            ) as snapshot_mock,
+            patch("server.api.dev_sheets.sync_product_import_template_to_sheet", new=AsyncMock(return_value=True)) as sync_mock,
+        ):
+            response = self.client.post("/api/dev/sheets/prepare-import-tab", headers=headers)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["ok"])
+        self.assertIsNone(response.json()["snapshot_backup_file_name"])
+        snapshot_mock.assert_awaited_once_with(
+            "prepare-import-tab",
+            note="before refresh import tab",
+            include_backup=False,
+            tab_titles=[dev_sheets_api.TAB_PRODUCT_IMPORT],
+        )
+        sync_mock.assert_awaited_once_with(fail_if_busy=True)
 
     def test_auth_login_me_and_invalid_password(self) -> None:
         bad_login = self.client.post(

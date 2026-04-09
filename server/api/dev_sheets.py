@@ -218,7 +218,12 @@ async def prepare_import_tab(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    snapshot = await create_sheet_operation_snapshot("prepare-import-tab", note="before refresh import tab")
+    snapshot = await create_sheet_operation_snapshot(
+        "prepare-import-tab",
+        note="before refresh import tab",
+        include_backup=False,
+        tab_titles=[TAB_PRODUCT_IMPORT],
+    )
     try:
         ok = await sync_product_import_template_to_sheet(fail_if_busy=True)
         if not ok:

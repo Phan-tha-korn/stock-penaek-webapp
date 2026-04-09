@@ -36,14 +36,17 @@ def _sanitize_token(value: str) -> str:
     return text or "snapshot"
 
 
-def _capture_sheet_tabs_blocking(sheet_id: str) -> list[dict[str, object]]:
+def _capture_sheet_tabs_blocking(sheet_id: str, tab_titles: list[str] | None = None) -> list[dict[str, object]]:
     client = get_client()
     if not client or not sheet_id:
         return []
 
     sheet = client.open_by_key(sheet_id)
+    wanted_titles = {str(title or "").strip() for title in (tab_titles or []) if str(title or "").strip()}
     out: list[dict[str, object]] = []
     for ws in sheet.worksheets():
+        if wanted_titles and str(ws.title or "").strip() not in wanted_titles:
+            continue
         values = ws.get_all_values()
         out.append(
             {
@@ -138,19 +141,28 @@ def _manifest_summary(manifest: dict[str, object], archive_path: Path) -> dict[s
     }
 
 
-async def create_sheet_operation_snapshot(operation: str, *, note: str = "") -> dict[str, object]:
+async def create_sheet_operation_snapshot(
+    operation: str,
+    *,
+    note: str = "",
+    include_backup: bool = True,
+    include_sheet: bool = True,
+    tab_titles: list[str] | None = None,
+) -> dict[str, object]:
     created_at = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     snapshot_id = _sanitize_token(f"{datetime.utcnow().strftime('%Y%m%d-%H%M%S-%f')}-{operation}")
     archive_path = sheet_operation_snapshots_root() / f"sheet-op-{snapshot_id}.zip"
 
-    backup = await create_backup_archive(f"before-{operation}")
+    backup: dict[str, object] = {}
+    if include_backup:
+        backup = await create_backup_archive(f"before-{operation}")
 
     cfg = load_master_config()
     sheet_id = str(cfg.get("google_sheets_id") or (cfg.get("google_sheets") or {}).get("sheet_id") or "")
     tabs: list[dict[str, object]] = []
-    if sheet_id:
+    if include_sheet and sheet_id:
         try:
-            tabs = await asyncio.to_thread(_capture_sheet_tabs_blocking, sheet_id)
+            tabs = await asyncio.to_thread(_capture_sheet_tabs_blocking, sheet_id, tab_titles)
         except Exception:
             logger.exception("Failed to capture Google Sheets snapshot for operation %s", operation)
 
@@ -200,14 +212,15 @@ async def rollback_to_sheet_operation_snapshot(snapshot_id: str) -> dict[str, ob
     rollback_backup = await create_backup_archive("before-sheet-rollback")
 
     backup_file_name = str(manifest.get("backup_file_name") or "")
-    if not backup_file_name:
+    restored: dict[str, int] = {}
+    if backup_file_name:
+        backup_path = backups_root() / backup_file_name
+        if backup_path.exists():
+            restored = await restore_backup_archive(backup_path.read_bytes())
+        elif not tabs:
+            raise FileNotFoundError("sheet_snapshot_backup_missing")
+    elif not tabs:
         raise FileNotFoundError("sheet_snapshot_backup_missing")
-
-    backup_path = backups_root() / backup_file_name
-    if not backup_path.exists():
-        raise FileNotFoundError("sheet_snapshot_backup_missing")
-
-    restored = await restore_backup_archive(backup_path.read_bytes())
 
     sheet_restored = False
     sheet_resynced = False
