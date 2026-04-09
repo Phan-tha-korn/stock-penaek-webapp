@@ -104,7 +104,6 @@ HEADERS = {
         "Max_Stock",
         "Unit_Price",
         "Threshold%",
-        "Current_Status",
         "Updated_At",
         "Notes",
     ],
@@ -406,7 +405,7 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
 
     col_widths: dict[str, list[int]] = {
         TAB_STOCK: [120, 260, 150, 110, 140, 140, 130, 130, 140, 140, 170, 150, 150, 320, 160],
-        TAB_PRODUCT_IMPORT: [120, 260, 150, 110, 140, 140, 130, 130, 150, 170, 260],
+        TAB_PRODUCT_IMPORT: [120, 260, 150, 110, 140, 140, 130, 130, 170, 260],
         TAB_STOCK_ALERTS: [140, 140, 260, 110, 110, 110, 140, 170, 300],
         TAB_AUDIT_LOG: [140, 170, 180, 150, 140, 260, 360, 170],
         TAB_EDIT_LOG: [170, 200, 140, 260, 360, 170],
@@ -636,7 +635,7 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
             _repeat_number(ws.id, cols, 5, "NUMBER", "#,##0.##", "RIGHT")
             _repeat_number(ws.id, cols, 6, "NUMBER", "฿#,##0.00", "RIGHT")
             _repeat_number(ws.id, cols, 7, "PERCENT", "0%", "RIGHT")
-            _repeat_number(ws.id, cols, 9, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            _repeat_number(ws.id, cols, 8, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
 
         if ws.title == TAB_STOCK_ALERTS:
             _repeat_number(ws.id, cols, 3, "NUMBER", "#,##0.##", "RIGHT")
@@ -765,7 +764,6 @@ def _build_import_template_rows(products: list[dict]) -> list[list[str]]:
                 _format_sheet_number(max_qty) if max_qty > 0 else "",
                 _format_sheet_number(float(price or 0)) if float(price or 0) > 0 else "",
                 _format_sheet_number(threshold),
-                str(product.get("status") or ""),
                 str(product.get("updated_at") or ""),
                 "",
             ]

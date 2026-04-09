@@ -81,6 +81,8 @@ class GSheetsSyncTests(unittest.TestCase):
         self.assertEqual(rows[1][5], "15")
         self.assertEqual(rows[1][6], "49")
         self.assertEqual(rows[1][7], "20")
+        self.assertEqual(rows[1][8], "2026-04-09T09:30:00")
+        self.assertNotIn("Current_Status", rows[0])
 
 
 if __name__ == "__main__":

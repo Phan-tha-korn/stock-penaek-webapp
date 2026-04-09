@@ -1752,15 +1752,15 @@ export function DevPage() {
                     <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => openSheetUrl(sheetsCfg?.import_tab_url, 'sync')}>
                       เปิดแท็บนำเข้า
                     </button>
-                    <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadSheetFile(sheetsCfg?.import_download_url, 'product-import-sheet.csv', 'sync')}>
-                      โหลดแท็บนำเข้า .csv
+                    <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadApiFile(sheetsCfg?.product_import_template_download_url, 'product-import-template.csv')}>
+                      โหลดไฟล์นำเข้าล่าสุด .csv
                     </button>
                     <button className="rounded border border-emerald-400/30 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-500/10" type="button" onClick={() => downloadApiFile(sheetsCfg?.product_import_template_download_url, 'product-import-template.csv')}>
-                      โหลดแม่แบบจากเว็บ .csv
+                      โหลดแม่แบบ .csv
                     </button>
                   </div>
                   <div className="mt-3 rounded border border-emerald-300/20 bg-black/20 p-3">
-                    <div className="text-xs text-emerald-50/90">แนะนำ: โหลดแม่แบบจากเว็บ .csv ไปแก้ใน Excel, Google Sheets หรือมือถือ แล้วค่อยอัปโหลดกลับเข้าเว็บ ระบบจะไม่ sync ทับแท็บ Product Import อัตโนมัติแล้ว</div>
+                    <div className="text-xs text-emerald-50/90">ไฟล์นำเข้าจะดึงข้อมูลล่าสุดจากเว็บ รวม Current_Qty และจะไม่ใส่ Current_Status แล้ว คุณเอาไปแก้ใน Excel, Google Sheets หรือมือถือ แล้วค่อยอัปโหลดกลับเข้าเว็บได้เลย</div>
                     <div className="mt-3 flex flex-col gap-2">
                       <input
                         type="file"
