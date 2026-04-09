@@ -63,6 +63,7 @@ class GSheetsSyncTests(unittest.TestCase):
                     "sku": "SKU-1000",
                     "name_th": "Template Product",
                     "category": "General",
+                    "type": "Bolt",
                     "unit": "pcs",
                     "stock_qty": 12,
                     "min_stock": 3,
@@ -77,11 +78,13 @@ class GSheetsSyncTests(unittest.TestCase):
         self.assertEqual(rows[0], HEADERS[TAB_PRODUCT_IMPORT])
         self.assertEqual(rows[1][0], "SKU-1000")
         self.assertEqual(rows[1][1], "Template Product")
-        self.assertEqual(rows[1][4], "12")
-        self.assertEqual(rows[1][5], "15")
-        self.assertEqual(rows[1][6], "49")
-        self.assertEqual(rows[1][7], "20")
-        self.assertEqual(rows[1][8], "2026-04-09T09:30:00")
+        self.assertIn("Type", rows[0])
+        self.assertEqual(rows[1][3], "Bolt")
+        self.assertEqual(rows[1][5], "12")
+        self.assertEqual(rows[1][6], "15")
+        self.assertEqual(rows[1][7], "49")
+        self.assertEqual(rows[1][8], "20")
+        self.assertEqual(rows[1][9], "2026-04-09T09:30:00")
         self.assertNotIn("Current_Status", rows[0])
 
 

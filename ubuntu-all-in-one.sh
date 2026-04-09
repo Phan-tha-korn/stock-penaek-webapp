@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/ubuntu-all-in-one.sh"
+bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/ubuntu-all-in-one.sh" "$@"

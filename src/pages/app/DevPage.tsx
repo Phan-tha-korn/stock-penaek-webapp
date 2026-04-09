@@ -1760,7 +1760,7 @@ export function DevPage() {
                     </button>
                   </div>
                   <div className="mt-3 rounded border border-emerald-300/20 bg-black/20 p-3">
-                    <div className="text-xs text-emerald-50/90">ไฟล์นำเข้าจะดึงข้อมูลล่าสุดจากเว็บ รวม Current_Qty และจะไม่ใส่ Current_Status แล้ว ตอน import ระบบจะอัปเดตจำนวนคงเหลือและราคาให้ตรงกับไฟล์ โดยช่องที่ปล่อยว่างจะคงค่าปัจจุบันไว้</div>
+                    <div className="text-xs text-emerald-50/90">ไฟล์นำเข้าจะดึงข้อมูลล่าสุดจากเว็บ รวม Category, Type, Current_Qty และจะไม่ใส่ Current_Status แล้ว ตอน import ระบบจะอัปเดตจำนวนคงเหลือ ราคา และประเภทให้ตรงกับไฟล์ โดยช่องที่ปล่อยว่างจะคงค่าปัจจุบันไว้</div>
                     <div className="mt-3 flex flex-col gap-2">
                       <input
                         type="file"

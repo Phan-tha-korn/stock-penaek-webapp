@@ -100,6 +100,7 @@ HEADERS = {
         "SKU",
         "Name",
         "Category",
+        "Type",
         "Unit",
         "Current_Qty",
         "Max_Stock",
@@ -406,7 +407,7 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
 
     col_widths: dict[str, list[int]] = {
         TAB_STOCK: [120, 260, 150, 110, 140, 140, 130, 130, 140, 140, 170, 150, 150, 320, 160],
-        TAB_PRODUCT_IMPORT: [120, 260, 150, 110, 140, 140, 130, 130, 170, 260],
+        TAB_PRODUCT_IMPORT: [120, 260, 150, 150, 110, 140, 140, 130, 130, 170, 260],
         TAB_STOCK_ALERTS: [140, 140, 260, 110, 110, 110, 140, 170, 300],
         TAB_AUDIT_LOG: [140, 170, 180, 150, 140, 260, 360, 170],
         TAB_EDIT_LOG: [170, 200, 140, 260, 360, 170],
@@ -632,11 +633,11 @@ def _style_sheet(sheet: gspread.Spreadsheet, worksheets: list[gspread.Worksheet]
                 )
 
         if ws.title == TAB_PRODUCT_IMPORT:
-            _repeat_number(ws.id, cols, 4, "NUMBER", "#,##0.##", "RIGHT")
             _repeat_number(ws.id, cols, 5, "NUMBER", "#,##0.##", "RIGHT")
-            _repeat_number(ws.id, cols, 6, "NUMBER", "฿#,##0.00", "RIGHT")
-            _repeat_number(ws.id, cols, 7, "PERCENT", "0%", "RIGHT")
-            _repeat_number(ws.id, cols, 8, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
+            _repeat_number(ws.id, cols, 6, "NUMBER", "#,##0.##", "RIGHT")
+            _repeat_number(ws.id, cols, 7, "NUMBER", "฿#,##0.00", "RIGHT")
+            _repeat_number(ws.id, cols, 8, "PERCENT", "0%", "RIGHT")
+            _repeat_number(ws.id, cols, 9, "DATE_TIME", "yyyy-mm-dd hh:mm:ss", "CENTER")
 
         if ws.title == TAB_STOCK_ALERTS:
             _repeat_number(ws.id, cols, 3, "NUMBER", "#,##0.##", "RIGHT")
@@ -772,6 +773,7 @@ def _build_import_template_rows(products: list[dict]) -> list[list[str]]:
                 sku,
                 str(product.get("name_th") or ""),
                 str(product.get("category") or ""),
+                str(product.get("type") or ""),
                 str(product.get("unit") or ""),
                 _format_sheet_number(qty),
                 _format_sheet_number(max_qty) if max_qty > 0 else "",
@@ -930,6 +932,7 @@ async def _collect_products_for_sheet_rows() -> list[dict]:
                     "sku": p.sku,
                     "name_th": p.name_th,
                     "category": p.category,
+                    "type": p.type,
                     "unit": p.unit,
                     "stock_qty": float(p.stock_qty or 0),
                     "min_stock": float(p.min_stock or 0),
@@ -979,7 +982,8 @@ async def _import_stock_from_values(
     header = values[0]
     id_idx = _get_col_idx(header, ["รหัสสินค้า", "ID", "SKU", "Sku"])
     name_idx = _get_col_idx(header, ["ชื่อสินค้า", "Name"])
-    type_idx = _get_col_idx(header, ["หมวดหมู่", "ประเภท", "Category"])
+    category_idx = _get_col_idx(header, ["หมวดหมู่", "Category"])
+    product_type_idx = _get_col_idx(header, ["ประเภท", "Type", "Product_Type"])
     unit_idx = _get_col_idx(header, ["หน่วยนับ", "หน่วย", "Unit"])
     qty_idx = _get_col_idx(header, ["จำนวนคงเหลือ", "จำนวนปัจจุบัน", "Current_Qty"])
     max_idx = _get_col_idx(header, ["จำนวนที่ควรมี", "Max_Stock"])
@@ -1011,7 +1015,8 @@ async def _import_stock_from_values(
             name_th = (row[name_idx] or "").strip() if name_idx < len(row) else ""
             if not name_th:
                 continue
-            category = (row[type_idx] or "").strip() if type_idx is not None and type_idx < len(row) else ""
+            category = (row[category_idx] or "").strip() if category_idx is not None and category_idx < len(row) else ""
+            product_type_raw = (row[product_type_idx] or "").strip() if product_type_idx is not None and product_type_idx < len(row) else ""
             unit = (row[unit_idx] or "").strip() if unit_idx is not None and unit_idx < len(row) else ""
             qty_raw = (row[qty_idx] or "").strip() if qty_idx is not None and qty_idx < len(row) else ""
             max_raw = (row[max_idx] or "").strip() if max_idx is not None and max_idx < len(row) else ""
@@ -1022,6 +1027,7 @@ async def _import_stock_from_values(
             has_max = bool(max_raw)
             has_price = bool(price_raw)
             has_threshold = bool(threshold_raw)
+            has_product_type = bool(product_type_raw)
 
             qty = _parse_float(qty_raw) if has_qty else 0.0
             max_qty = _parse_float(max_raw) if has_max else 0.0
@@ -1045,7 +1051,7 @@ async def _import_stock_from_values(
                     name_th=name_th,
                     name_en="",
                     category=category,
-                    type="",
+                    type=product_type_raw,
                     unit=unit or "ชิ้น",
                     cost_price=initial_price,
                     selling_price=initial_price if initial_price > 0 else None,
@@ -1070,6 +1076,8 @@ async def _import_stock_from_values(
                 p.name_th = name_th
                 if category:
                     p.category = category
+                if has_product_type:
+                    p.type = product_type_raw
                 if unit:
                     p.unit = unit
 

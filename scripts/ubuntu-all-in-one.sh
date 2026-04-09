@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_NAME="stock-penaek"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+CLOUDFLARE_TUNNEL_NAME=""
+CLOUDFLARE_CONFIG_PATH=""
+CLOUDFLARE_SERVICE_NAME="stock-penaek-cloudflared"
 
 log() {
   printf '[ubuntu-all-in-one] %s\n' "$*"
@@ -24,6 +27,31 @@ sudo_cmd() {
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+parse_args() {
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --cloudflare-tunnel|--tunnel-name)
+        [ "$#" -ge 2 ] || fail "Missing value for $1"
+        CLOUDFLARE_TUNNEL_NAME="$2"
+        shift 2
+        ;;
+      --cloudflare-config)
+        [ "$#" -ge 2 ] || fail "Missing value for $1"
+        CLOUDFLARE_CONFIG_PATH="$2"
+        shift 2
+        ;;
+      --cloudflare-service-name)
+        [ "$#" -ge 2 ] || fail "Missing value for $1"
+        CLOUDFLARE_SERVICE_NAME="$2"
+        shift 2
+        ;;
+      *)
+        fail "Unknown argument: $1"
+        ;;
+    esac
+  done
 }
 
 read_env_value() {
@@ -103,6 +131,7 @@ wait_for_health() {
 }
 
 main() {
+  parse_args "$@"
   command_exists systemctl || fail "systemctl was not found. This script expects Ubuntu with systemd."
   command_exists curl || true
 
@@ -130,10 +159,27 @@ main() {
     fail "Service started but health check did not become ready in time."
   fi
 
+  if [ -n "$CLOUDFLARE_TUNNEL_NAME" ]; then
+    log "Installing Cloudflare Tunnel autorun (${CLOUDFLARE_TUNNEL_NAME})"
+    local cf_args=(
+      --tunnel-name "$CLOUDFLARE_TUNNEL_NAME"
+      --service-name "$CLOUDFLARE_SERVICE_NAME"
+      --user "$service_user"
+    )
+    if [ -n "$CLOUDFLARE_CONFIG_PATH" ]; then
+      cf_args+=(--config "$CLOUDFLARE_CONFIG_PATH")
+    fi
+    bash "$ROOT_DIR/scripts/ubuntu-cloudflared-service-install.sh" "${cf_args[@]}"
+  fi
+
   log "Ubuntu autorun setup completed."
   log "App URL: http://127.0.0.1:${api_port}/"
   log "Status: sudo systemctl status ${SERVICE_NAME}"
   log "Logs:   sudo journalctl -u ${SERVICE_NAME} -f"
+  if [ -n "$CLOUDFLARE_TUNNEL_NAME" ]; then
+    log "Tunnel: sudo systemctl status ${CLOUDFLARE_SERVICE_NAME}"
+    log "Tunnel logs: sudo journalctl -u ${CLOUDFLARE_SERVICE_NAME} -f"
+  fi
   log "Remove: bash ./scripts/ubuntu-service-remove.sh"
 }
 
