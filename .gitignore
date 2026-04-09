@@ -48,3 +48,8 @@ credentials/*.json
 .env
 logs/
 vite.config.ts.timestamp-*.mjs
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.env
